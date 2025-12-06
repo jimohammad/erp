@@ -26,7 +26,7 @@ export interface IStorage {
   getSupplier(id: number): Promise<Supplier | undefined>;
   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
   updateSupplier(id: number, supplier: InsertSupplier): Promise<Supplier | undefined>;
-  deleteSupplier(id: number): Promise<boolean>;
+  deleteSupplier(id: number): Promise<{ deleted: boolean; error?: string }>;
 
   getItems(): Promise<Item[]>;
   getItem(id: number): Promise<Item | undefined>;
@@ -100,9 +100,21 @@ export class DatabaseStorage implements IStorage {
     return updated || undefined;
   }
 
-  async deleteSupplier(id: number): Promise<boolean> {
+  async deleteSupplier(id: number): Promise<{ deleted: boolean; error?: string }> {
+    const linkedOrders = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.supplierId, id));
+    
+    if (linkedOrders[0].count > 0) {
+      return { 
+        deleted: false, 
+        error: `Cannot delete supplier: ${linkedOrders[0].count} purchase order(s) are linked to this supplier` 
+      };
+    }
+    
     const result = await db.delete(suppliers).where(eq(suppliers.id, id)).returning();
-    return result.length > 0;
+    return { deleted: result.length > 0 };
   }
 
   async getItems(): Promise<Item[]> {

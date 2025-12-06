@@ -75,8 +75,11 @@ export async function registerRoutes(
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid supplier ID" });
       }
-      const deleted = await storage.deleteSupplier(id);
-      if (!deleted) {
+      const result = await storage.deleteSupplier(id);
+      if (result.error) {
+        return res.status(409).json({ error: result.error });
+      }
+      if (!result.deleted) {
         return res.status(404).json({ error: "Supplier not found" });
       }
       res.status(204).send();

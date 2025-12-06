@@ -65,13 +65,20 @@ export default function Home() {
   });
 
   const deleteSupplierMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/suppliers/${id}`),
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/suppliers/${id}`, { method: "DELETE", credentials: "include" });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete supplier");
+      }
+      return response;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       toast({ title: "Supplier deleted successfully" });
     },
-    onError: () => {
-      toast({ title: "Failed to delete supplier", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: error.message, variant: "destructive" });
     },
   });
 
@@ -99,13 +106,20 @@ export default function Home() {
   });
 
   const deleteItemMutation = useMutation({
-    mutationFn: (id: number) => apiRequest("DELETE", `/api/items/${id}`),
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/items/${id}`, { method: "DELETE", credentials: "include" });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete item");
+      }
+      return response;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/items"] });
       toast({ title: "Item deleted successfully" });
     },
-    onError: () => {
-      toast({ title: "Failed to delete item", variant: "destructive" });
+    onError: (error: Error) => {
+      toast({ title: error.message, variant: "destructive" });
     },
   });
 
