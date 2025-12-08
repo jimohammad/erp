@@ -220,7 +220,7 @@ export function SalesReportingSection({
           {isStatsLoading ? (
             <Skeleton className="h-[200px] w-full" />
           ) : (
-            <MonthlyChart stats={monthlyStats} title="Monthly Sales Revenue" />
+            <MonthlyChart data={monthlyStats} isLoading={isStatsLoading} title="Monthly Sales" />
           )}
         </div>
 

@@ -11,15 +11,16 @@ interface MonthlyStats {
 interface MonthlyChartProps {
   data: MonthlyStats[];
   isLoading: boolean;
+  title?: string;
 }
 
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export function MonthlyChart({ data, isLoading }: MonthlyChartProps) {
+export function MonthlyChart({ data, isLoading, title = "Monthly Purchases" }: MonthlyChartProps) {
   const chartData = useMemo(() => {
     const monthMap = new Map<number, { totalKwd: number; totalFx: number }>();
     
-    data.forEach(item => {
+    (data || []).forEach(item => {
       monthMap.set(item.month, {
         totalKwd: item.totalKwd,
         totalFx: item.totalFx,
@@ -41,7 +42,7 @@ export function MonthlyChart({ data, isLoading }: MonthlyChartProps) {
   if (isLoading) {
     return (
       <div className="bg-muted/50 rounded-lg p-4">
-        <p className="text-xs text-muted-foreground mb-2">Monthly Purchases (KWD & FX)</p>
+        <p className="text-xs text-muted-foreground mb-2">{title} (KWD & FX)</p>
         <div className="h-[200px] flex items-center justify-center">
           <div className="animate-pulse text-muted-foreground text-sm">Loading chart...</div>
         </div>
@@ -52,7 +53,7 @@ export function MonthlyChart({ data, isLoading }: MonthlyChartProps) {
   return (
     <div className="bg-muted/50 rounded-lg p-4">
       <p className="text-xs text-muted-foreground mb-2">
-        Monthly Purchases (KWD & FX) — grouped by month
+        {title} (KWD & FX) — grouped by month
       </p>
       <div className="h-[200px]" data-testid="chart-monthly">
         <ResponsiveContainer width="100%" height="100%">
