@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, insertLineItemSchema } from "@shared/schema";
+import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, insertLineItemSchema, insertCustomerSchema, insertSalesOrderSchema, insertSalesLineItemSchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
 
@@ -233,6 +233,158 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching monthly stats:", error);
       res.status(500).json({ error: "Failed to fetch monthly stats" });
+    }
+  });
+
+  // ==================== SALES MODULE ====================
+
+  app.get("/api/customers", isAuthenticated, async (req, res) => {
+    try {
+      const customers = await storage.getCustomers();
+      res.json(customers);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      res.status(500).json({ error: "Failed to fetch customers" });
+    }
+  });
+
+  app.post("/api/customers", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const parsed = insertCustomerSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const customer = await storage.createCustomer(parsed.data);
+      res.status(201).json(customer);
+    } catch (error) {
+      console.error("Error creating customer:", error);
+      res.status(500).json({ error: "Failed to create customer" });
+    }
+  });
+
+  app.put("/api/customers/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid customer ID" });
+      }
+      const parsed = insertCustomerSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const customer = await storage.updateCustomer(id, parsed.data);
+      if (!customer) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+      res.json(customer);
+    } catch (error) {
+      console.error("Error updating customer:", error);
+      res.status(500).json({ error: "Failed to update customer" });
+    }
+  });
+
+  app.delete("/api/customers/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid customer ID" });
+      }
+      const result = await storage.deleteCustomer(id);
+      if (result.error) {
+        return res.status(409).json({ error: result.error });
+      }
+      if (!result.deleted) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      res.status(500).json({ error: "Failed to delete customer" });
+    }
+  });
+
+  app.get("/api/sales-orders", isAuthenticated, async (req, res) => {
+    try {
+      const orders = await storage.getSalesOrders();
+      res.json(orders);
+    } catch (error) {
+      console.error("Error fetching sales orders:", error);
+      res.status(500).json({ error: "Failed to fetch sales orders" });
+    }
+  });
+
+  app.get("/api/sales-orders/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid order ID" });
+      }
+      const order = await storage.getSalesOrder(id);
+      if (!order) {
+        return res.status(404).json({ error: "Sales order not found" });
+      }
+      res.json(order);
+    } catch (error) {
+      console.error("Error fetching sales order:", error);
+      res.status(500).json({ error: "Failed to fetch sales order" });
+    }
+  });
+
+  app.post("/api/sales-orders", isAuthenticated, async (req: any, res) => {
+    try {
+      const { lineItems, ...orderData } = req.body;
+      const userId = req.user?.claims?.sub;
+      
+      const order = await storage.createSalesOrder(
+        {
+          saleDate: orderData.saleDate,
+          invoiceNumber: orderData.invoiceNumber,
+          customerId: orderData.customerId,
+          totalKwd: orderData.totalKwd,
+          fxCurrency: orderData.fxCurrency,
+          fxRate: orderData.fxRate,
+          totalFx: orderData.totalFx,
+          invoiceFilePath: orderData.invoiceFilePath,
+          deliveryNoteFilePath: orderData.deliveryNoteFilePath,
+          paymentReceiptFilePath: orderData.paymentReceiptFilePath,
+          deliveryDate: orderData.deliveryDate,
+          createdBy: userId,
+        },
+        lineItems || []
+      );
+      
+      res.status(201).json(order);
+    } catch (error) {
+      console.error("Error creating sales order:", error);
+      res.status(500).json({ error: "Failed to create sales order" });
+    }
+  });
+
+  app.delete("/api/sales-orders/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid order ID" });
+      }
+      const deleted = await storage.deleteSalesOrder(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Sales order not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting sales order:", error);
+      res.status(500).json({ error: "Failed to delete sales order" });
+    }
+  });
+
+  app.get("/api/sales-stats/monthly", isAuthenticated, async (req, res) => {
+    try {
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+      const stats = await storage.getSalesMonthlyStats(year);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching sales monthly stats:", error);
+      res.status(500).json({ error: "Failed to fetch sales monthly stats" });
     }
   });
 
