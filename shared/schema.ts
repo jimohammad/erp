@@ -195,10 +195,15 @@ export type SalesOrderWithDetails = SalesOrder & {
 export const PAYMENT_TYPES = ["Cash", "NBK Bank", "CBK Bank", "Knet", "Wamd"] as const;
 export type PaymentType = typeof PAYMENT_TYPES[number];
 
+export const PAYMENT_DIRECTIONS = ["IN", "OUT"] as const;
+export type PaymentDirection = typeof PAYMENT_DIRECTIONS[number];
+
 export const payments = pgTable("payments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   paymentDate: date("payment_date").notNull(),
+  direction: text("direction").notNull().default("IN"),
   customerId: integer("customer_id").references(() => customers.id),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
   paymentType: text("payment_type").notNull(),
   amount: numeric("amount", { precision: 12, scale: 3 }).notNull(),
   reference: text("reference"),
@@ -212,6 +217,10 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
     fields: [payments.customerId],
     references: [customers.id],
   }),
+  supplier: one(suppliers, {
+    fields: [payments.supplierId],
+    references: [suppliers.id],
+  }),
 }));
 
 export const insertPaymentSchema = createInsertSchema(payments).omit({ 
@@ -221,6 +230,7 @@ export const insertPaymentSchema = createInsertSchema(payments).omit({
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof payments.$inferSelect;
 
-export type PaymentWithCustomer = Payment & {
+export type PaymentWithDetails = Payment & {
   customer: Customer | null;
+  supplier: Supplier | null;
 };

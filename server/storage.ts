@@ -26,7 +26,7 @@ import {
   type SalesOrderWithDetails,
   type Payment,
   type InsertPayment,
-  type PaymentWithCustomer,
+  type PaymentWithDetails,
   type User,
   type UpsertUser,
 } from "@shared/schema";
@@ -71,9 +71,9 @@ export interface IStorage {
   getSalesMonthlyStats(year?: number): Promise<{ month: number; totalKwd: number; totalFx: number }[]>;
 
   // Payment Module
-  getPayments(): Promise<PaymentWithCustomer[]>;
-  getPayment(id: number): Promise<PaymentWithCustomer | undefined>;
-  createPayment(payment: InsertPayment): Promise<PaymentWithCustomer>;
+  getPayments(): Promise<PaymentWithDetails[]>;
+  getPayment(id: number): Promise<PaymentWithDetails | undefined>;
+  createPayment(payment: InsertPayment): Promise<PaymentWithDetails>;
   deletePayment(id: number): Promise<boolean>;
 }
 
@@ -358,29 +358,31 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== PAYMENT MODULE ====================
 
-  async getPayments(): Promise<PaymentWithCustomer[]> {
+  async getPayments(): Promise<PaymentWithDetails[]> {
     const paymentList = await db.query.payments.findMany({
       with: {
         customer: true,
+        supplier: true,
       },
       orderBy: [desc(payments.paymentDate), desc(payments.id)],
     });
     return paymentList;
   }
 
-  async getPayment(id: number): Promise<PaymentWithCustomer | undefined> {
+  async getPayment(id: number): Promise<PaymentWithDetails | undefined> {
     const payment = await db.query.payments.findFirst({
       where: eq(payments.id, id),
       with: {
         customer: true,
+        supplier: true,
       },
     });
     return payment || undefined;
   }
 
-  async createPayment(payment: InsertPayment): Promise<PaymentWithCustomer> {
+  async createPayment(payment: InsertPayment): Promise<PaymentWithDetails> {
     const [newPayment] = await db.insert(payments).values(payment).returning();
-    return this.getPayment(newPayment.id) as Promise<PaymentWithCustomer>;
+    return this.getPayment(newPayment.id) as Promise<PaymentWithDetails>;
   }
 
   async deletePayment(id: number): Promise<boolean> {
