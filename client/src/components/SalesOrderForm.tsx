@@ -6,7 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, RotateCcw, Save, Loader2 } from "lucide-react";
 import { SalesLineItemRow, type SalesLineItemData } from "./SalesLineItemRow";
-import { FileUploadField } from "./FileUploadField";
 import type { Customer, Item } from "@shared/schema";
 
 interface SalesOrderFormProps {
@@ -21,9 +20,6 @@ export interface SalesFormData {
   invoiceNumber: string;
   customerId: number | null;
   totalKwd: string;
-  invoiceFile: File | null;
-  deliveryNoteFile: File | null;
-  paymentReceiptFile: File | null;
   lineItems: SalesLineItemData[];
 }
 
@@ -40,9 +36,6 @@ export function SalesOrderForm({
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split("T")[0]);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [customerId, setCustomerId] = useState<string>("");
-  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
-  const [deliveryNoteFile, setDeliveryNoteFile] = useState<File | null>(null);
-  const [paymentReceiptFile, setPaymentReceiptFile] = useState<File | null>(null);
   const [lineItems, setLineItems] = useState<SalesLineItemData[]>([
     { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", totalKwd: "0.000", imeiNumbers: [] },
   ]);
@@ -90,9 +83,6 @@ export function SalesOrderForm({
     setSaleDate(new Date().toISOString().split("T")[0]);
     setInvoiceNumber("");
     setCustomerId("");
-    setInvoiceFile(null);
-    setDeliveryNoteFile(null);
-    setPaymentReceiptFile(null);
     setLineItems([
       { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", totalKwd: "0.000", imeiNumbers: [] },
     ]);
@@ -106,9 +96,6 @@ export function SalesOrderForm({
       invoiceNumber,
       customerId: customerId ? parseInt(customerId) : null,
       totalKwd,
-      invoiceFile,
-      deliveryNoteFile,
-      paymentReceiptFile,
       lineItems,
     });
 
@@ -212,27 +199,6 @@ export function SalesOrderForm({
                 {totalKwd} KWD
               </p>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <FileUploadField
-              label="Invoice"
-              value={invoiceFile}
-              onChange={setInvoiceFile}
-              testId="input-sales-invoice-file"
-            />
-            <FileUploadField
-              label="Delivery Note"
-              value={deliveryNoteFile}
-              onChange={setDeliveryNoteFile}
-              testId="input-sales-delivery-file"
-            />
-            <FileUploadField
-              label="Payment Receipt"
-              value={paymentReceiptFile}
-              onChange={setPaymentReceiptFile}
-              testId="input-payment-receipt-file"
-            />
           </div>
 
           <div className="flex justify-end">

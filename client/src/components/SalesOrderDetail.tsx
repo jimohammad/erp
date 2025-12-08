@@ -2,7 +2,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Truck, CreditCard, ExternalLink, Smartphone } from "lucide-react";
+import { Printer, Smartphone } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
 import type { SalesOrderWithDetails } from "@shared/schema";
 
 interface SalesOrderDetailProps {
@@ -32,13 +33,153 @@ export function SalesOrderDetail({
     return Number(value).toFixed(decimals);
   };
 
-  const hasDocuments = order.invoiceFilePath || order.deliveryNoteFilePath || order.paymentReceiptFilePath;
+  const handlePrint = () => {
+    const printContent = document.getElementById("sales-invoice-print-content");
+    if (!printContent) return;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Sales Invoice - ${order.invoiceNumber || order.id}</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .header h1 { margin: 0; font-size: 24px; }
+            .header p { margin: 5px 0; color: #666; }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+            .info-item { }
+            .info-label { font-size: 12px; color: #666; margin-bottom: 2px; }
+            .info-value { font-weight: 600; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+            th { background: #f5f5f5; font-weight: 600; }
+            .total-row { background: #f9f9f9; }
+            .total-label { font-weight: 600; }
+            .imei-list { font-size: 11px; color: #666; margin-top: 5px; }
+            .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #999; }
+            @media print { body { padding: 0; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>SALES INVOICE</h1>
+            <p>Iqbal Electronics Co. WLL</p>
+          </div>
+          <div class="info-grid">
+            <div class="info-item">
+              <div class="info-label">Invoice Number</div>
+              <div class="info-value">${order.invoiceNumber || "—"}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Sale Date</div>
+              <div class="info-value">${formatDate(order.saleDate)}</div>
+            </div>
+            <div class="info-item">
+              <div class="info-label">Customer</div>
+              <div class="info-value">${order.customer?.name || "—"}</div>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Price (KWD)</th>
+                <th>Total (KWD)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${order.lineItems.map((item, index) => `
+                <tr>
+                  <td>${index + 1}</td>
+                  <td>
+                    ${item.itemName}
+                    ${item.imeiNumbers && item.imeiNumbers.length > 0 
+                      ? `<div class="imei-list">IMEI: ${item.imeiNumbers.join(", ")}</div>` 
+                      : ""}
+                  </td>
+                  <td>${item.quantity}</td>
+                  <td>${formatNumber(item.priceKwd, 3)}</td>
+                  <td>${formatNumber(item.totalKwd, 3)}</td>
+                </tr>
+              `).join("")}
+              <tr class="total-row">
+                <td colspan="4" class="total-label">Total</td>
+                <td><strong>${formatNumber(order.totalKwd, 3)} KWD</strong></td>
+              </tr>
+            </tbody>
+          </table>
+          <div class="footer">
+            Thank you for your business!
+          </div>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+    printWindow.close();
+  };
+
+  const handleWhatsAppShare = () => {
+    const lineItemsText = order.lineItems.map((item, index) => {
+      let text = `${index + 1}. ${item.itemName} - Qty: ${item.quantity} - ${formatNumber(item.totalKwd, 3)} KWD`;
+      if (item.imeiNumbers && item.imeiNumbers.length > 0) {
+        text += `\n   IMEI: ${item.imeiNumbers.join(", ")}`;
+      }
+      return text;
+    }).join("\n");
+
+    const message = `*SALES INVOICE*
+Iqbal Electronics Co. WLL
+
+Invoice No: ${order.invoiceNumber || "—"}
+Date: ${formatDate(order.saleDate)}
+Customer: ${order.customer?.name || "—"}
+
+*Items:*
+${lineItemsText}
+
+*Total: ${formatNumber(order.totalKwd, 3)} KWD*
+
+Thank you for your business!`;
+
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/?text=${encodedMessage}`, "_blank");
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="flex flex-row items-center justify-between">
+        <DialogHeader className="flex flex-row items-center justify-between gap-4">
           <DialogTitle data-testid="dialog-title-so-detail">Sales Invoice Details</DialogTitle>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrint}
+              data-testid="button-print-invoice"
+            >
+              <Printer className="h-4 w-4 mr-1" />
+              Print
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleWhatsAppShare}
+              className="text-green-600 hover:text-green-700"
+              data-testid="button-whatsapp-share"
+            >
+              <SiWhatsapp className="h-4 w-4 mr-1" />
+              Share
+            </Button>
+          </div>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
@@ -127,59 +268,6 @@ export function SalesOrderDetail({
               <p className="text-xs text-muted-foreground mb-1">Delivery Date</p>
               <p className="font-medium" data-testid="text-so-delivery">{formatDate(order.deliveryDate)}</p>
             </div>
-          )}
-
-          {hasDocuments && (
-            <>
-              <Separator />
-              <div>
-                <p className="text-xs text-muted-foreground mb-2">Attached Documents</p>
-                <div className="flex flex-wrap gap-2">
-                  {order.invoiceFilePath && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                      data-testid="button-view-sales-invoice"
-                    >
-                      <a href={order.invoiceFilePath} target="_blank" rel="noopener noreferrer">
-                        <FileText className="h-4 w-4 mr-1" />
-                        Invoice
-                        <ExternalLink className="h-3 w-3 ml-1" />
-                      </a>
-                    </Button>
-                  )}
-                  {order.deliveryNoteFilePath && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                      data-testid="button-view-sales-delivery"
-                    >
-                      <a href={order.deliveryNoteFilePath} target="_blank" rel="noopener noreferrer">
-                        <Truck className="h-4 w-4 mr-1" />
-                        Delivery Note
-                        <ExternalLink className="h-3 w-3 ml-1" />
-                      </a>
-                    </Button>
-                  )}
-                  {order.paymentReceiptFilePath && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      asChild
-                      data-testid="button-view-payment-receipt"
-                    >
-                      <a href={order.paymentReceiptFilePath} target="_blank" rel="noopener noreferrer">
-                        <CreditCard className="h-4 w-4 mr-1" />
-                        Payment Receipt
-                        <ExternalLink className="h-3 w-3 ml-1" />
-                      </a>
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </>
           )}
         </div>
       </DialogContent>

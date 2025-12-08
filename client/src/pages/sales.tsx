@@ -76,53 +76,11 @@ export default function SalesPage() {
 
   const createSOMutation = useMutation({
     mutationFn: async (formData: SalesFormData) => {
-      let invoiceFilePath = null;
-      let deliveryNoteFilePath = null;
-      let paymentReceiptFilePath = null;
-
-      const uploadFile = async (file: File): Promise<string | null> => {
-        if (!file) return null;
-        try {
-          const response = await apiRequest("POST", "/api/objects/upload");
-          const { uploadURL } = response as { uploadURL: string };
-
-          await fetch(uploadURL, {
-            method: "PUT",
-            body: file,
-            headers: {
-              "Content-Type": file.type,
-            },
-          });
-
-          const updateResponse = await apiRequest("PUT", "/api/files/uploaded", {
-            uploadURL,
-          });
-          return (updateResponse as { objectPath: string }).objectPath;
-        } catch (error) {
-          console.error("Upload failed:", error);
-          return null;
-        }
-      };
-
-      if (formData.invoiceFile) {
-        invoiceFilePath = await uploadFile(formData.invoiceFile);
-      }
-      if (formData.deliveryNoteFile) {
-        deliveryNoteFilePath = await uploadFile(formData.deliveryNoteFile);
-      }
-      if (formData.paymentReceiptFile) {
-        paymentReceiptFilePath = await uploadFile(formData.paymentReceiptFile);
-      }
-
       const payload = {
         saleDate: formData.saleDate,
         invoiceNumber: formData.invoiceNumber || null,
         customerId: formData.customerId,
         totalKwd: formData.totalKwd,
-        deliveryDate: formData.deliveryDate || null,
-        invoiceFilePath,
-        deliveryNoteFilePath,
-        paymentReceiptFilePath,
         lineItems: formData.lineItems
           .filter(item => item.itemName)
           .map(item => ({
