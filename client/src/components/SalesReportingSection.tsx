@@ -203,7 +203,7 @@ export function SalesReportingSection({
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 rounded-md bg-muted/50">
-            <p className="text-xs text-muted-foreground mb-1">Total Orders</p>
+            <p className="text-xs text-muted-foreground mb-1">Total Invoices</p>
             <p className="text-2xl font-semibold" data-testid="text-sales-kpi-count">{kpis.count}</p>
           </div>
           <div className="p-4 rounded-md bg-muted/50">
@@ -225,7 +225,7 @@ export function SalesReportingSection({
         </div>
 
         <div>
-          <h3 className="text-sm font-medium mb-3">Sales Order Register</h3>
+          <h3 className="text-sm font-medium mb-3">Sales Invoice Register</h3>
           {isLoading ? (
             <div className="space-y-2">
               {[1, 2, 3].map(i => (
@@ -234,8 +234,8 @@ export function SalesReportingSection({
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              <p>No sales orders found.</p>
-              <p className="text-xs mt-1">Try adjusting your filters or create a new sales order.</p>
+              <p>No sales invoices found.</p>
+              <p className="text-xs mt-1">Try adjusting your filters or create a new sales invoice.</p>
             </div>
           ) : (
             <ScrollArea className="h-[400px] print:h-auto">
@@ -296,7 +296,7 @@ export function SalesReportingSection({
                           variant="ghost"
                           size="icon"
                           onClick={() => onDeleteOrder(order.id)}
-                          title="Delete order"
+                          title="Delete invoice"
                           data-testid={`button-delete-sales-order-${order.id}`}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />

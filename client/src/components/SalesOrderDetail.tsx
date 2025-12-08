@@ -37,7 +37,7 @@ export function SalesOrderDetail({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle data-testid="dialog-title-so-detail">Sales Order Details</DialogTitle>
+          <DialogTitle data-testid="dialog-title-so-detail">Sales Invoice Details</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-2">

@@ -186,10 +186,10 @@ export default function SalesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sales-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sales-stats/monthly"] });
-      toast({ title: "Sales order saved successfully" });
+      toast({ title: "Sales invoice saved successfully" });
     },
     onError: () => {
-      toast({ title: "Failed to save sales order", variant: "destructive" });
+      toast({ title: "Failed to save sales invoice", variant: "destructive" });
     },
   });
 
@@ -198,10 +198,10 @@ export default function SalesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sales-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sales-stats/monthly"] });
-      toast({ title: "Sales order deleted successfully" });
+      toast({ title: "Sales invoice deleted successfully" });
     },
     onError: () => {
-      toast({ title: "Failed to delete sales order", variant: "destructive" });
+      toast({ title: "Failed to delete sales invoice", variant: "destructive" });
     },
   });
 

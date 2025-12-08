@@ -43,7 +43,7 @@ function AppSidebar() {
       title: "Sales",
       url: "/sales",
       icon: TrendingUp,
-      description: "Manage sales orders",
+      description: "Manage sales invoices",
     },
   ];
 
@@ -126,7 +126,7 @@ function AuthenticatedLayout() {
       case "/":
         return "Purchase Order Register";
       case "/sales":
-        return "Sales Order Register";
+        return "Sales Invoice Register";
       default:
         return "";
     }

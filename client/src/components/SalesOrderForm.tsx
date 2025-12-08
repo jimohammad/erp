@@ -149,7 +149,7 @@ export function SalesOrderForm({
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
-        <CardTitle className="text-lg font-semibold">New Sales Entry</CardTitle>
+        <CardTitle className="text-lg font-semibold">New Sales Invoice</CardTitle>
         <div className="flex gap-2">
           <Button 
             variant="outline" 
@@ -365,7 +365,7 @@ export function SalesOrderForm({
               ) : (
                 <>
                   <Save className="h-4 w-4 mr-2" />
-                  Save Sales Order
+                  Save Invoice
                 </>
               )}
             </Button>
