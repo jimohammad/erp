@@ -205,26 +205,6 @@ export default function Home() {
     },
   });
 
-  const handleAddSupplier = () => {
-    setSupplierDialogMode("add");
-    setSupplierDialogOpen(true);
-  };
-
-  const handleEditSuppliers = () => {
-    setSupplierDialogMode("edit");
-    setSupplierDialogOpen(true);
-  };
-
-  const handleAddItem = () => {
-    setItemDialogMode("add");
-    setItemDialogOpen(true);
-  };
-
-  const handleEditItems = () => {
-    setItemDialogMode("edit");
-    setItemDialogOpen(true);
-  };
-
   const handleViewOrder = (order: PurchaseOrderWithDetails) => {
     setSelectedOrder(order);
     setDetailDialogOpen(true);
@@ -240,13 +220,8 @@ export default function Home() {
         <PurchaseOrderForm
           suppliers={suppliers}
           items={items}
-          onAddSupplier={handleAddSupplier}
-          onEditSuppliers={handleEditSuppliers}
-          onAddItem={handleAddItem}
-          onEditItems={handleEditItems}
           onSubmit={handleSubmitPO}
           isSubmitting={createPOMutation.isPending}
-          isAdmin={user?.role === "admin"}
         />
       </section>
 

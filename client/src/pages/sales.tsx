@@ -202,26 +202,6 @@ export default function SalesPage() {
     },
   });
 
-  const handleAddCustomer = () => {
-    setCustomerDialogMode("add");
-    setCustomerDialogOpen(true);
-  };
-
-  const handleEditCustomers = () => {
-    setCustomerDialogMode("edit");
-    setCustomerDialogOpen(true);
-  };
-
-  const handleAddItem = () => {
-    setItemDialogMode("add");
-    setItemDialogOpen(true);
-  };
-
-  const handleEditItems = () => {
-    setItemDialogMode("edit");
-    setItemDialogOpen(true);
-  };
-
   const handleViewOrder = (order: SalesOrderWithDetails) => {
     setSelectedOrder(order);
     setDetailDialogOpen(true);
@@ -237,13 +217,8 @@ export default function SalesPage() {
         <SalesOrderForm
           customers={customers}
           items={items}
-          onAddCustomer={handleAddCustomer}
-          onEditCustomers={handleEditCustomers}
-          onAddItem={handleAddItem}
-          onEditItems={handleEditItems}
           onSubmit={handleSubmitSO}
           isSubmitting={createSOMutation.isPending}
-          isAdmin={user?.role === "admin"}
         />
       </section>
 

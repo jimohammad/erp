@@ -12,13 +12,8 @@ import type { Customer, Item } from "@shared/schema";
 interface SalesOrderFormProps {
   customers: Customer[];
   items: Item[];
-  onAddCustomer: () => void;
-  onEditCustomers: () => void;
-  onAddItem: () => void;
-  onEditItems: () => void;
   onSubmit: (data: SalesFormData) => Promise<void>;
   isSubmitting: boolean;
-  isAdmin?: boolean;
 }
 
 export interface SalesFormData {
@@ -26,7 +21,6 @@ export interface SalesFormData {
   invoiceNumber: string;
   customerId: number | null;
   totalKwd: string;
-  deliveryDate: string;
   invoiceFile: File | null;
   deliveryNoteFile: File | null;
   paymentReceiptFile: File | null;
@@ -40,18 +34,12 @@ function generateItemId() {
 export function SalesOrderForm({
   customers,
   items,
-  onAddCustomer,
-  onEditCustomers,
-  onAddItem,
-  onEditItems,
   onSubmit,
   isSubmitting,
-  isAdmin = false,
 }: SalesOrderFormProps) {
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split("T")[0]);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [customerId, setCustomerId] = useState<string>("");
-  const [deliveryDate, setDeliveryDate] = useState("");
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
   const [deliveryNoteFile, setDeliveryNoteFile] = useState<File | null>(null);
   const [paymentReceiptFile, setPaymentReceiptFile] = useState<File | null>(null);
@@ -102,7 +90,6 @@ export function SalesOrderForm({
     setSaleDate(new Date().toISOString().split("T")[0]);
     setInvoiceNumber("");
     setCustomerId("");
-    setDeliveryDate("");
     setInvoiceFile(null);
     setDeliveryNoteFile(null);
     setPaymentReceiptFile(null);
@@ -119,7 +106,6 @@ export function SalesOrderForm({
       invoiceNumber,
       customerId: customerId ? parseInt(customerId) : null,
       totalKwd,
-      deliveryDate,
       invoiceFile,
       deliveryNoteFile,
       paymentReceiptFile,
@@ -186,73 +172,12 @@ export function SalesOrderForm({
                     ))}
                   </SelectContent>
                 </Select>
-                {isAdmin && (
-                  <div className="flex gap-1">
-                    <Button 
-                      type="button" 
-                      size="icon" 
-                      variant="outline"
-                      onClick={onAddCustomer}
-                      title="Add new customer"
-                      data-testid="button-add-customer"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      type="button" 
-                      size="sm" 
-                      variant="outline"
-                      onClick={onEditCustomers}
-                      data-testid="button-manage-customers"
-                    >
-                      Manage
-                    </Button>
-                  </div>
-                )}
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="deliveryDate">Delivery Date</Label>
-              <Input
-                id="deliveryDate"
-                type="date"
-                value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-                data-testid="input-delivery-date"
-              />
-            </div>
-          </div>
-
           <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label>Line Items</Label>
-              {isAdmin && (
-                <div className="flex gap-2">
-                  <Button 
-                    type="button" 
-                    size="sm" 
-                    variant="outline"
-                    onClick={onAddItem}
-                    data-testid="button-add-sales-item"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Item
-                  </Button>
-                  <Button 
-                    type="button" 
-                    size="sm" 
-                    variant="outline"
-                    onClick={onEditItems}
-                    data-testid="button-manage-sales-items"
-                  >
-                    Manage Items
-                  </Button>
-                </div>
-              )}
-            </div>
+            <Label>Line Items</Label>
             
             <div className="space-y-2">
               {lineItems.map((item, index) => (

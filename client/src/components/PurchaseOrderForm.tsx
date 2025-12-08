@@ -13,13 +13,8 @@ import type { Supplier, Item } from "@shared/schema";
 interface PurchaseOrderFormProps {
   suppliers: Supplier[];
   items: Item[];
-  onAddSupplier: () => void;
-  onEditSuppliers: () => void;
-  onAddItem: () => void;
-  onEditItems: () => void;
   onSubmit: (data: FormData) => Promise<void>;
   isSubmitting: boolean;
-  isAdmin?: boolean;
 }
 
 export interface FormData {
@@ -44,13 +39,8 @@ function generateItemId() {
 export function PurchaseOrderForm({
   suppliers,
   items,
-  onAddSupplier,
-  onEditSuppliers,
-  onAddItem,
-  onEditItems,
   onSubmit,
   isSubmitting,
-  isAdmin = false,
 }: PurchaseOrderFormProps) {
   const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0]);
   const [invoiceNumber, setInvoiceNumber] = useState("");
@@ -225,58 +215,10 @@ export function PurchaseOrderForm({
                   ))}
                 </SelectContent>
               </Select>
-              {isAdmin && (
-                <>
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={onAddSupplier}
-                    className="bg-emerald-600 hover:bg-emerald-700"
-                    data-testid="button-add-supplier"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Supplier
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="secondary"
-                    onClick={onEditSuppliers}
-                    className="bg-amber-500 hover:bg-amber-600 text-white"
-                    data-testid="button-edit-suppliers"
-                  >
-                    Edit
-                  </Button>
-                </>
-              )}
             </div>
           </div>
 
           <div className="space-y-2">
-            {isAdmin && (
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={onAddItem}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-xs"
-                  data-testid="button-add-item-master"
-                >
-                  <Plus className="h-3 w-3 mr-1" />
-                  Item master
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={onEditItems}
-                  className="bg-amber-500 hover:bg-amber-600 text-white text-xs"
-                  data-testid="button-edit-items"
-                >
-                  Edit item
-                </Button>
-              </div>
-            )}
             <div className="border border-border rounded-lg overflow-x-auto">
               <table className="min-w-full text-xs">
                 <thead className="bg-muted/50">
