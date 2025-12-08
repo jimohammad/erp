@@ -23,6 +23,7 @@ interface SalesLineItemRowProps {
   onChange: (id: string, field: keyof SalesLineItemData, value: string | number | string[]) => void;
   onRemove: (id: string) => void;
   canRemove: boolean;
+  allImeiNumbers: string[];
 }
 
 export function SalesLineItemRow({
@@ -32,9 +33,11 @@ export function SalesLineItemRow({
   onChange,
   onRemove,
   canRemove,
+  allImeiNumbers,
 }: SalesLineItemRowProps) {
   const [imeiDialogOpen, setImeiDialogOpen] = useState(false);
   const [newImei, setNewImei] = useState("");
+  const [imeiError, setImeiError] = useState("");
 
   const handleQuantityChange = (value: string) => {
     const qty = parseInt(value) || 0;
@@ -45,12 +48,38 @@ export function SalesLineItemRow({
     onChange(item.id, "priceKwd", value);
   };
 
-  const handleAddImei = () => {
-    if (newImei.trim()) {
-      const updatedImeis = [...item.imeiNumbers, newImei.trim()];
-      onChange(item.id, "imeiNumbers", updatedImeis);
-      setNewImei("");
+  const validateImei = (imei: string): string | null => {
+    const trimmedImei = imei.trim();
+    
+    if (!/^\d+$/.test(trimmedImei)) {
+      return "IMEI must contain only digits";
     }
+    
+    if (trimmedImei.length !== 15) {
+      return "IMEI must be exactly 15 digits";
+    }
+    
+    if (allImeiNumbers.includes(trimmedImei)) {
+      return "This IMEI has already been added";
+    }
+    
+    return null;
+  };
+
+  const handleAddImei = () => {
+    const trimmedImei = newImei.trim();
+    if (!trimmedImei) return;
+
+    const error = validateImei(trimmedImei);
+    if (error) {
+      setImeiError(error);
+      return;
+    }
+
+    const updatedImeis = [...item.imeiNumbers, trimmedImei];
+    onChange(item.id, "imeiNumbers", updatedImeis);
+    setNewImei("");
+    setImeiError("");
   };
 
   const handleRemoveImei = (imeiIndex: number) => {
@@ -165,24 +194,38 @@ export function SalesLineItemRow({
           </DialogHeader>
           
           <div className="space-y-4 py-4">
-            <div className="flex gap-2">
-              <Input
-                value={newImei}
-                onChange={(e) => setNewImei(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Enter IMEI number"
-                className="flex-1"
-                data-testid={`input-new-imei-${index}`}
-              />
-              <Button
-                type="button"
-                onClick={handleAddImei}
-                disabled={!newImei.trim()}
-                data-testid={`button-add-imei-${index}`}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                Add
-              </Button>
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  value={newImei}
+                  onChange={(e) => {
+                    setNewImei(e.target.value);
+                    setImeiError("");
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Enter 15-digit IMEI number"
+                  className={`flex-1 font-mono ${imeiError ? "border-destructive" : ""}`}
+                  maxLength={15}
+                  data-testid={`input-new-imei-${index}`}
+                />
+                <Button
+                  type="button"
+                  onClick={handleAddImei}
+                  disabled={!newImei.trim()}
+                  data-testid={`button-add-imei-${index}`}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              </div>
+              {imeiError && (
+                <p className="text-sm text-destructive" data-testid={`text-imei-error-${index}`}>
+                  {imeiError}
+                </p>
+              )}
+              <p className="text-xs text-muted-foreground">
+                IMEI must be exactly 15 digits. Duplicates are not allowed.
+              </p>
             </div>
             
             {item.imeiNumbers.length === 0 ? (

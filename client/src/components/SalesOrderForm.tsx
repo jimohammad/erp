@@ -167,17 +167,21 @@ export function SalesOrderForm({
             <Label>Line Items</Label>
             
             <div className="space-y-2">
-              {lineItems.map((item, index) => (
-                <SalesLineItemRow
-                  key={item.id}
-                  item={item}
-                  items={items}
-                  index={index}
-                  onChange={handleLineItemChange}
-                  onRemove={handleRemoveRow}
-                  canRemove={lineItems.length > 1}
-                />
-              ))}
+              {lineItems.map((item, index) => {
+                const allImeiNumbers = lineItems.flatMap(li => li.imeiNumbers);
+                return (
+                  <SalesLineItemRow
+                    key={item.id}
+                    item={item}
+                    items={items}
+                    index={index}
+                    onChange={handleLineItemChange}
+                    onRemove={handleRemoveRow}
+                    canRemove={lineItems.length > 1}
+                    allImeiNumbers={allImeiNumbers}
+                  />
+                );
+              })}
             </div>
             
             <Button 
