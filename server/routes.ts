@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, insertLineItemSchema, insertCustomerSchema, insertSalesOrderSchema, insertSalesLineItemSchema, insertPaymentSchema, PAYMENT_TYPES, PAYMENT_DIRECTIONS } from "@shared/schema";
+import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, insertLineItemSchema, insertCustomerSchema, insertSalesOrderSchema, insertSalesLineItemSchema, insertPaymentSchema, PAYMENT_TYPES, PAYMENT_DIRECTIONS, insertExpenseCategorySchema, insertExpenseSchema, insertAccountTransferSchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
 
@@ -545,6 +545,217 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching customer report:", error);
       res.status(500).json({ error: "Failed to fetch customer report" });
+    }
+  });
+
+  // ==================== ACCOUNTS MODULE ====================
+
+  await storage.ensureDefaultAccounts();
+
+  app.get("/api/accounts", isAuthenticated, async (req, res) => {
+    try {
+      const accountList = await storage.getAccounts();
+      res.json(accountList);
+    } catch (error) {
+      console.error("Error fetching accounts:", error);
+      res.status(500).json({ error: "Failed to fetch accounts" });
+    }
+  });
+
+  app.get("/api/accounts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid account ID" });
+      }
+      const account = await storage.getAccount(id);
+      if (!account) {
+        return res.status(404).json({ error: "Account not found" });
+      }
+      res.json(account);
+    } catch (error) {
+      console.error("Error fetching account:", error);
+      res.status(500).json({ error: "Failed to fetch account" });
+    }
+  });
+
+  app.get("/api/accounts/:id/transactions", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid account ID" });
+      }
+      const { startDate, endDate } = req.query;
+      const transactions = await storage.getAccountTransactions(
+        id,
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+      res.json(transactions);
+    } catch (error) {
+      console.error("Error fetching account transactions:", error);
+      res.status(500).json({ error: "Failed to fetch account transactions" });
+    }
+  });
+
+  app.get("/api/account-transfers", isAuthenticated, async (req, res) => {
+    try {
+      const transfers = await storage.getAccountTransfers();
+      res.json(transfers);
+    } catch (error) {
+      console.error("Error fetching account transfers:", error);
+      res.status(500).json({ error: "Failed to fetch account transfers" });
+    }
+  });
+
+  app.post("/api/account-transfers", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const transferData = { ...req.body, createdBy: userId };
+      
+      if (transferData.fromAccountId === transferData.toAccountId) {
+        return res.status(400).json({ error: "Cannot transfer to the same account" });
+      }
+      
+      const parsed = insertAccountTransferSchema.safeParse(transferData);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const transfer = await storage.createAccountTransfer(parsed.data);
+      res.status(201).json(transfer);
+    } catch (error) {
+      console.error("Error creating account transfer:", error);
+      res.status(500).json({ error: "Failed to create account transfer" });
+    }
+  });
+
+  // ==================== EXPENSE MODULE ====================
+
+  app.get("/api/expense-categories", isAuthenticated, async (req, res) => {
+    try {
+      const categories = await storage.getExpenseCategories();
+      res.json(categories);
+    } catch (error) {
+      console.error("Error fetching expense categories:", error);
+      res.status(500).json({ error: "Failed to fetch expense categories" });
+    }
+  });
+
+  app.post("/api/expense-categories", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const parsed = insertExpenseCategorySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const category = await storage.createExpenseCategory(parsed.data);
+      res.status(201).json(category);
+    } catch (error) {
+      console.error("Error creating expense category:", error);
+      res.status(500).json({ error: "Failed to create expense category" });
+    }
+  });
+
+  app.put("/api/expense-categories/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid category ID" });
+      }
+      const parsed = insertExpenseCategorySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const category = await storage.updateExpenseCategory(id, parsed.data);
+      if (!category) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.json(category);
+    } catch (error) {
+      console.error("Error updating expense category:", error);
+      res.status(500).json({ error: "Failed to update expense category" });
+    }
+  });
+
+  app.delete("/api/expense-categories/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid category ID" });
+      }
+      const result = await storage.deleteExpenseCategory(id);
+      if (result.error) {
+        return res.status(409).json({ error: result.error });
+      }
+      if (!result.deleted) {
+        return res.status(404).json({ error: "Category not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting expense category:", error);
+      res.status(500).json({ error: "Failed to delete expense category" });
+    }
+  });
+
+  app.get("/api/expenses", isAuthenticated, async (req, res) => {
+    try {
+      const expenseList = await storage.getExpenses();
+      res.json(expenseList);
+    } catch (error) {
+      console.error("Error fetching expenses:", error);
+      res.status(500).json({ error: "Failed to fetch expenses" });
+    }
+  });
+
+  app.get("/api/expenses/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid expense ID" });
+      }
+      const expense = await storage.getExpense(id);
+      if (!expense) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      res.json(expense);
+    } catch (error) {
+      console.error("Error fetching expense:", error);
+      res.status(500).json({ error: "Failed to fetch expense" });
+    }
+  });
+
+  app.post("/api/expenses", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user?.claims?.sub;
+      const expenseData = { ...req.body, createdBy: userId };
+      
+      const parsed = insertExpenseSchema.safeParse(expenseData);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      
+      const expense = await storage.createExpense(parsed.data);
+      res.status(201).json(expense);
+    } catch (error) {
+      console.error("Error creating expense:", error);
+      res.status(500).json({ error: "Failed to create expense" });
+    }
+  });
+
+  app.delete("/api/expenses/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid expense ID" });
+      }
+      const deleted = await storage.deleteExpense(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Expense not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting expense:", error);
+      res.status(500).json({ error: "Failed to delete expense" });
     }
   });
 
