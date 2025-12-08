@@ -3,6 +3,9 @@ import {
   items, 
   purchaseOrders, 
   purchaseOrderLineItems,
+  customers,
+  salesOrders,
+  salesOrderLineItems,
   users,
   type Supplier, 
   type InsertSupplier,
@@ -13,6 +16,13 @@ import {
   type LineItem,
   type InsertLineItem,
   type PurchaseOrderWithDetails,
+  type Customer,
+  type InsertCustomer,
+  type SalesOrder,
+  type InsertSalesOrder,
+  type SalesLineItem,
+  type InsertSalesLineItem,
+  type SalesOrderWithDetails,
   type User,
   type UpsertUser,
 } from "@shared/schema";
@@ -41,6 +51,20 @@ export interface IStorage {
   deletePurchaseOrder(id: number): Promise<boolean>;
 
   getMonthlyStats(year?: number): Promise<{ month: number; totalKwd: number; totalFx: number }[]>;
+
+  // Sales Module
+  getCustomers(): Promise<Customer[]>;
+  getCustomer(id: number): Promise<Customer | undefined>;
+  createCustomer(customer: InsertCustomer): Promise<Customer>;
+  updateCustomer(id: number, customer: InsertCustomer): Promise<Customer | undefined>;
+  deleteCustomer(id: number): Promise<{ deleted: boolean; error?: string }>;
+
+  getSalesOrders(): Promise<SalesOrderWithDetails[]>;
+  getSalesOrder(id: number): Promise<SalesOrderWithDetails | undefined>;
+  createSalesOrder(so: InsertSalesOrder, lineItems: Omit<InsertSalesLineItem, 'salesOrderId'>[]): Promise<SalesOrderWithDetails>;
+  deleteSalesOrder(id: number): Promise<boolean>;
+
+  getSalesMonthlyStats(year?: number): Promise<{ month: number; totalKwd: number; totalFx: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -220,6 +244,103 @@ export class DatabaseStorage implements IStorage {
       FROM purchase_orders
       ${year ? sql`WHERE EXTRACT(YEAR FROM purchase_date) = ${year}` : sql``}
       GROUP BY EXTRACT(MONTH FROM purchase_date)
+      ORDER BY month
+    `);
+    return result.rows as { month: number; totalKwd: number; totalFx: number }[];
+  }
+
+  // ==================== SALES MODULE ====================
+
+  async getCustomers(): Promise<Customer[]> {
+    return await db.select().from(customers).orderBy(customers.name);
+  }
+
+  async getCustomer(id: number): Promise<Customer | undefined> {
+    const [customer] = await db.select().from(customers).where(eq(customers.id, id));
+    return customer || undefined;
+  }
+
+  async createCustomer(customer: InsertCustomer): Promise<Customer> {
+    const [newCustomer] = await db.insert(customers).values(customer).returning();
+    return newCustomer;
+  }
+
+  async updateCustomer(id: number, customer: InsertCustomer): Promise<Customer | undefined> {
+    const [updated] = await db.update(customers).set(customer).where(eq(customers.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteCustomer(id: number): Promise<{ deleted: boolean; error?: string }> {
+    const linkedOrders = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(salesOrders)
+      .where(eq(salesOrders.customerId, id));
+    
+    if (linkedOrders[0].count > 0) {
+      return { 
+        deleted: false, 
+        error: `Cannot delete customer: ${linkedOrders[0].count} sales order(s) are linked to this customer` 
+      };
+    }
+    
+    const result = await db.delete(customers).where(eq(customers.id, id)).returning();
+    return { deleted: result.length > 0 };
+  }
+
+  async getSalesOrders(): Promise<SalesOrderWithDetails[]> {
+    const orders = await db.query.salesOrders.findMany({
+      with: {
+        customer: true,
+        lineItems: true,
+      },
+      orderBy: [desc(salesOrders.saleDate), desc(salesOrders.id)],
+    });
+    return orders;
+  }
+
+  async getSalesOrder(id: number): Promise<SalesOrderWithDetails | undefined> {
+    const order = await db.query.salesOrders.findFirst({
+      where: eq(salesOrders.id, id),
+      with: {
+        customer: true,
+        lineItems: true,
+      },
+    });
+    return order || undefined;
+  }
+
+  async createSalesOrder(
+    so: InsertSalesOrder, 
+    lineItems: Omit<InsertSalesLineItem, 'salesOrderId'>[]
+  ): Promise<SalesOrderWithDetails> {
+    const [newSo] = await db.insert(salesOrders).values(so).returning();
+    
+    if (lineItems.length > 0) {
+      await db.insert(salesOrderLineItems).values(
+        lineItems.map(item => ({
+          ...item,
+          salesOrderId: newSo.id,
+        }))
+      );
+    }
+
+    return this.getSalesOrder(newSo.id) as Promise<SalesOrderWithDetails>;
+  }
+
+  async deleteSalesOrder(id: number): Promise<boolean> {
+    const result = await db.delete(salesOrders).where(eq(salesOrders.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getSalesMonthlyStats(year?: number): Promise<{ month: number; totalKwd: number; totalFx: number }[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        EXTRACT(MONTH FROM sale_date)::integer as month,
+        COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as "totalKwd",
+        COALESCE(SUM(CAST(total_fx AS DECIMAL)), 0)::float as "totalFx"
+      FROM sales_orders
+      ${year ? sql`WHERE EXTRACT(YEAR FROM sale_date) = ${year}` : sql``}
+      GROUP BY EXTRACT(MONTH FROM sale_date)
       ORDER BY month
     `);
     return result.rows as { month: number; totalKwd: number; totalFx: number }[];
