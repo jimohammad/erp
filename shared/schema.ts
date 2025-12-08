@@ -167,8 +167,8 @@ export const salesOrderLineItems = pgTable("sales_order_line_items", {
   itemName: text("item_name").notNull(),
   quantity: integer("quantity").default(1),
   priceKwd: numeric("price_kwd", { precision: 12, scale: 3 }),
-  fxPrice: numeric("fx_price", { precision: 12, scale: 2 }),
   totalKwd: numeric("total_kwd", { precision: 12, scale: 3 }),
+  imeiNumbers: text("imei_numbers").array(),
 });
 
 export const salesOrderLineItemsRelations = relations(salesOrderLineItems, ({ one }) => ({
