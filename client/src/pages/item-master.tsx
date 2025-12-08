@@ -32,6 +32,7 @@ export default function ItemMaster() {
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [itemCode, setItemCode] = useState("");
   const [itemName, setItemName] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
@@ -41,7 +42,7 @@ export default function ItemMaster() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (name: string) => apiRequest("POST", "/api/items", { name }),
+    mutationFn: (data: { code: string | null; name: string }) => apiRequest("POST", "/api/items", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/items"] });
       toast({ title: "Item added successfully" });
@@ -53,8 +54,8 @@ export default function ItemMaster() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, name }: { id: number; name: string }) =>
-      apiRequest("PUT", `/api/items/${id}`, { name }),
+    mutationFn: ({ id, data }: { id: number; data: { code: string | null; name: string } }) =>
+      apiRequest("PUT", `/api/items/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/items"] });
       toast({ title: "Item updated successfully" });
@@ -87,12 +88,14 @@ export default function ItemMaster() {
 
   const handleOpenAdd = () => {
     setEditingItem(null);
+    setItemCode("");
     setItemName("");
     setDialogOpen(true);
   };
 
   const handleOpenEdit = (item: Item) => {
     setEditingItem(item);
+    setItemCode(item.code || "");
     setItemName(item.name);
     setDialogOpen(true);
   };
@@ -100,6 +103,7 @@ export default function ItemMaster() {
   const handleCloseDialog = () => {
     setDialogOpen(false);
     setEditingItem(null);
+    setItemCode("");
     setItemName("");
   };
 
@@ -107,10 +111,15 @@ export default function ItemMaster() {
     e.preventDefault();
     if (!itemName.trim()) return;
 
+    const data = {
+      code: itemCode.trim() || null,
+      name: itemName.trim(),
+    };
+
     if (editingItem) {
-      updateMutation.mutate({ id: editingItem.id, name: itemName.trim() });
+      updateMutation.mutate({ id: editingItem.id, data });
     } else {
-      createMutation.mutate(itemName.trim());
+      createMutation.mutate(data);
     }
   };
 
@@ -159,6 +168,7 @@ export default function ItemMaster() {
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-16">ID</TableHead>
+                    <TableHead className="w-32">Item Code</TableHead>
                     <TableHead>Item Name</TableHead>
                     {isAdmin && <TableHead className="w-24 text-right">Actions</TableHead>}
                   </TableRow>
@@ -168,6 +178,9 @@ export default function ItemMaster() {
                     <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
                       <TableCell className="font-mono text-sm text-muted-foreground">
                         {item.id}
+                      </TableCell>
+                      <TableCell className="font-mono text-sm" data-testid={`text-item-code-${item.id}`}>
+                        {item.code || "-"}
                       </TableCell>
                       <TableCell className="font-medium" data-testid={`text-item-name-${item.id}`}>
                         {item.name}
@@ -210,6 +223,16 @@ export default function ItemMaster() {
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="itemCode">Item Code</Label>
+                <Input
+                  id="itemCode"
+                  value={itemCode}
+                  onChange={(e) => setItemCode(e.target.value)}
+                  placeholder="Enter item code (optional)"
+                  data-testid="input-item-code"
+                />
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="itemName">Item Name</Label>
                 <Input

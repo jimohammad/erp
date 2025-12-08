@@ -33,6 +33,8 @@ export default function SupplierMaster() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
   const [supplierName, setSupplierName] = useState("");
+  const [supplierAddress, setSupplierAddress] = useState("");
+  const [supplierPhone, setSupplierPhone] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [supplierToDelete, setSupplierToDelete] = useState<Supplier | null>(null);
 
@@ -41,7 +43,8 @@ export default function SupplierMaster() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (name: string) => apiRequest("POST", "/api/suppliers", { name }),
+    mutationFn: (data: { name: string; address: string | null; phone: string | null }) => 
+      apiRequest("POST", "/api/suppliers", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       toast({ title: "Supplier added successfully" });
@@ -53,8 +56,8 @@ export default function SupplierMaster() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, name }: { id: number; name: string }) =>
-      apiRequest("PUT", `/api/suppliers/${id}`, { name }),
+    mutationFn: ({ id, data }: { id: number; data: { name: string; address: string | null; phone: string | null } }) =>
+      apiRequest("PUT", `/api/suppliers/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       toast({ title: "Supplier updated successfully" });
@@ -88,12 +91,16 @@ export default function SupplierMaster() {
   const handleOpenAdd = () => {
     setEditingSupplier(null);
     setSupplierName("");
+    setSupplierAddress("");
+    setSupplierPhone("");
     setDialogOpen(true);
   };
 
   const handleOpenEdit = (supplier: Supplier) => {
     setEditingSupplier(supplier);
     setSupplierName(supplier.name);
+    setSupplierAddress(supplier.address || "");
+    setSupplierPhone(supplier.phone || "");
     setDialogOpen(true);
   };
 
@@ -101,16 +108,24 @@ export default function SupplierMaster() {
     setDialogOpen(false);
     setEditingSupplier(null);
     setSupplierName("");
+    setSupplierAddress("");
+    setSupplierPhone("");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!supplierName.trim()) return;
 
+    const data = {
+      name: supplierName.trim(),
+      address: supplierAddress.trim() || null,
+      phone: supplierPhone.trim() || null,
+    };
+
     if (editingSupplier) {
-      updateMutation.mutate({ id: editingSupplier.id, name: supplierName.trim() });
+      updateMutation.mutate({ id: editingSupplier.id, data });
     } else {
-      createMutation.mutate(supplierName.trim());
+      createMutation.mutate(data);
     }
   };
 
@@ -160,6 +175,8 @@ export default function SupplierMaster() {
                   <TableRow>
                     <TableHead className="w-16">ID</TableHead>
                     <TableHead>Supplier Name</TableHead>
+                    <TableHead>Address</TableHead>
+                    <TableHead className="w-36">Phone</TableHead>
                     {isAdmin && <TableHead className="w-24 text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -171,6 +188,12 @@ export default function SupplierMaster() {
                       </TableCell>
                       <TableCell className="font-medium" data-testid={`text-supplier-name-${supplier.id}`}>
                         {supplier.name}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground" data-testid={`text-supplier-address-${supplier.id}`}>
+                        {supplier.address || "-"}
+                      </TableCell>
+                      <TableCell className="text-sm" data-testid={`text-supplier-phone-${supplier.id}`}>
+                        {supplier.phone || "-"}
                       </TableCell>
                       {isAdmin && (
                         <TableCell className="text-right">
@@ -218,6 +241,26 @@ export default function SupplierMaster() {
                   onChange={(e) => setSupplierName(e.target.value)}
                   placeholder="Enter supplier name"
                   data-testid="input-supplier-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="supplierAddress">Address</Label>
+                <Input
+                  id="supplierAddress"
+                  value={supplierAddress}
+                  onChange={(e) => setSupplierAddress(e.target.value)}
+                  placeholder="Enter address (optional)"
+                  data-testid="input-supplier-address"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="supplierPhone">Phone Number</Label>
+                <Input
+                  id="supplierPhone"
+                  value={supplierPhone}
+                  onChange={(e) => setSupplierPhone(e.target.value)}
+                  placeholder="Enter phone number (optional)"
+                  data-testid="input-supplier-phone"
                 />
               </div>
             </div>

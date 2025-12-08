@@ -31,6 +31,8 @@ export type User = typeof users.$inferSelect;
 export const suppliers = pgTable("suppliers", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   name: text("name").notNull(),
+  address: text("address"),
+  phone: text("phone"),
 });
 
 export const suppliersRelations = relations(suppliers, ({ many }) => ({
@@ -43,6 +45,7 @@ export type Supplier = typeof suppliers.$inferSelect;
 
 export const items = pgTable("items", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  code: text("code"),
   name: text("name").notNull().unique(),
 });
 
