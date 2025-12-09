@@ -16,11 +16,12 @@ import ReportsPage from "@/pages/reports";
 import PartyStatementPage from "@/pages/party-statement";
 import AccountStatementPage from "@/pages/account-statement";
 import ItemReportPage from "@/pages/item-report";
+import UserRolesPage from "@/pages/user-roles";
 import ExpensesPage from "@/pages/expenses";
 import AccountsPage from "@/pages/accounts";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
-import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown, RotateCcw, FileText } from "lucide-react";
+import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown, RotateCcw, FileText, Settings } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -94,6 +95,10 @@ function AppSidebar() {
     { title: "Party Statement", url: "/reports/party-statement" },
     { title: "Account Statement", url: "/reports/account-statement" },
     { title: "Item Report", url: "/reports/item-report" },
+  ];
+
+  const settingsSubItems = [
+    { title: "User Roles", url: "/settings/user-roles" },
   ];
 
   const handleLogout = () => {
@@ -208,6 +213,34 @@ function AppSidebar() {
                   </CollapsibleContent>
                 </SidebarMenuItem>
               </Collapsible>
+
+              <Collapsible defaultOpen={location.startsWith("/settings")} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={location.startsWith("/settings")}>
+                      <Settings className="h-4 w-4" />
+                      <span>Settings</span>
+                      <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {settingsSubItems.map((subItem) => (
+                        <SidebarMenuSubItem key={subItem.url}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={location === subItem.url}
+                          >
+                            <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(" ", "-")}`}>
+                              {subItem.title}
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -268,6 +301,8 @@ function AuthenticatedLayout() {
         return "Account Statement";
       case "/reports/item-report":
         return "Item Sales Report";
+      case "/settings/user-roles":
+        return "User Roles & Permissions";
       default:
         return "";
     }
@@ -317,6 +352,7 @@ function AuthenticatedLayout() {
               <Route path="/reports/party-statement" component={PartyStatementPage} />
               <Route path="/reports/account-statement" component={AccountStatementPage} />
               <Route path="/reports/item-report" component={ItemReportPage} />
+              <Route path="/settings/user-roles" component={UserRolesPage} />
               <Route component={NotFound} />
             </Switch>
           </main>

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, insertLineItemSchema, insertCustomerSchema, insertSalesOrderSchema, insertSalesLineItemSchema, insertPaymentSchema, PAYMENT_TYPES, PAYMENT_DIRECTIONS, insertExpenseCategorySchema, insertExpenseSchema, insertAccountTransferSchema, insertReturnSchema, insertReturnLineItemSchema } from "@shared/schema";
+import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, insertLineItemSchema, insertCustomerSchema, insertSalesOrderSchema, insertSalesLineItemSchema, insertPaymentSchema, PAYMENT_TYPES, PAYMENT_DIRECTIONS, insertExpenseCategorySchema, insertExpenseSchema, insertAccountTransferSchema, insertReturnSchema, insertReturnLineItemSchema, insertUserRoleAssignmentSchema, ROLE_TYPES, MODULE_NAMES } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
 
@@ -898,6 +898,132 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting return:", error);
       res.status(500).json({ error: "Failed to delete return" });
+    }
+  });
+
+  // ==================== ROLE & PERMISSIONS ====================
+
+  await storage.ensureDefaultRolePermissions();
+
+  const isSuperUser = async (req: any, res: any, next: any) => {
+    const userEmail = req.user?.claims?.email;
+    if (!userEmail) {
+      return res.status(403).json({ error: "Unauthorized" });
+    }
+    const role = await storage.getRoleForEmail(userEmail);
+    if (role !== "super_user") {
+      return res.status(403).json({ error: "Super user access required" });
+    }
+    next();
+  };
+
+  app.get("/api/role-permissions", isAuthenticated, async (req, res) => {
+    try {
+      const permissions = await storage.getRolePermissions();
+      res.json(permissions);
+    } catch (error) {
+      console.error("Error fetching role permissions:", error);
+      res.status(500).json({ error: "Failed to fetch role permissions" });
+    }
+  });
+
+  app.put("/api/role-permissions", isAuthenticated, isSuperUser, async (req, res) => {
+    try {
+      const { role, moduleName, canAccess } = req.body;
+      if (!role || !moduleName || canAccess === undefined) {
+        return res.status(400).json({ error: "Role, moduleName, and canAccess are required" });
+      }
+      await storage.updateRolePermission(role, moduleName, canAccess ? 1 : 0);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating role permission:", error);
+      res.status(500).json({ error: "Failed to update role permission" });
+    }
+  });
+
+  app.get("/api/user-role-assignments", isAuthenticated, async (req, res) => {
+    try {
+      const assignments = await storage.getUserRoleAssignments();
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching user role assignments:", error);
+      res.status(500).json({ error: "Failed to fetch user role assignments" });
+    }
+  });
+
+  app.post("/api/user-role-assignments", isAuthenticated, isSuperUser, async (req, res) => {
+    try {
+      const parsed = insertUserRoleAssignmentSchema.safeParse({
+        ...req.body,
+        email: req.body.email?.toLowerCase(),
+      });
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const assignment = await storage.createUserRoleAssignment(parsed.data);
+      res.status(201).json(assignment);
+    } catch (error: any) {
+      if (error.code === "23505") {
+        return res.status(409).json({ error: "This email is already assigned a role" });
+      }
+      console.error("Error creating user role assignment:", error);
+      res.status(500).json({ error: "Failed to create user role assignment" });
+    }
+  });
+
+  app.put("/api/user-role-assignments/:id", isAuthenticated, isSuperUser, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid assignment ID" });
+      }
+      const parsed = insertUserRoleAssignmentSchema.safeParse({
+        ...req.body,
+        email: req.body.email?.toLowerCase(),
+      });
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const assignment = await storage.updateUserRoleAssignment(id, parsed.data);
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error updating user role assignment:", error);
+      res.status(500).json({ error: "Failed to update user role assignment" });
+    }
+  });
+
+  app.delete("/api/user-role-assignments/:id", isAuthenticated, isSuperUser, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid assignment ID" });
+      }
+      const deleted = await storage.deleteUserRoleAssignment(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting user role assignment:", error);
+      res.status(500).json({ error: "Failed to delete user role assignment" });
+    }
+  });
+
+  app.get("/api/my-permissions", isAuthenticated, async (req: any, res) => {
+    try {
+      const userEmail = req.user?.claims?.email;
+      if (!userEmail) {
+        return res.json({ role: "user", modules: MODULE_NAMES });
+      }
+      const role = await storage.getRoleForEmail(userEmail);
+      const modules = await storage.getModulesForRole(role);
+      res.json({ role, modules });
+    } catch (error) {
+      console.error("Error fetching user permissions:", error);
+      res.status(500).json({ error: "Failed to fetch user permissions" });
     }
   });
 

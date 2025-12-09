@@ -14,7 +14,11 @@ import {
   expenses,
   returns,
   returnLineItems,
+  rolePermissions,
+  userRoleAssignments,
   ACCOUNT_NAMES,
+  ROLE_TYPES,
+  MODULE_NAMES,
   type Supplier, 
   type InsertSupplier,
   type Item,
@@ -51,6 +55,10 @@ import {
   type ReturnLineItem,
   type InsertReturnLineItem,
   type ReturnWithDetails,
+  type RolePermission,
+  type InsertRolePermission,
+  type UserRoleAssignment,
+  type InsertUserRoleAssignment,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -130,6 +138,19 @@ export interface IStorage {
   getReturn(id: number): Promise<ReturnWithDetails | undefined>;
   createReturn(returnData: InsertReturn, lineItems: Omit<InsertReturnLineItem, 'returnId'>[]): Promise<ReturnWithDetails>;
   deleteReturn(id: number): Promise<boolean>;
+
+  // Role Permissions
+  getRolePermissions(): Promise<RolePermission[]>;
+  updateRolePermission(role: string, moduleName: string, canAccess: number): Promise<void>;
+  ensureDefaultRolePermissions(): Promise<void>;
+  getModulesForRole(role: string): Promise<string[]>;
+
+  // User Role Assignments  
+  getUserRoleAssignments(): Promise<UserRoleAssignment[]>;
+  createUserRoleAssignment(assignment: InsertUserRoleAssignment): Promise<UserRoleAssignment>;
+  updateUserRoleAssignment(id: number, assignment: InsertUserRoleAssignment): Promise<UserRoleAssignment | undefined>;
+  deleteUserRoleAssignment(id: number): Promise<boolean>;
+  getRoleForEmail(email: string): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -990,6 +1011,82 @@ export class DatabaseStorage implements IStorage {
   async deleteReturn(id: number): Promise<boolean> {
     const result = await db.delete(returns).where(eq(returns.id, id)).returning();
     return result.length > 0;
+  }
+
+  // ==================== ROLE PERMISSIONS ====================
+
+  async getRolePermissions(): Promise<RolePermission[]> {
+    return await db.select().from(rolePermissions).orderBy(rolePermissions.role, rolePermissions.moduleName);
+  }
+
+  async updateRolePermission(role: string, moduleName: string, canAccess: number): Promise<void> {
+    const existing = await db.select().from(rolePermissions)
+      .where(and(eq(rolePermissions.role, role), eq(rolePermissions.moduleName, moduleName)));
+    
+    if (existing.length > 0) {
+      await db.update(rolePermissions)
+        .set({ canAccess })
+        .where(and(eq(rolePermissions.role, role), eq(rolePermissions.moduleName, moduleName)));
+    } else {
+      await db.insert(rolePermissions).values({ role, moduleName, canAccess });
+    }
+  }
+
+  async ensureDefaultRolePermissions(): Promise<void> {
+    const existing = await db.select().from(rolePermissions);
+    if (existing.length > 0) return;
+
+    const defaultPermissions: InsertRolePermission[] = [];
+    for (const role of ROLE_TYPES) {
+      for (const moduleName of MODULE_NAMES) {
+        let canAccess = 1;
+        if (role === "user") {
+          if (moduleName === "settings") canAccess = 0;
+        }
+        if (role === "admin") {
+          if (moduleName === "settings") canAccess = 0;
+        }
+        defaultPermissions.push({ role, moduleName, canAccess });
+      }
+    }
+    
+    await db.insert(rolePermissions).values(defaultPermissions);
+  }
+
+  async getModulesForRole(role: string): Promise<string[]> {
+    const permissions = await db.select().from(rolePermissions)
+      .where(and(eq(rolePermissions.role, role), eq(rolePermissions.canAccess, 1)));
+    return permissions.map(p => p.moduleName);
+  }
+
+  // ==================== USER ROLE ASSIGNMENTS ====================
+
+  async getUserRoleAssignments(): Promise<UserRoleAssignment[]> {
+    return await db.select().from(userRoleAssignments).orderBy(userRoleAssignments.email);
+  }
+
+  async createUserRoleAssignment(assignment: InsertUserRoleAssignment): Promise<UserRoleAssignment> {
+    const [newAssignment] = await db.insert(userRoleAssignments).values(assignment).returning();
+    return newAssignment;
+  }
+
+  async updateUserRoleAssignment(id: number, assignment: InsertUserRoleAssignment): Promise<UserRoleAssignment | undefined> {
+    const [updated] = await db.update(userRoleAssignments)
+      .set(assignment)
+      .where(eq(userRoleAssignments.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteUserRoleAssignment(id: number): Promise<boolean> {
+    const result = await db.delete(userRoleAssignments).where(eq(userRoleAssignments.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getRoleForEmail(email: string): Promise<string> {
+    const [assignment] = await db.select().from(userRoleAssignments)
+      .where(eq(userRoleAssignments.email, email.toLowerCase()));
+    return assignment?.role || "user";
   }
 }
 

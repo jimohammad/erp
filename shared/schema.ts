@@ -402,3 +402,44 @@ export type ReturnWithDetails = Return & {
   supplier: Supplier | null;
   lineItems: ReturnLineItem[];
 };
+
+// ==================== ROLE PERMISSIONS ====================
+
+export const ROLE_TYPES = ["super_user", "admin", "user"] as const;
+export type RoleType = typeof ROLE_TYPES[number];
+
+export const MODULE_NAMES = [
+  "purchases",
+  "sales", 
+  "payments",
+  "returns",
+  "expenses",
+  "accounts",
+  "items",
+  "parties",
+  "reports",
+  "settings"
+] as const;
+export type ModuleName = typeof MODULE_NAMES[number];
+
+export const rolePermissions = pgTable("role_permissions", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  role: text("role").notNull(),
+  moduleName: text("module_name").notNull(),
+  canAccess: integer("can_access").default(1).notNull(),
+});
+
+export const insertRolePermissionSchema = createInsertSchema(rolePermissions).omit({ id: true });
+export type InsertRolePermission = z.infer<typeof insertRolePermissionSchema>;
+export type RolePermission = typeof rolePermissions.$inferSelect;
+
+export const userRoleAssignments = pgTable("user_role_assignments", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  email: text("email").notNull().unique(),
+  role: text("role").notNull().default("user"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertUserRoleAssignmentSchema = createInsertSchema(userRoleAssignments).omit({ id: true, createdAt: true });
+export type InsertUserRoleAssignment = z.infer<typeof insertUserRoleAssignmentSchema>;
+export type UserRoleAssignment = typeof userRoleAssignments.$inferSelect;
