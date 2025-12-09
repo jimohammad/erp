@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Smartphone, Download, Search, Printer } from "lucide-react";
+import { Smartphone, Download, Search, Printer, FileText } from "lucide-react";
 import type { Customer, Item } from "@shared/schema";
 
 interface ImeiRecord {
@@ -124,6 +124,62 @@ export default function ExportImeiPage() {
     }
   };
 
+  const handleExportPDF = () => {
+    const pdfWindow = window.open("", "_blank");
+    if (pdfWindow) {
+      const rows = imeiRecords.map(r => 
+        `<tr><td>${r.imei}</td><td>${r.itemName}</td><td>${r.customerName}</td><td>${r.invoiceNumber}</td><td>${r.saleDate}</td></tr>`
+      ).join("");
+      
+      pdfWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>IMEI Export - ${new Date().toISOString().split("T")[0]}</title>
+          <style>
+            @media print {
+              @page { margin: 1cm; }
+            }
+            body { font-family: Arial, sans-serif; padding: 20px; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .company { font-size: 24px; font-weight: bold; }
+            .title { font-size: 18px; margin-top: 10px; }
+            .date { font-size: 12px; color: #666; margin-top: 5px; }
+            .summary { margin: 20px 0; font-size: 14px; }
+            table { width: 100%; border-collapse: collapse; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px; }
+            th { background: #f5f5f5; font-weight: bold; }
+            .footer { margin-top: 20px; text-align: center; font-size: 10px; color: #666; }
+            .instructions { margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 5px; text-align: center; }
+            .instructions p { margin: 5px 0; }
+            @media print { .instructions { display: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company">Iqbal Electronics Co. WLL</div>
+            <div class="title">IMEI Export Report</div>
+            <div class="date">Generated: ${new Date().toLocaleDateString()}</div>
+          </div>
+          <div class="summary">Total Records: ${imeiRecords.length}</div>
+          <table>
+            <thead>
+              <tr><th>IMEI</th><th>Item</th><th>Customer</th><th>Invoice</th><th>Date</th></tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+          <div class="footer">Iqbal Electronics Co. WLL - IMEI Report</div>
+          <div class="instructions">
+            <p><strong>To save as PDF:</strong></p>
+            <p>Press Ctrl+P (or Cmd+P on Mac), then select "Save as PDF" as the destination.</p>
+          </div>
+        </body>
+        </html>
+      `);
+      pdfWindow.document.close();
+    }
+  };
+
   return (
     <div className="p-4 space-y-6">
       <div className="flex items-center justify-between">
@@ -217,6 +273,10 @@ export default function ExportImeiPage() {
                 <Button variant="outline" onClick={handleExportCSV} data-testid="button-export-csv">
                   <Download className="h-4 w-4 mr-2" />
                   Export CSV
+                </Button>
+                <Button variant="outline" onClick={handleExportPDF} data-testid="button-export-pdf">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Export PDF
                 </Button>
                 <Button variant="outline" onClick={handlePrint} data-testid="button-print">
                   <Printer className="h-4 w-4 mr-2" />
