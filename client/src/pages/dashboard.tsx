@@ -4,20 +4,17 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Package, DollarSign, TrendingUp, TrendingDown, ShoppingCart, Search, Loader2, ArrowRight, Wallet, Building2, CreditCard, Smartphone } from "lucide-react";
-
-interface AccountBalance {
-  name: string;
-  balance: number;
-}
+import { Package, DollarSign, TrendingUp, TrendingDown, ShoppingCart, Search, Loader2, ArrowRight, Wallet, Building2 } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 interface DashboardStats {
   stockAmount: number;
   totalCredit: number;
   totalDebit: number;
   cashBalance: number;
-  accountBalances: AccountBalance[];
+  bankAccountsBalance: number;
   monthlySales: number;
+  lastMonthSales: number;
   monthlyPurchases: number;
 }
 
@@ -62,21 +59,25 @@ export default function DashboardPage() {
     }).format(value);
   };
 
-  const getAccountIcon = (name: string) => {
-    switch (name) {
-      case "NBK Bank":
-      case "CBK Bank":
-        return <Building2 className="h-4 w-4 text-muted-foreground" />;
-      case "Knet":
-        return <CreditCard className="h-4 w-4 text-muted-foreground" />;
-      case "Wamd":
-        return <Smartphone className="h-4 w-4 text-muted-foreground" />;
-      default:
-        return <DollarSign className="h-4 w-4 text-muted-foreground" />;
-    }
-  };
+  const currentDate = new Date();
+  const currentMonthName = currentDate.toLocaleString("default", { month: "short" });
+  const lastMonthDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
+  const lastMonthName = lastMonthDate.toLocaleString("default", { month: "short" });
 
-  const currentMonth = new Date().toLocaleString("default", { month: "long", year: "numeric" });
+  const salesComparisonData = [
+    {
+      name: lastMonthName,
+      sales: stats?.lastMonthSales || 0,
+    },
+    {
+      name: currentMonthName,
+      sales: stats?.monthlySales || 0,
+    },
+  ];
+
+  const salesChange = stats?.lastMonthSales && stats.lastMonthSales > 0
+    ? ((stats.monthlySales - stats.lastMonthSales) / stats.lastMonthSales * 100).toFixed(1)
+    : null;
 
   return (
     <div className="p-6 space-y-6">
@@ -145,7 +146,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card data-testid="card-stock-amount">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Stock Amount</CardTitle>
@@ -184,49 +185,32 @@ export default function DashboardPage() {
                 <p className="text-xs text-muted-foreground">All outgoing payments</p>
               </CardContent>
             </Card>
+          </div>
 
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card data-testid="card-cash-balance">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Cash Available</CardTitle>
+                <CardTitle className="text-sm font-medium">Cash</CardTitle>
                 <Wallet className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold" data-testid="text-cash-balance">
                   {formatCurrency(stats?.cashBalance || 0)} KWD
                 </div>
-                <p className="text-xs text-muted-foreground">Cash account balance</p>
+                <p className="text-xs text-muted-foreground">Cash in hand</p>
               </CardContent>
             </Card>
-          </div>
 
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {stats?.accountBalances?.map((account) => (
-              <Card key={account.name} data-testid={`card-account-${account.name.toLowerCase().replace(/\s+/g, '-')}`}>
-                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium">{account.name}</CardTitle>
-                  {getAccountIcon(account.name)}
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold" data-testid={`text-account-${account.name.toLowerCase().replace(/\s+/g, '-')}`}>
-                    {formatCurrency(account.balance)} KWD
-                  </div>
-                  <p className="text-xs text-muted-foreground">Account balance</p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card data-testid="card-monthly-sales">
+            <Card data-testid="card-bank-accounts">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Monthly Sales</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium">Bank Accounts</CardTitle>
+                <Building2 className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold" data-testid="text-monthly-sales">
-                  {formatCurrency(stats?.monthlySales || 0)} KWD
+                <div className="text-2xl font-bold" data-testid="text-bank-accounts">
+                  {formatCurrency(stats?.bankAccountsBalance || 0)} KWD
                 </div>
-                <p className="text-xs text-muted-foreground">{currentMonth}</p>
+                <p className="text-xs text-muted-foreground">NBK, CBK, Knet, Wamd</p>
               </CardContent>
             </Card>
 
@@ -239,10 +223,70 @@ export default function DashboardPage() {
                 <div className="text-2xl font-bold" data-testid="text-monthly-purchases">
                   {formatCurrency(stats?.monthlyPurchases || 0)} KWD
                 </div>
-                <p className="text-xs text-muted-foreground">{currentMonth}</p>
+                <p className="text-xs text-muted-foreground">{currentMonthName} {currentDate.getFullYear()}</p>
               </CardContent>
             </Card>
           </div>
+
+          <Card data-testid="card-sales-comparison">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <div>
+                <CardTitle className="text-lg font-semibold">Sales Comparison</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  {lastMonthName} vs {currentMonthName} {currentDate.getFullYear()}
+                </p>
+              </div>
+              {salesChange !== null && (
+                <Badge 
+                  variant="secondary" 
+                  className={Number(salesChange) >= 0 ? "text-green-600" : "text-red-600"}
+                >
+                  {Number(salesChange) >= 0 ? "+" : ""}{salesChange}%
+                </Badge>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={salesComparisonData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis 
+                      dataKey="name" 
+                      tick={{ fontSize: 12 }}
+                      className="text-muted-foreground"
+                    />
+                    <YAxis 
+                      tick={{ fontSize: 12 }}
+                      tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
+                      className="text-muted-foreground"
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [`${formatCurrency(value)} KWD`, "Sales"]}
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                    />
+                    <Bar dataKey="sales" radius={[8, 8, 0, 0]}>
+                      <Cell fill="hsl(var(--muted-foreground))" />
+                      <Cell fill="hsl(var(--primary))" />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t">
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">{lastMonthName} Sales</p>
+                  <p className="text-xl font-bold">{formatCurrency(stats?.lastMonthSales || 0)} KWD</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground">{currentMonthName} Sales</p>
+                  <p className="text-xl font-bold text-primary">{formatCurrency(stats?.monthlySales || 0)} KWD</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       )}
     </div>

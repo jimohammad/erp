@@ -1297,8 +1297,9 @@ export class DatabaseStorage implements IStorage {
     totalCredit: number; 
     totalDebit: number; 
     cashBalance: number; 
-    accountBalances: { name: string; balance: number }[];
+    bankAccountsBalance: number;
     monthlySales: number; 
+    lastMonthSales: number;
     monthlyPurchases: number 
   }> {
     const currentDate = new Date();
@@ -1408,14 +1409,14 @@ export class DatabaseStorage implements IStorage {
       ORDER BY a.id
     `);
     
-    const accountBalances: { name: string; balance: number }[] = [];
     let cashBalance = 0;
+    let bankAccountsBalance = 0;
     
     for (const row of accountsResult.rows as { name: string; balance: number }[]) {
       if (row.name === 'Cash') {
         cashBalance = row.balance || 0;
       } else {
-        accountBalances.push({ name: row.name, balance: row.balance || 0 });
+        bankAccountsBalance += row.balance || 0;
       }
     }
 
@@ -1428,6 +1429,17 @@ export class DatabaseStorage implements IStorage {
     `);
     const monthlySales = (salesResult.rows[0] as { total: number })?.total || 0;
 
+    // Get last month sales for comparison
+    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
+    const lastMonthSalesResult = await db.execute(sql`
+      SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
+      FROM sales_orders
+      WHERE EXTRACT(MONTH FROM sale_date) = ${lastMonth}
+      AND EXTRACT(YEAR FROM sale_date) = ${lastMonthYear}
+    `);
+    const lastMonthSales = (lastMonthSalesResult.rows[0] as { total: number })?.total || 0;
+
     // Get current month purchases
     const purchasesResult = await db.execute(sql`
       SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
@@ -1437,7 +1449,7 @@ export class DatabaseStorage implements IStorage {
     `);
     const monthlyPurchases = (purchasesResult.rows[0] as { total: number })?.total || 0;
 
-    return { stockAmount, totalCredit, totalDebit, cashBalance, accountBalances, monthlySales, monthlyPurchases };
+    return { stockAmount, totalCredit, totalDebit, cashBalance, bankAccountsBalance, monthlySales, lastMonthSales, monthlyPurchases };
   }
 
   async globalSearch(query: string): Promise<{ type: string; id: number; title: string; subtitle: string; url: string }[]> {
