@@ -21,7 +21,9 @@ import ExpensesPage from "@/pages/expenses";
 import AccountsPage from "@/pages/accounts";
 import DiscountPage from "@/pages/discount";
 import ExportImeiPage from "@/pages/export-imei";
+import CustomerStatementPage from "@/pages/customer-statement";
 import Landing from "@/pages/landing";
+import PublicStatementPage from "@/pages/public-statement";
 import NotFound from "@/pages/not-found";
 import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown, RotateCcw, FileText, Settings, Percent } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -122,6 +124,7 @@ function AppSidebar() {
     { title: "General Reports", url: "/reports" },
     { title: "Party Statement", url: "/reports/party-statement" },
     { title: "Account Statement", url: "/reports/account-statement" },
+    { title: "Customer Statement", url: "/reports/customer-statement" },
     { title: "Item Report", url: "/reports/item-report" },
     { title: "Export IMEI", url: "/reports/export-imei" },
   ];
@@ -342,6 +345,10 @@ function AuthenticatedLayout() {
         return "Account Statement";
       case "/reports/item-report":
         return "Item Sales Report";
+      case "/reports/customer-statement":
+        return "Customer Statement";
+      case "/reports/export-imei":
+        return "Export IMEI";
       case "/settings/user-roles":
         return "User Roles & Permissions";
       default:
@@ -395,6 +402,7 @@ function AuthenticatedLayout() {
               <Route path="/reports/account-statement" component={AccountStatementPage} />
               <Route path="/reports/item-report" component={ItemReportPage} />
               <Route path="/reports/export-imei" component={ExportImeiPage} />
+              <Route path="/reports/customer-statement" component={CustomerStatementPage} />
               <Route path="/settings/user-roles" component={UserRolesPage} />
               <Route component={NotFound} />
             </Switch>
@@ -431,7 +439,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <Router />
+        <Switch>
+          <Route path="/statement/:customerId" component={PublicStatementPage} />
+          <Route component={Router} />
+        </Switch>
       </TooltipProvider>
     </QueryClientProvider>
   );

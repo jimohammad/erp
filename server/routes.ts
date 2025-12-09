@@ -1105,6 +1105,74 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== CUSTOMER STATEMENT ROUTE ====================
+
+  app.get("/api/customer-statement", isAuthenticated, async (req, res) => {
+    try {
+      const customerId = req.query.customerId ? parseInt(req.query.customerId as string) : undefined;
+      if (!customerId || isNaN(customerId)) {
+        return res.status(400).json({ error: "Customer ID is required" });
+      }
+      
+      const customer = await storage.getCustomer(customerId);
+      if (!customer) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+
+      // Get transactions for customer (sales = debit, payments IN = credit, returns = credit)
+      const entries = await storage.getCustomerStatementEntries(customerId, startDate, endDate);
+      
+      const openingBalance = 0; // Could be calculated from transactions before startDate
+      const closingBalance = entries.length > 0 ? entries[entries.length - 1].balance : 0;
+
+      res.json({
+        customer,
+        entries,
+        openingBalance,
+        closingBalance,
+      });
+    } catch (error) {
+      console.error("Error fetching customer statement:", error);
+      res.status(500).json({ error: "Failed to fetch customer statement" });
+    }
+  });
+
+  // Public customer statement (no auth required - for sharing with customers)
+  app.get("/api/public/customer-statement/:customerId", async (req, res) => {
+    try {
+      const customerId = parseInt(req.params.customerId);
+      if (isNaN(customerId)) {
+        return res.status(400).json({ error: "Invalid customer ID" });
+      }
+      
+      const customer = await storage.getCustomer(customerId);
+      if (!customer) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+
+      const entries = await storage.getCustomerStatementEntries(customerId, startDate, endDate);
+      
+      const openingBalance = 0;
+      const closingBalance = entries.length > 0 ? entries[entries.length - 1].balance : 0;
+
+      res.json({
+        customer: { name: customer.name, phone: customer.phone },
+        entries,
+        openingBalance,
+        closingBalance,
+      });
+    } catch (error) {
+      console.error("Error fetching public customer statement:", error);
+      res.status(500).json({ error: "Failed to fetch customer statement" });
+    }
+  });
+
   // ==================== EXPORT IMEI ROUTE ====================
 
   app.get("/api/export-imei", isAuthenticated, async (req, res) => {
