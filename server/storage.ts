@@ -74,6 +74,14 @@ import {
   type StockTransferLineItem,
   type InsertStockTransferLineItem,
   type StockTransferWithDetails,
+  inventoryAdjustments,
+  openingBalances,
+  type InventoryAdjustment,
+  type InsertInventoryAdjustment,
+  type InventoryAdjustmentWithDetails,
+  type OpeningBalance,
+  type InsertOpeningBalance,
+  type OpeningBalanceWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -195,6 +203,19 @@ export interface IStorage {
   getStockTransfer(id: number): Promise<StockTransferWithDetails | undefined>;
   createStockTransfer(transfer: InsertStockTransfer, lineItems: Omit<InsertStockTransferLineItem, 'stockTransferId'>[]): Promise<StockTransferWithDetails>;
   deleteStockTransfer(id: number): Promise<boolean>;
+
+  // Opening Balances Module
+  getInventoryAdjustments(branchId?: number): Promise<InventoryAdjustmentWithDetails[]>;
+  getInventoryAdjustment(id: number): Promise<InventoryAdjustmentWithDetails | undefined>;
+  createInventoryAdjustment(adjustment: InsertInventoryAdjustment): Promise<InventoryAdjustment>;
+  updateInventoryAdjustment(id: number, adjustment: Partial<InsertInventoryAdjustment>): Promise<InventoryAdjustment | undefined>;
+  deleteInventoryAdjustment(id: number): Promise<boolean>;
+
+  getOpeningBalances(branchId?: number): Promise<OpeningBalanceWithDetails[]>;
+  getOpeningBalance(id: number): Promise<OpeningBalance | undefined>;
+  createOpeningBalance(balance: InsertOpeningBalance): Promise<OpeningBalance>;
+  updateOpeningBalance(id: number, balance: Partial<InsertOpeningBalance>): Promise<OpeningBalance | undefined>;
+  deleteOpeningBalance(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1674,6 +1695,99 @@ export class DatabaseStorage implements IStorage {
 
   async deleteStockTransfer(id: number): Promise<boolean> {
     const result = await db.delete(stockTransfers).where(eq(stockTransfers.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // Opening Balances Module
+  async getInventoryAdjustments(branchId?: number): Promise<InventoryAdjustmentWithDetails[]> {
+    const adjustments = branchId 
+      ? await db.select().from(inventoryAdjustments).where(eq(inventoryAdjustments.branchId, branchId)).orderBy(desc(inventoryAdjustments.effectiveDate))
+      : await db.select().from(inventoryAdjustments).orderBy(desc(inventoryAdjustments.effectiveDate));
+    
+    const result: InventoryAdjustmentWithDetails[] = [];
+    for (const adjustment of adjustments) {
+      const item = await this.getItem(adjustment.itemId);
+      const branch = await this.getBranch(adjustment.branchId);
+      result.push({
+        ...adjustment,
+        item: item!,
+        branch: branch!,
+      });
+    }
+    return result;
+  }
+
+  async getInventoryAdjustment(id: number): Promise<InventoryAdjustmentWithDetails | undefined> {
+    const [adjustment] = await db.select().from(inventoryAdjustments).where(eq(inventoryAdjustments.id, id));
+    if (!adjustment) return undefined;
+
+    const item = await this.getItem(adjustment.itemId);
+    const branch = await this.getBranch(adjustment.branchId);
+    
+    return {
+      ...adjustment,
+      item: item!,
+      branch: branch!,
+    };
+  }
+
+  async createInventoryAdjustment(adjustment: InsertInventoryAdjustment): Promise<InventoryAdjustment> {
+    const [newAdjustment] = await db.insert(inventoryAdjustments).values(adjustment).returning();
+    return newAdjustment;
+  }
+
+  async updateInventoryAdjustment(id: number, adjustment: Partial<InsertInventoryAdjustment>): Promise<InventoryAdjustment | undefined> {
+    const [updated] = await db.update(inventoryAdjustments).set(adjustment).where(eq(inventoryAdjustments.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteInventoryAdjustment(id: number): Promise<boolean> {
+    const result = await db.delete(inventoryAdjustments).where(eq(inventoryAdjustments.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async getOpeningBalances(branchId?: number): Promise<OpeningBalanceWithDetails[]> {
+    const balances = branchId
+      ? await db.select().from(openingBalances).where(eq(openingBalances.branchId, branchId)).orderBy(desc(openingBalances.effectiveDate))
+      : await db.select().from(openingBalances).orderBy(desc(openingBalances.effectiveDate));
+    
+    const result: OpeningBalanceWithDetails[] = [];
+    for (const balance of balances) {
+      const branch = balance.branchId ? await this.getBranch(balance.branchId) : undefined;
+      let partyName = "";
+      if (balance.partyType === "customer") {
+        const customer = await this.getCustomer(balance.partyId);
+        partyName = customer?.name || "Unknown Customer";
+      } else if (balance.partyType === "supplier") {
+        const supplier = await this.getSupplier(balance.partyId);
+        partyName = supplier?.name || "Unknown Supplier";
+      }
+      result.push({
+        ...balance,
+        branch,
+        partyName,
+      });
+    }
+    return result;
+  }
+
+  async getOpeningBalance(id: number): Promise<OpeningBalance | undefined> {
+    const [balance] = await db.select().from(openingBalances).where(eq(openingBalances.id, id));
+    return balance || undefined;
+  }
+
+  async createOpeningBalance(balance: InsertOpeningBalance): Promise<OpeningBalance> {
+    const [newBalance] = await db.insert(openingBalances).values(balance).returning();
+    return newBalance;
+  }
+
+  async updateOpeningBalance(id: number, balance: Partial<InsertOpeningBalance>): Promise<OpeningBalance | undefined> {
+    const [updated] = await db.update(openingBalances).set(balance).where(eq(openingBalances.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteOpeningBalance(id: number): Promise<boolean> {
+    const result = await db.delete(openingBalances).where(eq(openingBalances.id, id)).returning();
     return result.length > 0;
   }
 }
