@@ -170,31 +170,8 @@ export function SalesOrderForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="saleDate">Sale Date *</Label>
-              <Input
-                id="saleDate"
-                type="date"
-                value={saleDate}
-                onChange={(e) => setSaleDate(e.target.value)}
-                required
-                data-testid="input-sale-date"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="invoiceNumber">Invoice Number</Label>
-              <Input
-                id="invoiceNumber"
-                placeholder="e.g., INV-2024-001"
-                value={invoiceNumber}
-                onChange={(e) => setInvoiceNumber(e.target.value)}
-                data-testid="input-sales-invoice-number"
-              />
-            </div>
-
-            <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="customer">Customer</Label>
               <div className="flex gap-2">
                 <Select value={customerId} onValueChange={setCustomerId}>
@@ -215,6 +192,29 @@ export function SalesOrderForm({
                   Credit Limit: {creditLimitInfo.limit.toFixed(3)} KWD
                 </p>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="saleDate">Date *</Label>
+              <Input
+                id="saleDate"
+                type="date"
+                value={saleDate}
+                onChange={(e) => setSaleDate(e.target.value)}
+                required
+                data-testid="input-sale-date"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invoiceNumber">Invoice Number</Label>
+              <Input
+                id="invoiceNumber"
+                placeholder="e.g., INV-2024-001"
+                value={invoiceNumber}
+                onChange={(e) => setInvoiceNumber(e.target.value)}
+                data-testid="input-sales-invoice-number"
+              />
             </div>
           </div>
 
