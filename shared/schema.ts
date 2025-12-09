@@ -14,6 +14,22 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)],
 );
 
+// ==================== BRANCHES ====================
+
+export const branches = pgTable("branches", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  name: text("name").notNull().unique(),
+  code: text("code"),
+  address: text("address"),
+  phone: text("phone"),
+  isDefault: integer("is_default").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertBranchSchema = createInsertSchema(branches).omit({ id: true, createdAt: true });
+export type InsertBranch = z.infer<typeof insertBranchSchema>;
+export type Branch = typeof branches.$inferSelect;
+
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
@@ -73,6 +89,7 @@ export const purchaseOrders = pgTable("purchase_orders", {
   deliveryNoteFilePath: text("delivery_note_file_path"),
   ttCopyFilePath: text("tt_copy_file_path"),
   grnDate: date("grn_date"),
+  branchId: integer("branch_id").references(() => branches.id),
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -128,6 +145,7 @@ export const customers = pgTable("customers", {
   phone: text("phone"),
   email: text("email"),
   creditLimit: numeric("credit_limit", { precision: 12, scale: 3 }),
+  branchId: integer("branch_id").references(() => branches.id),
 });
 
 export const customersRelations = relations(customers, ({ many }) => ({
@@ -151,6 +169,7 @@ export const salesOrders = pgTable("sales_orders", {
   deliveryNoteFilePath: text("delivery_note_file_path"),
   paymentReceiptFilePath: text("payment_receipt_file_path"),
   deliveryDate: date("delivery_date"),
+  branchId: integer("branch_id").references(() => branches.id),
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -216,6 +235,7 @@ export const payments = pgTable("payments", {
   amount: numeric("amount", { precision: 12, scale: 3 }).notNull(),
   reference: text("reference"),
   notes: text("notes"),
+  branchId: integer("branch_id").references(() => branches.id),
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -250,8 +270,9 @@ export type AccountName = typeof ACCOUNT_NAMES[number];
 
 export const accounts = pgTable("accounts", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
-  name: text("name").notNull().unique(),
+  name: text("name").notNull(),
   balance: numeric("balance", { precision: 12, scale: 3 }).default("0"),
+  branchId: integer("branch_id").references(() => branches.id),
 });
 
 export const insertAccountSchema = createInsertSchema(accounts).omit({ id: true });
@@ -311,6 +332,7 @@ export const expenses = pgTable("expenses", {
   amount: numeric("amount", { precision: 12, scale: 3 }).notNull(),
   description: text("description"),
   reference: text("reference"),
+  branchId: integer("branch_id").references(() => branches.id),
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -353,6 +375,7 @@ export const returns = pgTable("returns", {
   totalKwd: numeric("total_kwd", { precision: 12, scale: 3 }),
   reason: text("reason"),
   notes: text("notes"),
+  branchId: integer("branch_id").references(() => branches.id),
   createdBy: varchar("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -476,4 +499,57 @@ export type Discount = typeof discounts.$inferSelect;
 export type DiscountWithDetails = Discount & {
   customer: Customer;
   salesOrder: SalesOrder;
+};
+
+// ==================== STOCK TRANSFERS ====================
+
+export const stockTransfers = pgTable("stock_transfers", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  transferDate: date("transfer_date").notNull(),
+  transferNumber: text("transfer_number"),
+  fromBranchId: integer("from_branch_id").references(() => branches.id).notNull(),
+  toBranchId: integer("to_branch_id").references(() => branches.id).notNull(),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const stockTransfersRelations = relations(stockTransfers, ({ one, many }) => ({
+  fromBranch: one(branches, {
+    fields: [stockTransfers.fromBranchId],
+    references: [branches.id],
+  }),
+  toBranch: one(branches, {
+    fields: [stockTransfers.toBranchId],
+    references: [branches.id],
+  }),
+  lineItems: many(stockTransferLineItems),
+}));
+
+export const insertStockTransferSchema = createInsertSchema(stockTransfers).omit({ id: true, createdAt: true });
+export type InsertStockTransfer = z.infer<typeof insertStockTransferSchema>;
+export type StockTransfer = typeof stockTransfers.$inferSelect;
+
+export const stockTransferLineItems = pgTable("stock_transfer_line_items", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  stockTransferId: integer("stock_transfer_id").references(() => stockTransfers.id, { onDelete: "cascade" }).notNull(),
+  itemName: text("item_name").notNull(),
+  quantity: integer("quantity").default(1),
+});
+
+export const stockTransferLineItemsRelations = relations(stockTransferLineItems, ({ one }) => ({
+  stockTransfer: one(stockTransfers, {
+    fields: [stockTransferLineItems.stockTransferId],
+    references: [stockTransfers.id],
+  }),
+}));
+
+export const insertStockTransferLineItemSchema = createInsertSchema(stockTransferLineItems).omit({ id: true });
+export type InsertStockTransferLineItem = z.infer<typeof insertStockTransferLineItemSchema>;
+export type StockTransferLineItem = typeof stockTransferLineItems.$inferSelect;
+
+export type StockTransferWithDetails = StockTransfer & {
+  fromBranch: Branch;
+  toBranch: Branch;
+  lineItems: StockTransferLineItem[];
 };
