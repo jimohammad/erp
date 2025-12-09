@@ -234,9 +234,6 @@ export function SalesLineItemRow({
                   {imeiError}
                 </p>
               )}
-              <p className="text-xs text-muted-foreground">
-                IMEI must be exactly 15 digits. Duplicates are not allowed.
-              </p>
             </div>
             
             {item.imeiNumbers.length === 0 ? (
