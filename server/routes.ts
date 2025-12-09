@@ -331,8 +331,7 @@ export async function registerRoutes(
   app.get("/api/sales-orders/next-invoice-number", isAuthenticated, async (req, res) => {
     try {
       const orders = await storage.getSalesOrders();
-      const currentYear = new Date().getFullYear();
-      const prefix = `SI-${currentYear}-`;
+      const prefix = `SI-2026-`;
       
       // Find the highest invoice number for the current year
       let maxNumber = 10000; // Start from 10001
