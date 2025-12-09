@@ -188,7 +188,6 @@ function AppSidebar() {
                               isActive={location === subItem.url}
                             >
                               <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(" ", "-")}`}>
-                                {subItem.title === "Bulk Edit" && <Edit3 className="h-3 w-3" />}
                                 {subItem.title}
                               </Link>
                             </SidebarMenuSubButton>
@@ -233,7 +232,6 @@ function AppSidebar() {
                               isActive={location === subItem.url}
                             >
                               <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(" ", "-")}`}>
-                                {subItem.title === "Party Statement" && <FileText className="h-3 w-3" />}
                                 {subItem.title}
                               </Link>
                             </SidebarMenuSubButton>
