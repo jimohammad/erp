@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import Home from "@/pages/home";
 import SalesPage from "@/pages/sales";
 import PaymentsPage from "@/pages/payments";
+import ReturnsPage from "@/pages/returns";
 import ItemMaster from "@/pages/item-master";
 import ItemBulkEdit from "@/pages/item-bulk-edit";
 import PartyMaster from "@/pages/party-master";
@@ -16,7 +17,7 @@ import ExpensesPage from "@/pages/expenses";
 import AccountsPage from "@/pages/accounts";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
-import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown } from "lucide-react";
+import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown, RotateCcw } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -62,6 +63,11 @@ function AppSidebar() {
       title: "Payments",
       url: "/payments",
       icon: CreditCard,
+    },
+    {
+      title: "Returns",
+      url: "/returns",
+      icon: RotateCcw,
     },
     {
       title: "Expenses",
@@ -218,6 +224,8 @@ function AuthenticatedLayout() {
         return "Sales Invoice Register";
       case "/payments":
         return "Payment Register";
+      case "/returns":
+        return "Returns Register";
       case "/expenses":
         return "Expense Tracker";
       case "/accounts":
@@ -269,6 +277,7 @@ function AuthenticatedLayout() {
               <Route path="/" component={Home} />
               <Route path="/sales" component={SalesPage} />
               <Route path="/payments" component={PaymentsPage} />
+              <Route path="/returns" component={ReturnsPage} />
               <Route path="/expenses" component={ExpensesPage} />
               <Route path="/accounts" component={AccountsPage} />
               <Route path="/items" component={ItemMaster} />
