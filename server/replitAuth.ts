@@ -164,9 +164,23 @@ export const isAdmin: RequestHandler = async (req, res, next) => {
   }
   
   const dbUser = await storage.getUser(user.claims.sub);
-  if (!dbUser || dbUser.role !== "admin") {
+  if (!dbUser) {
     return res.status(403).json({ message: "Forbidden: Admin access required" });
   }
   
-  return next();
+  // Check database role first
+  if (dbUser.role === "admin") {
+    return next();
+  }
+  
+  // Also check role assignments for super_user or admin
+  const email = user.claims.email;
+  if (email) {
+    const assignedRole = await storage.getRoleForEmail(email);
+    if (assignedRole === "super_user" || assignedRole === "admin") {
+      return next();
+    }
+  }
+  
+  return res.status(403).json({ message: "Forbidden: Admin access required" });
 };
