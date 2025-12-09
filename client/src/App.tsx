@@ -38,6 +38,8 @@ import {
 const Home = lazy(() => import("@/pages/home"));
 const DashboardPage = lazy(() => import("@/pages/dashboard"));
 const SalesPage = lazy(() => import("@/pages/sales"));
+const AllPurchasesPage = lazy(() => import("@/pages/all-purchases"));
+const AllSalesPage = lazy(() => import("@/pages/all-sales"));
 const PaymentsPage = lazy(() => import("@/pages/payments"));
 const ReturnsPage = lazy(() => import("@/pages/returns"));
 const ItemMaster = lazy(() => import("@/pages/item-master"));
@@ -93,18 +95,6 @@ function AppSidebar() {
       module: "dashboard",
     },
     {
-      title: "Purchases",
-      url: "/purchases",
-      icon: ShoppingCart,
-      module: "purchases",
-    },
-    {
-      title: "Sales",
-      url: "/sales",
-      icon: TrendingUp,
-      module: "sales",
-    },
-    {
       title: "Payments",
       url: "/payments",
       icon: CreditCard,
@@ -141,6 +131,14 @@ function AppSidebar() {
       module: "purchases",
     },
   ].filter(item => canAccess(item.module));
+
+  const purchasesSubItems = [
+    { title: "All Purchases", url: "/purchases/all" },
+  ];
+
+  const salesSubItems = [
+    { title: "All Sales", url: "/sales/all" },
+  ];
 
   const itemMasterSubItems = [
     { title: "View Items", url: "/items" },
@@ -208,6 +206,86 @@ function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
+
+              {canAccess("purchases") && (
+                <Collapsible defaultOpen={location.startsWith("/purchases")} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton isActive={location.startsWith("/purchases")}>
+                        <ShoppingCart className="h-4 w-4" />
+                        <span>Purchase Invoice +</span>
+                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={location === "/purchases"}
+                          >
+                            <Link href="/purchases" data-testid="link-new-purchase">
+                              New Purchase
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        {purchasesSubItems.map((subItem) => (
+                          <SidebarMenuSubItem key={subItem.url}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location === subItem.url}
+                            >
+                              <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(" ", "-")}`}>
+                                {subItem.title}
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+
+              {canAccess("sales") && (
+                <Collapsible defaultOpen={location.startsWith("/sales")} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton isActive={location.startsWith("/sales")}>
+                        <TrendingUp className="h-4 w-4" />
+                        <span>Sales Invoice +</span>
+                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={location === "/sales"}
+                          >
+                            <Link href="/sales" data-testid="link-new-sale">
+                              New Sale
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        {salesSubItems.map((subItem) => (
+                          <SidebarMenuSubItem key={subItem.url}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location === subItem.url}
+                            >
+                              <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(" ", "-")}`}>
+                                {subItem.title}
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
 
               {canAccess("items") && (
                 <Collapsible defaultOpen={location.startsWith("/items")} className="group/collapsible">
@@ -433,7 +511,9 @@ function AuthenticatedLayout() {
               <Switch>
                 <Route path="/" component={DashboardPage} />
                 <Route path="/purchases" component={Home} />
+                <Route path="/purchases/all" component={AllPurchasesPage} />
                 <Route path="/sales" component={SalesPage} />
+                <Route path="/sales/all" component={AllSalesPage} />
                 <Route path="/payments" component={PaymentsPage} />
                 <Route path="/returns" component={ReturnsPage} />
                 <Route path="/expenses" component={ExpensesPage} />
