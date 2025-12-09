@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Plus, Trash2, RotateCcw, X } from "lucide-react";
+import { Plus, Trash2, RotateCcw, X, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -71,8 +71,10 @@ export default function ReturnsPage() {
   const [lineItems, setLineItems] = useState<ReturnLineItemForm[]>([
     { itemName: "", quantity: 1, priceKwd: "", totalKwd: "", imeiNumbers: [] },
   ]);
-  const [currentImei, setCurrentImei] = useState("");
-  const [activeLineIndex, setActiveLineIndex] = useState<number | null>(null);
+  const [imeiDialogOpen, setImeiDialogOpen] = useState(false);
+  const [imeiDialogLineIndex, setImeiDialogLineIndex] = useState<number | null>(null);
+  const [newImei, setNewImei] = useState("");
+  const [imeiError, setImeiError] = useState("");
 
   const { data: returns = [], isLoading } = useQuery<ReturnWithDetails[]>({
     queryKey: ["/api/returns"],
@@ -187,32 +189,74 @@ export default function ReturnsPage() {
     }
   };
 
-  const addImeiToLine = (index: number, imei: string) => {
-    if (!imei.trim()) return;
-    
-    if (imei.length !== 15 || !/^\d+$/.test(imei)) {
-      toast({ title: "Invalid IMEI", description: "IMEI must be exactly 15 digits", variant: "destructive" });
-      return;
-    }
-    
-    const updated = [...lineItems];
-    if (!updated[index].imeiNumbers.includes(imei)) {
-      updated[index].imeiNumbers = [...updated[index].imeiNumbers, imei];
-      updated[index].quantity = updated[index].imeiNumbers.length;
-      const total = (parseFloat(updated[index].priceKwd) || 0) * updated[index].quantity;
-      updated[index].totalKwd = total.toFixed(3);
-      setLineItems(updated);
-    }
-    setCurrentImei("");
+  const openImeiDialog = (index: number) => {
+    setImeiDialogLineIndex(index);
+    setNewImei("");
+    setImeiError("");
+    setImeiDialogOpen(true);
   };
 
-  const removeImeiFromLine = (lineIndex: number, imei: string) => {
+  const closeImeiDialog = () => {
+    setImeiDialogOpen(false);
+    setImeiDialogLineIndex(null);
+    setNewImei("");
+    setImeiError("");
+  };
+
+  const getAllImeiNumbers = (): string[] => {
+    return lineItems.flatMap(item => item.imeiNumbers);
+  };
+
+  const validateImei = (imei: string): string | null => {
+    const trimmed = imei.trim();
+    if (!/^\d+$/.test(trimmed)) {
+      return "IMEI must contain only digits";
+    }
+    if (trimmed.length !== 15) {
+      return "IMEI must be exactly 15 digits";
+    }
+    if (getAllImeiNumbers().includes(trimmed)) {
+      return "This IMEI has already been added";
+    }
+    return null;
+  };
+
+  const handleAddImei = () => {
+    if (imeiDialogLineIndex === null) return;
+    const trimmed = newImei.trim();
+    if (!trimmed) return;
+
+    const error = validateImei(trimmed);
+    if (error) {
+      setImeiError(error);
+      return;
+    }
+
     const updated = [...lineItems];
-    updated[lineIndex].imeiNumbers = updated[lineIndex].imeiNumbers.filter(i => i !== imei);
-    updated[lineIndex].quantity = Math.max(1, updated[lineIndex].imeiNumbers.length);
-    const total = (parseFloat(updated[lineIndex].priceKwd) || 0) * updated[lineIndex].quantity;
-    updated[lineIndex].totalKwd = total.toFixed(3);
+    updated[imeiDialogLineIndex].imeiNumbers = [...updated[imeiDialogLineIndex].imeiNumbers, trimmed];
+    updated[imeiDialogLineIndex].quantity = updated[imeiDialogLineIndex].imeiNumbers.length;
+    const total = (parseFloat(updated[imeiDialogLineIndex].priceKwd) || 0) * updated[imeiDialogLineIndex].quantity;
+    updated[imeiDialogLineIndex].totalKwd = total.toFixed(3);
     setLineItems(updated);
+    setNewImei("");
+    setImeiError("");
+  };
+
+  const handleRemoveImei = (imeiIndex: number) => {
+    if (imeiDialogLineIndex === null) return;
+    const updated = [...lineItems];
+    updated[imeiDialogLineIndex].imeiNumbers = updated[imeiDialogLineIndex].imeiNumbers.filter((_, i) => i !== imeiIndex);
+    updated[imeiDialogLineIndex].quantity = Math.max(1, updated[imeiDialogLineIndex].imeiNumbers.length);
+    const total = (parseFloat(updated[imeiDialogLineIndex].priceKwd) || 0) * updated[imeiDialogLineIndex].quantity;
+    updated[imeiDialogLineIndex].totalKwd = total.toFixed(3);
+    setLineItems(updated);
+  };
+
+  const handleImeiKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddImei();
+    }
   };
 
   const onSubmit = (data: ReturnFormValues) => {
@@ -411,49 +455,16 @@ export default function ReturnsPage() {
                               />
                             </TableCell>
                             <TableCell>
-                              <div className="space-y-1">
-                                <div className="flex gap-1 flex-wrap">
-                                  {item.imeiNumbers.map((imei) => (
-                                    <Badge key={imei} variant="secondary" className="text-xs">
-                                      {imei}
-                                      <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-3 w-3 ml-1 p-0"
-                                        onClick={() => removeImeiFromLine(index, imei)}
-                                      >
-                                        <X className="h-2 w-2" />
-                                      </Button>
-                                    </Badge>
-                                  ))}
-                                </div>
-                                <div className="flex gap-1">
-                                  <Input
-                                    placeholder="Enter IMEI"
-                                    value={activeLineIndex === index ? currentImei : ""}
-                                    onFocus={() => setActiveLineIndex(index)}
-                                    onChange={(e) => setCurrentImei(e.target.value)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        addImeiToLine(index, currentImei);
-                                      }
-                                    }}
-                                    className="h-7 text-xs"
-                                    data-testid={`input-imei-${index}`}
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 px-2"
-                                    onClick={() => addImeiToLine(index, currentImei)}
-                                  >
-                                    Add
-                                  </Button>
-                                </div>
-                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openImeiDialog(index)}
+                                data-testid={`button-imei-${index}`}
+                              >
+                                <Smartphone className="h-4 w-4 mr-1" />
+                                {item.imeiNumbers.length > 0 ? `${item.imeiNumbers.length} IMEI` : "Add IMEI"}
+                              </Button>
                             </TableCell>
                             <TableCell>
                               <Button
@@ -489,6 +500,84 @@ export default function ReturnsPage() {
                 </div>
               </form>
             </Form>
+          </DialogContent>
+        </Dialog>
+
+        {/* IMEI Popup Dialog */}
+        <Dialog open={imeiDialogOpen} onOpenChange={setImeiDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Smartphone className="h-5 w-5" />
+                Manage IMEI Numbers
+                {imeiDialogLineIndex !== null && lineItems[imeiDialogLineIndex]?.itemName && (
+                  <span className="text-sm font-normal text-muted-foreground">
+                    - {lineItems[imeiDialogLineIndex].itemName}
+                  </span>
+                )}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4">
+              {/* Add IMEI Input */}
+              <div className="space-y-2">
+                <Label>Add IMEI Number</Label>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter 15-digit IMEI"
+                    value={newImei}
+                    onChange={(e) => {
+                      setNewImei(e.target.value);
+                      setImeiError("");
+                    }}
+                    onKeyDown={handleImeiKeyDown}
+                    maxLength={15}
+                    data-testid="input-imei-popup"
+                  />
+                  <Button
+                    type="button"
+                    onClick={handleAddImei}
+                    data-testid="button-add-imei-popup"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                {imeiError && (
+                  <p className="text-sm text-destructive">{imeiError}</p>
+                )}
+              </div>
+
+              {/* List of IMEIs */}
+              {imeiDialogLineIndex !== null && lineItems[imeiDialogLineIndex]?.imeiNumbers.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Added IMEI Numbers ({lineItems[imeiDialogLineIndex].imeiNumbers.length})</Label>
+                  <div className="max-h-48 overflow-y-auto border rounded-md p-2 space-y-1">
+                    {lineItems[imeiDialogLineIndex].imeiNumbers.map((imei, idx) => (
+                      <div key={idx} className="flex items-center justify-between gap-2 p-1 rounded bg-muted/50">
+                        <span className="text-sm font-mono">{imei}</span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => handleRemoveImei(idx)}
+                          data-testid={`button-remove-imei-${idx}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Done Button */}
+              <div className="flex justify-end">
+                <Button onClick={closeImeiDialog} data-testid="button-close-imei-popup">
+                  Done
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
