@@ -29,8 +29,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Trash2, Package, Users, Building2 } from "lucide-react";
+import { Plus, Trash2, Package, Users, Building2, Shield } from "lucide-react";
 import type { 
   InventoryAdjustmentWithDetails, 
   OpeningBalanceWithDetails, 
@@ -42,6 +43,9 @@ import type {
 
 export default function OpeningBalances() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  const isAdminOrSuperUser = user?.role === "admin" || user?.role === "super_user";
   
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);
   const [isAddBalanceOpen, setIsAddBalanceOpen] = useState(false);
@@ -196,6 +200,25 @@ export default function OpeningBalances() {
 
   const parties = balancePartyType === "customer" ? customers : suppliers;
 
+  if (!isAdminOrSuperUser) {
+    return (
+      <div className="p-6">
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Shield className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+            <h2 className="text-xl font-semibold mb-2">Access Restricted</h2>
+            <p className="text-muted-foreground">
+              Only Admins and Super Users can manage opening balances.
+            </p>
+            <p className="text-sm text-muted-foreground mt-2">
+              Your current role: <Badge variant="secondary">{user?.role || "user"}</Badge>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-6 p-4">
       <div>
