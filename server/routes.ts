@@ -151,6 +151,31 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/items/:itemName/last-pricing", isAuthenticated, async (req, res) => {
+    try {
+      const itemName = decodeURIComponent(req.params.itemName);
+      const pricing = await storage.getItemLastPricing(itemName);
+      res.json(pricing || { priceKwd: null, fxCurrency: null });
+    } catch (error) {
+      console.error("Error fetching last pricing:", error);
+      res.status(500).json({ error: "Failed to fetch last pricing" });
+    }
+  });
+
+  app.put("/api/items/bulk", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { updates } = req.body;
+      if (!Array.isArray(updates) || updates.length === 0) {
+        return res.status(400).json({ error: "Updates array is required" });
+      }
+      const updatedItems = await storage.bulkUpdateItems(updates);
+      res.json(updatedItems);
+    } catch (error) {
+      console.error("Error bulk updating items:", error);
+      res.status(500).json({ error: "Failed to bulk update items" });
+    }
+  });
+
   app.get("/api/purchase-orders", isAuthenticated, async (req, res) => {
     try {
       const orders = await storage.getPurchaseOrders();
