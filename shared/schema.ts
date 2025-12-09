@@ -34,6 +34,7 @@ export const suppliers = pgTable("suppliers", {
   address: text("address"),
   phone: text("phone"),
   partyType: text("party_type").default("supplier").notNull(),
+  creditLimit: numeric("credit_limit", { precision: 12, scale: 3 }),
 });
 
 export const suppliersRelations = relations(suppliers, ({ many }) => ({

@@ -38,6 +38,7 @@ export default function PartyMaster() {
   const [partyAddress, setPartyAddress] = useState("");
   const [partyPhone, setPartyPhone] = useState("");
   const [partyType, setPartyType] = useState<PartyType>("supplier");
+  const [creditLimit, setCreditLimit] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [partyToDelete, setPartyToDelete] = useState<Supplier | null>(null);
   
@@ -52,7 +53,7 @@ export default function PartyMaster() {
     : allParties.filter(p => p.partyType === filterType);
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; address: string | null; phone: string | null; partyType: PartyType }) => 
+    mutationFn: (data: { name: string; address: string | null; phone: string | null; partyType: PartyType; creditLimit: string | null }) => 
       apiRequest("POST", "/api/suppliers", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
@@ -65,7 +66,7 @@ export default function PartyMaster() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name: string; address: string | null; phone: string | null; partyType: PartyType } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { name: string; address: string | null; phone: string | null; partyType: PartyType; creditLimit: string | null } }) =>
       apiRequest("PUT", `/api/suppliers/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
@@ -103,6 +104,7 @@ export default function PartyMaster() {
     setPartyAddress("");
     setPartyPhone("");
     setPartyType("supplier");
+    setCreditLimit("");
     setDialogOpen(true);
   };
 
@@ -112,6 +114,7 @@ export default function PartyMaster() {
     setPartyAddress(party.address || "");
     setPartyPhone(party.phone || "");
     setPartyType((party.partyType as PartyType) || "supplier");
+    setCreditLimit(party.creditLimit || "");
     setDialogOpen(true);
   };
 
@@ -122,6 +125,7 @@ export default function PartyMaster() {
     setPartyAddress("");
     setPartyPhone("");
     setPartyType("supplier");
+    setCreditLimit("");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -133,6 +137,7 @@ export default function PartyMaster() {
       address: partyAddress.trim() || null,
       phone: partyPhone.trim() || null,
       partyType,
+      creditLimit: partyType === "customer" && creditLimit.trim() ? creditLimit.trim() : null,
     };
 
     if (editingParty) {
@@ -151,6 +156,12 @@ export default function PartyMaster() {
     if (partyToDelete) {
       deleteMutation.mutate(partyToDelete.id);
     }
+  };
+
+  const formatCurrency = (value: string | null) => {
+    if (!value) return "-";
+    const num = parseFloat(value);
+    return isNaN(num) ? "-" : `${num.toFixed(3)} KWD`;
   };
 
   if (isLoading) {
@@ -219,6 +230,7 @@ export default function PartyMaster() {
                     <TableHead className="w-28">Type</TableHead>
                     <TableHead>Address</TableHead>
                     <TableHead className="w-36">Phone</TableHead>
+                    <TableHead className="w-32 text-right">Credit Limit</TableHead>
                     {isAdmin && <TableHead className="w-24 text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -244,6 +256,9 @@ export default function PartyMaster() {
                       </TableCell>
                       <TableCell className="text-sm" data-testid={`text-party-phone-${party.id}`}>
                         {party.phone || "-"}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium" data-testid={`text-credit-limit-${party.id}`}>
+                        {party.partyType === "customer" ? formatCurrency(party.creditLimit) : "-"}
                       </TableCell>
                       {isAdmin && (
                         <TableCell className="text-right">
@@ -335,6 +350,24 @@ export default function PartyMaster() {
                   data-testid="input-party-phone"
                 />
               </div>
+              {partyType === "customer" && (
+                <div className="space-y-2">
+                  <Label htmlFor="creditLimit">Credit Limit (KWD)</Label>
+                  <Input
+                    id="creditLimit"
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    value={creditLimit}
+                    onChange={(e) => setCreditLimit(e.target.value)}
+                    placeholder="Enter maximum credit limit (optional)"
+                    data-testid="input-credit-limit"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Maximum amount the salesman can invoice without admin approval
+                  </p>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={handleCloseDialog}>
