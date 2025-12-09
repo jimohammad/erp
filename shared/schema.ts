@@ -581,6 +581,8 @@ export const stockTransferLineItems = pgTable("stock_transfer_line_items", {
   stockTransferId: integer("stock_transfer_id").references(() => stockTransfers.id, { onDelete: "cascade" }).notNull(),
   itemName: text("item_name").notNull(),
   quantity: integer("quantity").default(1),
+  priceKwd: numeric("price_kwd", { precision: 12, scale: 3 }),
+  imeiNumbers: text("imei_numbers").array(),
 }, (table) => [
   index("idx_transfer_line_item").on(table.itemName),
   index("idx_transfer_line_transfer").on(table.stockTransferId),

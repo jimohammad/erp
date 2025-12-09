@@ -1336,6 +1336,30 @@ export async function registerRoutes(
 
   // ==================== STOCK TRANSFER ROUTES ====================
 
+  app.get("/api/stock-transfers/next-transfer-number", isAuthenticated, async (req, res) => {
+    try {
+      const transfers = await storage.getStockTransfers();
+      const prefix = `TR-2026-`;
+      
+      // Find the highest transfer number
+      let maxNumber = 10000; // Start from 10001
+      transfers.forEach(transfer => {
+        if (transfer.transferNumber && transfer.transferNumber.startsWith(prefix)) {
+          const numPart = parseInt(transfer.transferNumber.substring(prefix.length));
+          if (!isNaN(numPart) && numPart > maxNumber) {
+            maxNumber = numPart;
+          }
+        }
+      });
+      
+      const nextNumber = `${prefix}${maxNumber + 1}`;
+      res.json({ transferNumber: nextNumber });
+    } catch (error) {
+      console.error("Error generating transfer number:", error);
+      res.status(500).json({ error: "Failed to generate transfer number" });
+    }
+  });
+
   app.get("/api/stock-transfers", isAuthenticated, async (req, res) => {
     try {
       const transfers = await storage.getStockTransfers();

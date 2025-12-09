@@ -49,6 +49,8 @@ interface StockTransferLineItem {
   stockTransferId: number;
   itemName: string;
   quantity: number | null;
+  priceKwd: string | null;
+  imeiNumbers: string[] | null;
 }
 
 interface StockTransfer {
@@ -66,6 +68,8 @@ interface StockTransfer {
 interface LineItemInput {
   itemName: string;
   quantity: number;
+  priceKwd: string;
+  imeiNumbers: string[];
 }
 
 export default function StockTransfersPage() {
@@ -79,7 +83,22 @@ export default function StockTransfersPage() {
     toBranchId: "",
     notes: "",
   });
-  const [lineItems, setLineItems] = useState<LineItemInput[]>([{ itemName: "", quantity: 1 }]);
+  const [lineItems, setLineItems] = useState<LineItemInput[]>([{ itemName: "", quantity: 1, priceKwd: "", imeiNumbers: [] }]);
+  const [imeiDialogOpen, setImeiDialogOpen] = useState(false);
+  const [currentImeiIndex, setCurrentImeiIndex] = useState<number | null>(null);
+  const [imeiText, setImeiText] = useState("");
+
+  // Fetch next transfer number
+  const { data: nextTransferData, refetch: refetchTransferNumber } = useQuery<{ transferNumber: string }>({
+    queryKey: ["/api/stock-transfers/next-transfer-number"],
+  });
+
+  // Auto-populate transfer number when dialog opens
+  useEffect(() => {
+    if (isDialogOpen && nextTransferData?.transferNumber && !formData.transferNumber) {
+      setFormData(prev => ({ ...prev, transferNumber: nextTransferData.transferNumber }));
+    }
+  }, [isDialogOpen, nextTransferData]);
 
   const { data: allTransfers = [], isLoading } = useQuery<StockTransfer[]>({
     queryKey: ["/api/stock-transfers"],
@@ -116,10 +135,7 @@ export default function StockTransfersPage() {
       notes: string;
       lineItems: LineItemInput[];
     }) => {
-      return await apiRequest("/api/stock-transfers", {
-        method: "POST",
-        body: JSON.stringify(data),
-      });
+      return await apiRequest("POST", "/api/stock-transfers", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
@@ -134,7 +150,7 @@ export default function StockTransfersPage() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      return await apiRequest(`/api/stock-transfers/${id}`, { method: "DELETE" });
+      return await apiRequest("DELETE", `/api/stock-transfers/${id}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers"] });
@@ -153,7 +169,24 @@ export default function StockTransfersPage() {
       toBranchId: "",
       notes: "",
     });
-    setLineItems([{ itemName: "", quantity: 1 }]);
+    setLineItems([{ itemName: "", quantity: 1, priceKwd: "", imeiNumbers: [] }]);
+    queryClient.invalidateQueries({ queryKey: ["/api/stock-transfers/next-transfer-number"] });
+  };
+
+  const openImeiDialog = (index: number) => {
+    setCurrentImeiIndex(index);
+    setImeiText(lineItems[index].imeiNumbers.join("\n"));
+    setImeiDialogOpen(true);
+  };
+
+  const saveImeiNumbers = () => {
+    if (currentImeiIndex !== null) {
+      const imeis = imeiText.split("\n").map(s => s.trim()).filter(s => s.length > 0);
+      setLineItems(prev => prev.map((item, idx) => 
+        idx === currentImeiIndex ? { ...item, imeiNumbers: imeis } : item
+      ));
+    }
+    setImeiDialogOpen(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -184,7 +217,7 @@ export default function StockTransfersPage() {
   };
 
   const addLineItem = () => {
-    setLineItems([...lineItems, { itemName: "", quantity: 1 }]);
+    setLineItems([...lineItems, { itemName: "", quantity: 1, priceKwd: "", imeiNumbers: [] }]);
   };
 
   const removeLineItem = (index: number) => {
@@ -301,7 +334,9 @@ export default function StockTransfersPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Item</TableHead>
-                        <TableHead className="w-24">Quantity</TableHead>
+                        <TableHead className="w-20">Qty</TableHead>
+                        <TableHead className="w-24">Price</TableHead>
+                        <TableHead className="w-20">IMEI</TableHead>
                         <TableHead className="w-12"></TableHead>
                       </TableRow>
                     </TableHeader>
@@ -333,6 +368,27 @@ export default function StockTransfersPage() {
                               onChange={(e) => updateLineItem(index, "quantity", parseInt(e.target.value) || 1)}
                               data-testid={`input-quantity-${index}`}
                             />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="0.001"
+                              value={item.priceKwd}
+                              onChange={(e) => updateLineItem(index, "priceKwd", e.target.value)}
+                              placeholder="0.000"
+                              data-testid={`input-price-${index}`}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openImeiDialog(index)}
+                              data-testid={`button-imei-${index}`}
+                            >
+                              {item.imeiNumbers.length > 0 ? `${item.imeiNumbers.length}` : "+"}
+                            </Button>
                           </TableCell>
                           <TableCell>
                             <Button
@@ -437,6 +493,32 @@ export default function StockTransfersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* IMEI Dialog */}
+      <Dialog open={imeiDialogOpen} onOpenChange={setImeiDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enter IMEI Numbers</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Textarea
+              value={imeiText}
+              onChange={(e) => setImeiText(e.target.value)}
+              placeholder="Enter IMEI numbers, one per line"
+              rows={8}
+              data-testid="textarea-imei"
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setImeiDialogOpen(false)} data-testid="button-cancel-imei">
+                Cancel
+              </Button>
+              <Button onClick={saveImeiNumbers} data-testid="button-save-imei">
+                Save
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
