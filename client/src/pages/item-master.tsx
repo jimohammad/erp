@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -7,6 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -22,7 +29,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Loader2, Package } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Package, RefreshCw } from "lucide-react";
 import type { Item } from "@shared/schema";
 
 export default function ItemMaster() {
@@ -34,6 +41,10 @@ export default function ItemMaster() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [itemCode, setItemCode] = useState("");
   const [itemName, setItemName] = useState("");
+  const [purchasePriceKwd, setPurchasePriceKwd] = useState("");
+  const [fxCurrency, setFxCurrency] = useState("");
+  const [sellingPriceKwd, setSellingPriceKwd] = useState("");
+  const [fetchingPricing, setFetchingPricing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
 
@@ -41,8 +52,16 @@ export default function ItemMaster() {
     queryKey: ["/api/items"],
   });
 
+  type ItemFormData = {
+    code: string | null;
+    name: string;
+    purchasePriceKwd: string | null;
+    fxCurrency: string | null;
+    sellingPriceKwd: string | null;
+  };
+
   const createMutation = useMutation({
-    mutationFn: (data: { code: string | null; name: string }) => apiRequest("POST", "/api/items", data),
+    mutationFn: (data: ItemFormData) => apiRequest("POST", "/api/items", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/items"] });
       toast({ title: "Item added successfully" });
@@ -54,7 +73,7 @@ export default function ItemMaster() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { code: string | null; name: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: ItemFormData }) =>
       apiRequest("PUT", `/api/items/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/items"] });
@@ -65,6 +84,29 @@ export default function ItemMaster() {
       toast({ title: "Failed to update item", variant: "destructive" });
     },
   });
+
+  const fetchLastPricing = async (name: string) => {
+    if (!name.trim()) return;
+    setFetchingPricing(true);
+    try {
+      const response = await fetch(`/api/items/${encodeURIComponent(name)}/last-pricing`, {
+        credentials: "include",
+      });
+      if (response.ok) {
+        const pricing = await response.json();
+        if (pricing.priceKwd) {
+          setPurchasePriceKwd(pricing.priceKwd);
+        }
+        if (pricing.fxCurrency) {
+          setFxCurrency(pricing.fxCurrency);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching last pricing:", error);
+    } finally {
+      setFetchingPricing(false);
+    }
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -90,6 +132,9 @@ export default function ItemMaster() {
     setEditingItem(null);
     setItemCode("");
     setItemName("");
+    setPurchasePriceKwd("");
+    setFxCurrency("");
+    setSellingPriceKwd("");
     setDialogOpen(true);
   };
 
@@ -97,6 +142,9 @@ export default function ItemMaster() {
     setEditingItem(item);
     setItemCode(item.code || "");
     setItemName(item.name);
+    setPurchasePriceKwd(item.purchasePriceKwd || "");
+    setFxCurrency(item.fxCurrency || "");
+    setSellingPriceKwd(item.sellingPriceKwd || "");
     setDialogOpen(true);
   };
 
@@ -105,15 +153,21 @@ export default function ItemMaster() {
     setEditingItem(null);
     setItemCode("");
     setItemName("");
+    setPurchasePriceKwd("");
+    setFxCurrency("");
+    setSellingPriceKwd("");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!itemName.trim()) return;
 
-    const data = {
+    const data: ItemFormData = {
       code: itemCode.trim() || null,
       name: itemName.trim(),
+      purchasePriceKwd: purchasePriceKwd.trim() || null,
+      fxCurrency: fxCurrency.trim() || null,
+      sellingPriceKwd: sellingPriceKwd.trim() || null,
     };
 
     if (editingItem) {
@@ -163,13 +217,16 @@ export default function ItemMaster() {
               No items found. {isAdmin && "Add your first item to get started."}
             </div>
           ) : (
-            <div className="border rounded-md">
+            <div className="border rounded-md overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-16">ID</TableHead>
                     <TableHead className="w-32">Item Code</TableHead>
                     <TableHead>Item Name</TableHead>
+                    <TableHead className="w-28 text-right">Purchase KWD</TableHead>
+                    <TableHead className="w-20">FX</TableHead>
+                    <TableHead className="w-28 text-right">Selling KWD</TableHead>
                     {isAdmin && <TableHead className="w-24 text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -184,6 +241,15 @@ export default function ItemMaster() {
                       </TableCell>
                       <TableCell className="font-medium" data-testid={`text-item-name-${item.id}`}>
                         {item.name}
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-purchase-price-${item.id}`}>
+                        {item.purchasePriceKwd ? parseFloat(item.purchasePriceKwd).toFixed(3) : "-"}
+                      </TableCell>
+                      <TableCell data-testid={`text-fx-currency-${item.id}`}>
+                        {item.fxCurrency || "-"}
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-selling-price-${item.id}`}>
+                        {item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "-"}
                       </TableCell>
                       {isAdmin && (
                         <TableCell className="text-right">
@@ -217,30 +283,89 @@ export default function ItemMaster() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{editingItem ? "Edit Item" : "Add New Item"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="itemCode">Item Code</Label>
+                  <Input
+                    id="itemCode"
+                    value={itemCode}
+                    onChange={(e) => setItemCode(e.target.value)}
+                    placeholder="Optional"
+                    data-testid="input-item-code"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="itemName">Item Name</Label>
+                  <Input
+                    id="itemName"
+                    value={itemName}
+                    onChange={(e) => setItemName(e.target.value)}
+                    placeholder="Enter item name"
+                    data-testid="input-item-name"
+                  />
+                </div>
+              </div>
+              
               <div className="space-y-2">
-                <Label htmlFor="itemCode">Item Code</Label>
+                <div className="flex items-center justify-between gap-2">
+                  <Label>Purchase Price (KWD)</Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fetchLastPricing(itemName)}
+                    disabled={fetchingPricing || !itemName.trim()}
+                    data-testid="button-fetch-pricing"
+                    className="h-7 text-xs"
+                  >
+                    {fetchingPricing ? (
+                      <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3 mr-1" />
+                    )}
+                    Fetch Last Price
+                  </Button>
+                </div>
                 <Input
-                  id="itemCode"
-                  value={itemCode}
-                  onChange={(e) => setItemCode(e.target.value)}
-                  placeholder="Enter item code (optional)"
-                  data-testid="input-item-code"
+                  value={purchasePriceKwd}
+                  onChange={(e) => setPurchasePriceKwd(e.target.value)}
+                  placeholder="0.000"
+                  type="number"
+                  step="0.001"
+                  data-testid="input-purchase-price"
                 />
               </div>
+              
               <div className="space-y-2">
-                <Label htmlFor="itemName">Item Name</Label>
+                <Label htmlFor="fxCurrency">FX Currency</Label>
+                <Select value={fxCurrency} onValueChange={setFxCurrency}>
+                  <SelectTrigger data-testid="select-fx-currency">
+                    <SelectValue placeholder="Select currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AED">AED</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="KWD">KWD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="sellingPrice">Selling Price (KWD)</Label>
                 <Input
-                  id="itemName"
-                  value={itemName}
-                  onChange={(e) => setItemName(e.target.value)}
-                  placeholder="Enter item name"
-                  data-testid="input-item-name"
+                  id="sellingPrice"
+                  value={sellingPriceKwd}
+                  onChange={(e) => setSellingPriceKwd(e.target.value)}
+                  placeholder="0.000"
+                  type="number"
+                  step="0.001"
+                  data-testid="input-selling-price"
                 />
               </div>
             </div>
