@@ -111,7 +111,7 @@ export function SalesLineItemRow({
         className="flex flex-wrap items-center gap-2 p-2 rounded-md bg-muted/30"
         data-testid={`sales-line-item-row-${index}`}
       >
-        <div className="flex-1 min-w-[150px]">
+        <div className="flex-1 min-w-[300px]">
           <Select
             value={item.itemName || "none"}
             onValueChange={handleItemChange}

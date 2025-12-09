@@ -223,7 +223,7 @@ export function PurchaseOrderForm({
               <table className="min-w-full text-xs">
                 <thead className="bg-muted/50">
                   <tr className="text-[11px] text-muted-foreground uppercase tracking-wide">
-                    <th className="px-3 py-2 text-left w-1/2 min-w-[260px]">Item</th>
+                    <th className="px-3 py-2 text-left w-1/2 min-w-[400px]">Item</th>
                     <th className="px-1 py-2 text-center w-[8%]">Qty</th>
                     <th className="px-1 py-2 text-center w-[12%]">Price KWD</th>
                     <th className="px-1 py-2 text-center w-[15%]">FX Price</th>

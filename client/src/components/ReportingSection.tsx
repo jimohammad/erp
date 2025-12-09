@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Eye, FileText, Truck, CreditCard, Printer, X, Trash2 } from "lucide-react";
-import { MonthlyChart } from "./MonthlyChart";
 import type { PurchaseOrderWithDetails } from "@shared/schema";
 
 interface ReportingSectionProps {
@@ -237,8 +236,6 @@ export function ReportingSection({
             )}
           </div>
         </div>
-
-        <MonthlyChart data={monthlyStats} isLoading={isStatsLoading} />
 
         <div className="border border-border rounded-lg overflow-hidden">
           <ScrollArea className="max-h-[420px]">

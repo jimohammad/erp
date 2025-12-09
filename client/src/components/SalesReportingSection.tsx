@@ -8,7 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Eye, FileText, Truck, CreditCard, Printer, X, Trash2 } from "lucide-react";
-import { MonthlyChart } from "./MonthlyChart";
 import type { SalesOrderWithDetails } from "@shared/schema";
 
 interface SalesReportingSectionProps {
@@ -207,14 +206,6 @@ export function SalesReportingSection({
             <p className="text-xs text-muted-foreground mb-1">Total Revenue (KWD)</p>
             <p className="text-2xl font-semibold font-mono" data-testid="text-sales-kpi-kwd">{kpis.totalKwd}</p>
           </div>
-        </div>
-
-        <div className="no-print">
-          {isStatsLoading ? (
-            <Skeleton className="h-[200px] w-full" />
-          ) : (
-            <MonthlyChart data={monthlyStats} isLoading={isStatsLoading} title="Monthly Sales" />
-          )}
         </div>
 
         <div>
