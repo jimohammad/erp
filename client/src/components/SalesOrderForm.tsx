@@ -1,4 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,6 +41,18 @@ export function SalesOrderForm({
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split("T")[0]);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [customerId, setCustomerId] = useState<string>("");
+
+  // Fetch next invoice number on mount
+  const { data: nextInvoiceData } = useQuery<{ invoiceNumber: string }>({
+    queryKey: ["/api/sales-orders/next-invoice-number"],
+  });
+
+  // Set invoice number when data is fetched
+  useEffect(() => {
+    if (nextInvoiceData?.invoiceNumber && !invoiceNumber) {
+      setInvoiceNumber(nextInvoiceData.invoiceNumber);
+    }
+  }, [nextInvoiceData]);
   const [lineItems, setLineItems] = useState<SalesLineItemData[]>([
     { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", totalKwd: "0.000", imeiNumbers: [] },
   ]);
@@ -108,13 +122,16 @@ export function SalesOrderForm({
     setLineItems(prev => prev.filter(item => item.id !== id));
   };
 
-  const handleReset = () => {
+  const handleReset = (refetchInvoiceNumber = false) => {
     setSaleDate(new Date().toISOString().split("T")[0]);
     setInvoiceNumber("");
     setCustomerId("");
     setLineItems([
       { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", totalKwd: "0.000", imeiNumbers: [] },
     ]);
+    if (refetchInvoiceNumber) {
+      queryClient.invalidateQueries({ queryKey: ["/api/sales-orders/next-invoice-number"] });
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -132,7 +149,7 @@ export function SalesOrderForm({
       lineItems,
     });
 
-    handleReset();
+    handleReset(true);
   };
 
   return (
@@ -143,7 +160,7 @@ export function SalesOrderForm({
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={handleReset}
+            onClick={() => handleReset()}
             data-testid="button-reset-sales"
           >
             <RotateCcw className="h-4 w-4 mr-1" />

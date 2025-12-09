@@ -328,6 +328,31 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/sales-orders/next-invoice-number", isAuthenticated, async (req, res) => {
+    try {
+      const orders = await storage.getSalesOrders();
+      const currentYear = new Date().getFullYear();
+      const prefix = `SI-${currentYear}-`;
+      
+      // Find the highest invoice number for the current year
+      let maxNumber = 10000; // Start from 10001
+      orders.forEach(order => {
+        if (order.invoiceNumber && order.invoiceNumber.startsWith(prefix)) {
+          const numPart = parseInt(order.invoiceNumber.substring(prefix.length));
+          if (!isNaN(numPart) && numPart > maxNumber) {
+            maxNumber = numPart;
+          }
+        }
+      });
+      
+      const nextNumber = `${prefix}${maxNumber + 1}`;
+      res.json({ invoiceNumber: nextNumber });
+    } catch (error) {
+      console.error("Error generating invoice number:", error);
+      res.status(500).json({ error: "Failed to generate invoice number" });
+    }
+  });
+
   app.get("/api/sales-orders", isAuthenticated, async (req, res) => {
     try {
       const orders = await storage.getSalesOrders();
