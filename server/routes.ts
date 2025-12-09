@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, insertLineItemSchema, insertCustomerSchema, insertSalesOrderSchema, insertSalesLineItemSchema, insertPaymentSchema, PAYMENT_TYPES, PAYMENT_DIRECTIONS, insertExpenseCategorySchema, insertExpenseSchema, insertAccountTransferSchema, insertReturnSchema, insertReturnLineItemSchema, insertUserRoleAssignmentSchema, insertDiscountSchema, ROLE_TYPES, MODULE_NAMES } from "@shared/schema";
+import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, insertLineItemSchema, insertCustomerSchema, insertSalesOrderSchema, insertSalesLineItemSchema, insertPaymentSchema, PAYMENT_TYPES, PAYMENT_DIRECTIONS, insertExpenseCategorySchema, insertExpenseSchema, insertAccountTransferSchema, insertReturnSchema, insertReturnLineItemSchema, insertUserRoleAssignmentSchema, insertDiscountSchema, insertBranchSchema, insertStockTransferSchema, insertStockTransferLineItemSchema, ROLE_TYPES, MODULE_NAMES } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
 
@@ -1212,6 +1212,170 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error performing search:", error);
       res.status(500).json({ error: "Failed to perform search" });
+    }
+  });
+
+  // ==================== BRANCH ROUTES ====================
+
+  app.get("/api/branches", isAuthenticated, async (req, res) => {
+    try {
+      const branchesList = await storage.getBranches();
+      res.json(branchesList);
+    } catch (error) {
+      console.error("Error fetching branches:", error);
+      res.status(500).json({ error: "Failed to fetch branches" });
+    }
+  });
+
+  app.get("/api/branches/default", isAuthenticated, async (req, res) => {
+    try {
+      const branch = await storage.getDefaultBranch();
+      res.json(branch || null);
+    } catch (error) {
+      console.error("Error fetching default branch:", error);
+      res.status(500).json({ error: "Failed to fetch default branch" });
+    }
+  });
+
+  app.get("/api/branches/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid branch ID" });
+      }
+      const branch = await storage.getBranch(id);
+      if (!branch) {
+        return res.status(404).json({ error: "Branch not found" });
+      }
+      res.json(branch);
+    } catch (error) {
+      console.error("Error fetching branch:", error);
+      res.status(500).json({ error: "Failed to fetch branch" });
+    }
+  });
+
+  app.post("/api/branches", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const parsed = insertBranchSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const branch = await storage.createBranch(parsed.data);
+      res.status(201).json(branch);
+    } catch (error) {
+      console.error("Error creating branch:", error);
+      res.status(500).json({ error: "Failed to create branch" });
+    }
+  });
+
+  app.put("/api/branches/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid branch ID" });
+      }
+      const parsed = insertBranchSchema.partial().safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+      const branch = await storage.updateBranch(id, parsed.data);
+      if (!branch) {
+        return res.status(404).json({ error: "Branch not found" });
+      }
+      res.json(branch);
+    } catch (error) {
+      console.error("Error updating branch:", error);
+      res.status(500).json({ error: "Failed to update branch" });
+    }
+  });
+
+  app.delete("/api/branches/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid branch ID" });
+      }
+      const result = await storage.deleteBranch(id);
+      if (result.error) {
+        return res.status(409).json({ error: result.error });
+      }
+      if (!result.deleted) {
+        return res.status(404).json({ error: "Branch not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting branch:", error);
+      res.status(500).json({ error: "Failed to delete branch" });
+    }
+  });
+
+  // ==================== STOCK TRANSFER ROUTES ====================
+
+  app.get("/api/stock-transfers", isAuthenticated, async (req, res) => {
+    try {
+      const transfers = await storage.getStockTransfers();
+      res.json(transfers);
+    } catch (error) {
+      console.error("Error fetching stock transfers:", error);
+      res.status(500).json({ error: "Failed to fetch stock transfers" });
+    }
+  });
+
+  app.get("/api/stock-transfers/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid transfer ID" });
+      }
+      const transfer = await storage.getStockTransfer(id);
+      if (!transfer) {
+        return res.status(404).json({ error: "Stock transfer not found" });
+      }
+      res.json(transfer);
+    } catch (error) {
+      console.error("Error fetching stock transfer:", error);
+      res.status(500).json({ error: "Failed to fetch stock transfer" });
+    }
+  });
+
+  app.post("/api/stock-transfers", isAuthenticated, async (req: any, res) => {
+    try {
+      const { lineItems, ...transferData } = req.body;
+      
+      const parsed = insertStockTransferSchema.safeParse({
+        ...transferData,
+        createdBy: req.user?.claims?.sub,
+      });
+      if (!parsed.success) {
+        return res.status(400).json({ error: parsed.error.message });
+      }
+
+      if (!lineItems || !Array.isArray(lineItems) || lineItems.length === 0) {
+        return res.status(400).json({ error: "At least one line item is required" });
+      }
+
+      const transfer = await storage.createStockTransfer(parsed.data, lineItems);
+      res.status(201).json(transfer);
+    } catch (error) {
+      console.error("Error creating stock transfer:", error);
+      res.status(500).json({ error: "Failed to create stock transfer" });
+    }
+  });
+
+  app.delete("/api/stock-transfers/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid transfer ID" });
+      }
+      const deleted = await storage.deleteStockTransfer(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Stock transfer not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting stock transfer:", error);
+      res.status(500).json({ error: "Failed to delete stock transfer" });
     }
   });
 

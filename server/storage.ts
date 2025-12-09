@@ -17,6 +17,9 @@ import {
   rolePermissions,
   userRoleAssignments,
   discounts,
+  branches,
+  stockTransfers,
+  stockTransferLineItems,
   ACCOUNT_NAMES,
   ROLE_TYPES,
   MODULE_NAMES,
@@ -63,6 +66,13 @@ import {
   type Discount,
   type InsertDiscount,
   type DiscountWithDetails,
+  type Branch,
+  type InsertBranch,
+  type StockTransfer,
+  type InsertStockTransfer,
+  type StockTransferLineItem,
+  type InsertStockTransferLineItem,
+  type StockTransferWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -170,6 +180,20 @@ export interface IStorage {
   // Dashboard
   getDashboardStats(): Promise<{ totalStock: number; totalCash: number; monthlySales: number; monthlyPurchases: number }>;
   globalSearch(query: string): Promise<{ type: string; id: number; title: string; subtitle: string; url: string }[]>;
+
+  // Branches
+  getBranches(): Promise<Branch[]>;
+  getBranch(id: number): Promise<Branch | undefined>;
+  createBranch(branch: InsertBranch): Promise<Branch>;
+  updateBranch(id: number, branch: Partial<InsertBranch>): Promise<Branch | undefined>;
+  deleteBranch(id: number): Promise<{ deleted: boolean; error?: string }>;
+  getDefaultBranch(): Promise<Branch | undefined>;
+
+  // Stock Transfers
+  getStockTransfers(): Promise<StockTransferWithDetails[]>;
+  getStockTransfer(id: number): Promise<StockTransferWithDetails | undefined>;
+  createStockTransfer(transfer: InsertStockTransfer, lineItems: Omit<InsertStockTransferLineItem, 'stockTransferId'>[]): Promise<StockTransferWithDetails>;
+  deleteStockTransfer(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1523,6 +1547,106 @@ export class DatabaseStorage implements IStorage {
     }
 
     return results.slice(0, 20);
+  }
+
+  // ==================== BRANCHES ====================
+
+  async getBranches(): Promise<Branch[]> {
+    return await db.select().from(branches).orderBy(branches.name);
+  }
+
+  async getBranch(id: number): Promise<Branch | undefined> {
+    const [branch] = await db.select().from(branches).where(eq(branches.id, id));
+    return branch || undefined;
+  }
+
+  async createBranch(branch: InsertBranch): Promise<Branch> {
+    const [newBranch] = await db.insert(branches).values(branch).returning();
+    return newBranch;
+  }
+
+  async updateBranch(id: number, branch: Partial<InsertBranch>): Promise<Branch | undefined> {
+    const [updated] = await db.update(branches).set(branch).where(eq(branches.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteBranch(id: number): Promise<{ deleted: boolean; error?: string }> {
+    // Check if this is the default branch
+    const branchRecord = await this.getBranch(id);
+    if (branchRecord?.isDefault) {
+      return { deleted: false, error: "Cannot delete the default branch" };
+    }
+
+    // Check for linked data
+    const linkedCustomers = await db.select({ count: sql<number>`count(*)::int` }).from(customers).where(eq(customers.branchId, id));
+    if (linkedCustomers[0].count > 0) {
+      return { deleted: false, error: `Cannot delete branch: ${linkedCustomers[0].count} customer(s) are linked to this branch` };
+    }
+
+    const result = await db.delete(branches).where(eq(branches.id, id)).returning();
+    return { deleted: result.length > 0 };
+  }
+
+  async getDefaultBranch(): Promise<Branch | undefined> {
+    const [branch] = await db.select().from(branches).where(eq(branches.isDefault, 1));
+    return branch || undefined;
+  }
+
+  // ==================== STOCK TRANSFERS ====================
+
+  async getStockTransfers(): Promise<StockTransferWithDetails[]> {
+    const transfers = await db.select().from(stockTransfers).orderBy(desc(stockTransfers.transferDate));
+    
+    const result: StockTransferWithDetails[] = [];
+    for (const transfer of transfers) {
+      const fromBranch = await this.getBranch(transfer.fromBranchId);
+      const toBranch = await this.getBranch(transfer.toBranchId);
+      const lineItems = await db.select().from(stockTransferLineItems).where(eq(stockTransferLineItems.stockTransferId, transfer.id));
+      
+      result.push({
+        ...transfer,
+        fromBranch: fromBranch!,
+        toBranch: toBranch!,
+        lineItems,
+      });
+    }
+    return result;
+  }
+
+  async getStockTransfer(id: number): Promise<StockTransferWithDetails | undefined> {
+    const [transfer] = await db.select().from(stockTransfers).where(eq(stockTransfers.id, id));
+    if (!transfer) return undefined;
+
+    const fromBranch = await this.getBranch(transfer.fromBranchId);
+    const toBranch = await this.getBranch(transfer.toBranchId);
+    const lineItems = await db.select().from(stockTransferLineItems).where(eq(stockTransferLineItems.stockTransferId, transfer.id));
+
+    return {
+      ...transfer,
+      fromBranch: fromBranch!,
+      toBranch: toBranch!,
+      lineItems,
+    };
+  }
+
+  async createStockTransfer(transfer: InsertStockTransfer, lineItems: Omit<InsertStockTransferLineItem, 'stockTransferId'>[]): Promise<StockTransferWithDetails> {
+    const [newTransfer] = await db.insert(stockTransfers).values(transfer).returning();
+
+    const lineItemsWithId = lineItems.map(item => ({
+      ...item,
+      stockTransferId: newTransfer.id,
+    }));
+
+    if (lineItemsWithId.length > 0) {
+      await db.insert(stockTransferLineItems).values(lineItemsWithId);
+    }
+
+    return (await this.getStockTransfer(newTransfer.id))!;
+  }
+
+  async deleteStockTransfer(id: number): Promise<boolean> {
+    const result = await db.delete(stockTransfers).where(eq(stockTransfers.id, id)).returning();
+    return result.length > 0;
   }
 }
 
