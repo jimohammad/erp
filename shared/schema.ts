@@ -33,6 +33,7 @@ export const suppliers = pgTable("suppliers", {
   name: text("name").notNull(),
   address: text("address"),
   phone: text("phone"),
+  partyType: text("party_type").default("supplier").notNull(),
 });
 
 export const suppliersRelations = relations(suppliers, ({ many }) => ({
@@ -42,6 +43,8 @@ export const suppliersRelations = relations(suppliers, ({ many }) => ({
 export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: true });
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type Supplier = typeof suppliers.$inferSelect;
+
+export type PartyType = "supplier" | "customer";
 
 export const items = pgTable("items", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),

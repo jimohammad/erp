@@ -10,13 +10,13 @@ import SalesPage from "@/pages/sales";
 import PaymentsPage from "@/pages/payments";
 import ItemMaster from "@/pages/item-master";
 import ItemBulkEdit from "@/pages/item-bulk-edit";
-import SupplierMaster from "@/pages/supplier-master";
+import PartyMaster from "@/pages/party-master";
 import ReportsPage from "@/pages/reports";
 import ExpensesPage from "@/pages/expenses";
 import AccountsPage from "@/pages/accounts";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
-import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Truck, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown } from "lucide-react";
+import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -82,9 +82,9 @@ function AppSidebar() {
 
   const bottomMenuItems = [
     {
-      title: "Supplier Master",
-      url: "/suppliers",
-      icon: Truck,
+      title: "Party Master",
+      url: "/parties",
+      icon: Users,
     },
     {
       title: "Reports",
@@ -226,8 +226,8 @@ function AuthenticatedLayout() {
         return "Item Master";
       case "/items/bulk-edit":
         return "Item Master - Bulk Edit";
-      case "/suppliers":
-        return "Supplier Master";
+      case "/parties":
+        return "Party Master";
       case "/reports":
         return "Reports";
       default:
@@ -273,7 +273,7 @@ function AuthenticatedLayout() {
               <Route path="/accounts" component={AccountsPage} />
               <Route path="/items" component={ItemMaster} />
               <Route path="/items/bulk-edit" component={ItemBulkEdit} />
-              <Route path="/suppliers" component={SupplierMaster} />
+              <Route path="/parties" component={PartyMaster} />
               <Route path="/reports" component={ReportsPage} />
               <Route component={NotFound} />
             </Switch>
