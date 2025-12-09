@@ -252,11 +252,13 @@ export function SalesOrderForm({
           </div>
 
           <div className="p-4 bg-muted/50 rounded-md">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Total (KWD)</Label>
-              <p className="text-xl font-semibold font-mono" data-testid="text-sales-total-kwd">
-                {totalKwd} KWD
-              </p>
+            <div className="flex justify-end">
+              <div className="text-right space-y-1">
+                <Label className="text-xs text-muted-foreground">Total (KWD)</Label>
+                <p className="text-xl font-semibold font-mono" data-testid="text-sales-total-kwd">
+                  {totalKwd} KWD
+                </p>
+              </div>
             </div>
           </div>
 
