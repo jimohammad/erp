@@ -4,11 +4,19 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Package, DollarSign, TrendingUp, ShoppingCart, Search, Loader2, ArrowRight } from "lucide-react";
+import { Package, DollarSign, TrendingUp, TrendingDown, ShoppingCart, Search, Loader2, ArrowRight, Wallet, Building2, CreditCard, Smartphone } from "lucide-react";
+
+interface AccountBalance {
+  name: string;
+  balance: number;
+}
 
 interface DashboardStats {
-  totalStock: number;
-  totalCash: number;
+  stockAmount: number;
+  totalCredit: number;
+  totalDebit: number;
+  cashBalance: number;
+  accountBalances: AccountBalance[];
   monthlySales: number;
   monthlyPurchases: number;
 }
@@ -52,6 +60,20 @@ export default function DashboardPage() {
       minimumFractionDigits: 3,
       maximumFractionDigits: 3,
     }).format(value);
+  };
+
+  const getAccountIcon = (name: string) => {
+    switch (name) {
+      case "NBK Bank":
+      case "CBK Bank":
+        return <Building2 className="h-4 w-4 text-muted-foreground" />;
+      case "Knet":
+        return <CreditCard className="h-4 w-4 text-muted-foreground" />;
+      case "Wamd":
+        return <Smartphone className="h-4 w-4 text-muted-foreground" />;
+      default:
+        return <DollarSign className="h-4 w-4 text-muted-foreground" />;
+    }
   };
 
   const currentMonth = new Date().toLocaleString("default", { month: "long", year: "numeric" });
@@ -122,58 +144,105 @@ export default function DashboardPage() {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card data-testid="card-stock-available">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Stock Available</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-stock">
-                {stats?.totalStock?.toLocaleString() || 0}
-              </div>
-              <p className="text-xs text-muted-foreground">Total units in inventory</p>
-            </CardContent>
-          </Card>
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card data-testid="card-stock-amount">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Stock Amount</CardTitle>
+                <Package className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-stock-amount">
+                  {formatCurrency(stats?.stockAmount || 0)} KWD
+                </div>
+                <p className="text-xs text-muted-foreground">Total inventory value</p>
+              </CardContent>
+            </Card>
 
-          <Card data-testid="card-total-cash">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Cash</CardTitle>
-              <DollarSign className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-total-cash">
-                {formatCurrency(stats?.totalCash || 0)} KWD
-              </div>
-              <p className="text-xs text-muted-foreground">Across all accounts</p>
-            </CardContent>
-          </Card>
+            <Card data-testid="card-total-credit">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Credit</CardTitle>
+                <TrendingUp className="h-4 w-4 text-green-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600" data-testid="text-total-credit">
+                  {formatCurrency(stats?.totalCredit || 0)} KWD
+                </div>
+                <p className="text-xs text-muted-foreground">All incoming payments</p>
+              </CardContent>
+            </Card>
 
-          <Card data-testid="card-monthly-sales">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Sales</CardTitle>
-              <TrendingUp className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-monthly-sales">
-                {formatCurrency(stats?.monthlySales || 0)} KWD
-              </div>
-              <p className="text-xs text-muted-foreground">{currentMonth}</p>
-            </CardContent>
-          </Card>
+            <Card data-testid="card-total-debit">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Debit</CardTitle>
+                <TrendingDown className="h-4 w-4 text-red-600" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600" data-testid="text-total-debit">
+                  {formatCurrency(stats?.totalDebit || 0)} KWD
+                </div>
+                <p className="text-xs text-muted-foreground">All outgoing payments</p>
+              </CardContent>
+            </Card>
 
-          <Card data-testid="card-monthly-purchases">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Monthly Purchases</CardTitle>
-              <ShoppingCart className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" data-testid="text-monthly-purchases">
-                {formatCurrency(stats?.monthlyPurchases || 0)} KWD
-              </div>
-              <p className="text-xs text-muted-foreground">{currentMonth}</p>
-            </CardContent>
-          </Card>
+            <Card data-testid="card-cash-balance">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Cash Available</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-cash-balance">
+                  {formatCurrency(stats?.cashBalance || 0)} KWD
+                </div>
+                <p className="text-xs text-muted-foreground">Cash account balance</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {stats?.accountBalances?.map((account) => (
+              <Card key={account.name} data-testid={`card-account-${account.name.toLowerCase().replace(/\s+/g, '-')}`}>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">{account.name}</CardTitle>
+                  {getAccountIcon(account.name)}
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold" data-testid={`text-account-${account.name.toLowerCase().replace(/\s+/g, '-')}`}>
+                    {formatCurrency(account.balance)} KWD
+                  </div>
+                  <p className="text-xs text-muted-foreground">Account balance</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card data-testid="card-monthly-sales">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Monthly Sales</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-monthly-sales">
+                  {formatCurrency(stats?.monthlySales || 0)} KWD
+                </div>
+                <p className="text-xs text-muted-foreground">{currentMonth}</p>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-monthly-purchases">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Monthly Purchases</CardTitle>
+                <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" data-testid="text-monthly-purchases">
+                  {formatCurrency(stats?.monthlyPurchases || 0)} KWD
+                </div>
+                <p className="text-xs text-muted-foreground">{currentMonth}</p>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
     </div>

@@ -1292,15 +1292,25 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== DASHBOARD ====================
 
-  async getDashboardStats(): Promise<{ totalStock: number; totalCash: number; monthlySales: number; monthlyPurchases: number }> {
+  async getDashboardStats(): Promise<{ 
+    stockAmount: number; 
+    totalCredit: number; 
+    totalDebit: number; 
+    cashBalance: number; 
+    accountBalances: { name: string; balance: number }[];
+    monthlySales: number; 
+    monthlyPurchases: number 
+  }> {
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth() + 1;
     const currentYear = currentDate.getFullYear();
 
-    // Get total stock balance (purchased - sold + sale_returns - purchase_returns)
+    // Get total stock amount (value in KWD based on purchase prices)
     const stockResult = await db.execute(sql`
       WITH purchased AS (
-        SELECT item_name, COALESCE(SUM(quantity), 0) as qty
+        SELECT item_name, 
+               COALESCE(SUM(quantity), 0) as qty,
+               COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as amount
         FROM purchase_order_line_items
         GROUP BY item_name
       ),
@@ -1328,20 +1338,40 @@ export class DatabaseStorage implements IStorage {
         UNION SELECT item_name FROM sold
         UNION SELECT item_name FROM sale_returns
         UNION SELECT item_name FROM purchase_returns
+      ),
+      stock_qty AS (
+        SELECT ai.item_name,
+               COALESCE(p.qty, 0) - COALESCE(s.qty, 0) + COALESCE(sr.qty, 0) - COALESCE(pr.qty, 0) as net_qty,
+               CASE WHEN COALESCE(p.qty, 0) > 0 THEN p.amount / p.qty ELSE 0 END as avg_cost
+        FROM all_items ai
+        LEFT JOIN purchased p ON ai.item_name = p.item_name
+        LEFT JOIN sold s ON ai.item_name = s.item_name
+        LEFT JOIN sale_returns sr ON ai.item_name = sr.item_name
+        LEFT JOIN purchase_returns pr ON ai.item_name = pr.item_name
       )
-      SELECT COALESCE(SUM(
-        COALESCE(p.qty, 0) - COALESCE(s.qty, 0) + COALESCE(sr.qty, 0) - COALESCE(pr.qty, 0)
-      ), 0)::integer as total
-      FROM all_items ai
-      LEFT JOIN purchased p ON ai.item_name = p.item_name
-      LEFT JOIN sold s ON ai.item_name = s.item_name
-      LEFT JOIN sale_returns sr ON ai.item_name = sr.item_name
-      LEFT JOIN purchase_returns pr ON ai.item_name = pr.item_name
+      SELECT COALESCE(SUM(GREATEST(net_qty, 0) * avg_cost), 0)::float as total
+      FROM stock_qty
     `);
-    const totalStock = (stockResult.rows[0] as { total: number })?.total || 0;
+    const stockAmount = (stockResult.rows[0] as { total: number })?.total || 0;
 
-    // Get total cash across all accounts
-    const cashResult = await db.execute(sql`
+    // Get total credit (all IN payments)
+    const creditResult = await db.execute(sql`
+      SELECT COALESCE(SUM(CAST(amount AS DECIMAL)), 0)::float as total
+      FROM payments
+      WHERE direction = 'IN'
+    `);
+    const totalCredit = (creditResult.rows[0] as { total: number })?.total || 0;
+
+    // Get total debit (all OUT payments + expenses)
+    const debitResult = await db.execute(sql`
+      SELECT 
+        COALESCE((SELECT SUM(CAST(amount AS DECIMAL)) FROM payments WHERE direction = 'OUT'), 0) +
+        COALESCE((SELECT SUM(CAST(amount AS DECIMAL)) FROM expenses), 0) as total
+    `);
+    const totalDebit = ((debitResult.rows[0] as { total: number })?.total || 0) as number;
+
+    // Get individual account balances
+    const accountsResult = await db.execute(sql`
       WITH payment_totals AS (
         SELECT 
           payment_type,
@@ -1357,21 +1387,37 @@ export class DatabaseStorage implements IStorage {
         JOIN accounts a ON e.account_id = a.id
         GROUP BY a.name
       ),
-      transfer_totals AS (
-        SELECT 
-          from_account_id,
-          to_account_id,
-          SUM(CAST(amount AS DECIMAL)) as amount
+      transfer_in AS (
+        SELECT to_account_id as account_id, SUM(CAST(amount AS DECIMAL)) as amount
         FROM account_transfers
-        GROUP BY from_account_id, to_account_id
+        GROUP BY to_account_id
+      ),
+      transfer_out AS (
+        SELECT from_account_id as account_id, SUM(CAST(amount AS DECIMAL)) as amount
+        FROM account_transfers
+        GROUP BY from_account_id
       )
       SELECT 
-        COALESCE(SUM(COALESCE(p.net, 0) + COALESCE(e.net, 0)), 0)::float as total
+        a.name,
+        (COALESCE(p.net, 0) + COALESCE(e.net, 0) + COALESCE(ti.amount, 0) - COALESCE(tout.amount, 0))::float as balance
       FROM accounts a
       LEFT JOIN payment_totals p ON a.name = p.payment_type
       LEFT JOIN expense_totals e ON a.name = e.account_name
+      LEFT JOIN transfer_in ti ON a.id = ti.account_id
+      LEFT JOIN transfer_out tout ON a.id = tout.account_id
+      ORDER BY a.id
     `);
-    const totalCash = (cashResult.rows[0] as { total: number })?.total || 0;
+    
+    const accountBalances: { name: string; balance: number }[] = [];
+    let cashBalance = 0;
+    
+    for (const row of accountsResult.rows as { name: string; balance: number }[]) {
+      if (row.name === 'Cash') {
+        cashBalance = row.balance || 0;
+      } else {
+        accountBalances.push({ name: row.name, balance: row.balance || 0 });
+      }
+    }
 
     // Get current month sales
     const salesResult = await db.execute(sql`
@@ -1391,7 +1437,7 @@ export class DatabaseStorage implements IStorage {
     `);
     const monthlyPurchases = (purchasesResult.rows[0] as { total: number })?.total || 0;
 
-    return { totalStock, totalCash, monthlySales, monthlyPurchases };
+    return { stockAmount, totalCredit, totalDebit, cashBalance, accountBalances, monthlySales, monthlyPurchases };
   }
 
   async globalSearch(query: string): Promise<{ type: string; id: number; title: string; subtitle: string; url: string }[]> {
