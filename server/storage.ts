@@ -104,6 +104,7 @@ export interface IStorage {
   getStockBalance(): Promise<{ itemName: string; purchased: number; sold: number; balance: number }[]>;
   getDailyCashFlow(startDate?: string, endDate?: string): Promise<{ date: string; inAmount: number; outAmount: number; net: number; runningBalance: number }[]>;
   getCustomerReport(): Promise<{ customerId: number; customerName: string; totalSales: number; totalPayments: number; balance: number }[]>;
+  getPartyStatement(partyId: number, startDate?: string, endDate?: string): Promise<{ id: number; date: string; type: string; reference: string; description: string; debit: number; credit: number; balance: number }[]>;
 
   // Accounts Module
   getAccounts(): Promise<Account[]>;
@@ -567,6 +568,153 @@ export class DatabaseStorage implements IStorage {
       ORDER BY c.name
     `);
     return result.rows as { customerId: number; customerName: string; totalSales: number; totalPayments: number; balance: number }[];
+  }
+
+  async getPartyStatement(partyId: number, startDate?: string, endDate?: string): Promise<{ id: number; date: string; type: string; reference: string; description: string; debit: number; credit: number; balance: number }[]> {
+    const party = await db.select().from(suppliers).where(eq(suppliers.id, partyId));
+    if (party.length === 0) return [];
+    
+    const partyData = party[0];
+    const isSupplier = partyData.partyType === "supplier";
+
+    let dateFilter = sql``;
+    if (startDate && endDate) {
+      dateFilter = sql`AND date >= ${startDate} AND date <= ${endDate}`;
+    } else if (startDate) {
+      dateFilter = sql`AND date >= ${startDate}`;
+    } else if (endDate) {
+      dateFilter = sql`AND date <= ${endDate}`;
+    }
+
+    let result;
+    
+    if (isSupplier) {
+      result = await db.execute(sql`
+        WITH all_transactions AS (
+          -- Purchases from this supplier (we owe them - credit)
+          SELECT 
+            id,
+            purchase_date as date,
+            'purchase' as type,
+            invoice_number as reference,
+            'Purchase Order' as description,
+            0::float as debit,
+            COALESCE(CAST(total_kwd AS DECIMAL), 0)::float as credit,
+            created_at
+          FROM purchase_orders
+          WHERE supplier_id = ${partyId}
+          ${dateFilter}
+          
+          UNION ALL
+          
+          -- Payments to this supplier (we paid them - debit)
+          SELECT 
+            id,
+            payment_date as date,
+            'payment_out' as type,
+            receipt_number as reference,
+            'Payment' as description,
+            COALESCE(CAST(amount AS DECIMAL), 0)::float as debit,
+            0::float as credit,
+            created_at
+          FROM payments
+          WHERE supplier_id = ${partyId} AND direction = 'OUT'
+          ${dateFilter}
+          
+          UNION ALL
+          
+          -- Purchase Returns (we returned goods - reduces what we owe - debit)
+          SELECT 
+            id,
+            return_date as date,
+            'return' as type,
+            return_number as reference,
+            'Purchase Return' as description,
+            COALESCE(CAST(total_amount AS DECIMAL), 0)::float as debit,
+            0::float as credit,
+            created_at
+          FROM returns
+          WHERE supplier_id = ${partyId} AND return_type = 'purchase'
+          ${dateFilter}
+        )
+        SELECT 
+          id,
+          TO_CHAR(date, 'YYYY-MM-DD') as date,
+          type,
+          reference,
+          description,
+          debit::float,
+          credit::float,
+          SUM(credit - debit) OVER (ORDER BY date, created_at)::float as balance
+        FROM all_transactions
+        ORDER BY date, created_at
+      `);
+    } else {
+      result = await db.execute(sql`
+        WITH all_transactions AS (
+          -- Sales to this customer (they owe us - debit)
+          SELECT 
+            so.id,
+            so.invoice_date as date,
+            'sale' as type,
+            so.invoice_number as reference,
+            'Sales Invoice' as description,
+            COALESCE(CAST(so.total_kwd AS DECIMAL), 0)::float as debit,
+            0::float as credit,
+            so.created_at
+          FROM sales_orders so
+          JOIN customers c ON so.customer_id = c.id
+          WHERE c.name = ${partyData.name}
+          ${dateFilter}
+          
+          UNION ALL
+          
+          -- Payments from this customer (they paid us - credit)
+          SELECT 
+            p.id,
+            p.payment_date as date,
+            'payment_in' as type,
+            p.receipt_number as reference,
+            'Payment Received' as description,
+            0::float as debit,
+            COALESCE(CAST(p.amount AS DECIMAL), 0)::float as credit,
+            p.created_at
+          FROM payments p
+          JOIN customers c ON p.customer_id = c.id
+          WHERE c.name = ${partyData.name} AND p.direction = 'IN'
+          ${dateFilter}
+          
+          UNION ALL
+          
+          -- Sale Returns (customer returned goods - reduces what they owe - credit)
+          SELECT 
+            id,
+            return_date as date,
+            'return' as type,
+            return_number as reference,
+            'Sale Return' as description,
+            0::float as debit,
+            COALESCE(CAST(total_amount AS DECIMAL), 0)::float as credit,
+            created_at
+          FROM returns
+          WHERE supplier_id = ${partyId} AND return_type = 'sale'
+          ${dateFilter}
+        )
+        SELECT 
+          id,
+          TO_CHAR(date, 'YYYY-MM-DD') as date,
+          type,
+          reference,
+          description,
+          debit::float,
+          credit::float,
+          SUM(debit - credit) OVER (ORDER BY date, created_at)::float as balance
+        FROM all_transactions
+        ORDER BY date, created_at
+      `);
+    }
+    
+    return result.rows as { id: number; date: string; type: string; reference: string; description: string; debit: number; credit: number; balance: number }[];
   }
 
   // ==================== ACCOUNTS MODULE ====================

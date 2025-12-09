@@ -13,11 +13,12 @@ import ItemMaster from "@/pages/item-master";
 import ItemBulkEdit from "@/pages/item-bulk-edit";
 import PartyMaster from "@/pages/party-master";
 import ReportsPage from "@/pages/reports";
+import PartyStatementPage from "@/pages/party-statement";
 import ExpensesPage from "@/pages/expenses";
 import AccountsPage from "@/pages/accounts";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
-import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown, RotateCcw } from "lucide-react";
+import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown, RotateCcw, FileText } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,17 +87,9 @@ function AppSidebar() {
     { title: "Bulk Edit", url: "/items/bulk-edit" },
   ];
 
-  const bottomMenuItems = [
-    {
-      title: "Party Master",
-      url: "/parties",
-      icon: Users,
-    },
-    {
-      title: "Reports",
-      url: "/reports",
-      icon: FileBarChart,
-    },
+  const reportsSubItems = [
+    { title: "General Reports", url: "/reports" },
+    { title: "Party Statement", url: "/reports/party-statement" },
   ];
 
   const handleLogout = () => {
@@ -171,19 +164,46 @@ function AppSidebar() {
                 </SidebarMenuItem>
               </Collapsible>
 
-              {bottomMenuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={location === item.url}
-                  >
-                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase().replace(" ", "-")}`}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
+              <SidebarMenuItem>
+                <SidebarMenuButton 
+                  asChild 
+                  isActive={location === "/parties"}
+                >
+                  <Link href="/parties" data-testid="link-party-master">
+                    <Users className="h-4 w-4" />
+                    <span>Party Master</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+
+              <Collapsible defaultOpen={location.startsWith("/reports")} className="group/collapsible">
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton isActive={location.startsWith("/reports")}>
+                      <FileBarChart className="h-4 w-4" />
+                      <span>Reports</span>
+                      <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {reportsSubItems.map((subItem) => (
+                        <SidebarMenuSubItem key={subItem.url}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={location === subItem.url}
+                          >
+                            <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(" ", "-")}`}>
+                              {subItem.title === "Party Statement" && <FileText className="h-3 w-3" />}
+                              {subItem.title}
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
                 </SidebarMenuItem>
-              ))}
+              </Collapsible>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -238,6 +258,8 @@ function AuthenticatedLayout() {
         return "Party Master";
       case "/reports":
         return "Reports";
+      case "/reports/party-statement":
+        return "Party Statement";
       default:
         return "";
     }
@@ -284,6 +306,7 @@ function AuthenticatedLayout() {
               <Route path="/items/bulk-edit" component={ItemBulkEdit} />
               <Route path="/parties" component={PartyMaster} />
               <Route path="/reports" component={ReportsPage} />
+              <Route path="/reports/party-statement" component={PartyStatementPage} />
               <Route component={NotFound} />
             </Switch>
           </main>

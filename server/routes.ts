@@ -573,6 +573,25 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/reports/party-statement/:partyId", isAuthenticated, async (req, res) => {
+    try {
+      const partyId = parseInt(req.params.partyId);
+      if (isNaN(partyId)) {
+        return res.status(400).json({ error: "Invalid party ID" });
+      }
+      const { startDate, endDate } = req.query;
+      const transactions = await storage.getPartyStatement(
+        partyId,
+        startDate as string | undefined,
+        endDate as string | undefined
+      );
+      res.json(transactions);
+    } catch (error) {
+      console.error("Error fetching party statement:", error);
+      res.status(500).json({ error: "Failed to fetch party statement" });
+    }
+  });
+
   // ==================== ACCOUNTS MODULE ====================
 
   await storage.ensureDefaultAccounts();
