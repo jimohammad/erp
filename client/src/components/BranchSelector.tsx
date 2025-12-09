@@ -18,9 +18,10 @@ interface Branch {
 interface BranchSelectorProps {
   selectedBranchId: number | null;
   onBranchChange: (branchId: number) => void;
+  disabled?: boolean;
 }
 
-export function BranchSelector({ selectedBranchId, onBranchChange }: BranchSelectorProps) {
+export function BranchSelector({ selectedBranchId, onBranchChange, disabled }: BranchSelectorProps) {
   const { data: branches = [], isLoading } = useQuery<Branch[]>({
     queryKey: ["/api/branches"],
   });
@@ -42,6 +43,7 @@ export function BranchSelector({ selectedBranchId, onBranchChange }: BranchSelec
     <Select
       value={selectedBranchId?.toString() || ""}
       onValueChange={(value) => onBranchChange(parseInt(value))}
+      disabled={disabled}
     >
       <SelectTrigger 
         className="w-[180px] h-9" 

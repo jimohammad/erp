@@ -31,8 +31,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Trash2, Edit2, Users, Shield, Settings } from "lucide-react";
-import type { UserRoleAssignment, RolePermission } from "@shared/schema";
+import { Plus, Trash2, Edit2, Users, Shield, Settings, Building2 } from "lucide-react";
+import type { UserRoleAssignment, RolePermission, Branch } from "@shared/schema";
+
+interface UserRoleAssignmentWithBranch extends UserRoleAssignment {
+  branch?: Branch;
+}
 
 const ROLE_LABELS: Record<string, string> = {
   super_user: "Super User",
@@ -56,20 +60,22 @@ const MODULE_LABELS: Record<string, string> = {
 interface MyPermissions {
   role: string;
   modules: string[];
+  assignedBranchId: number | null;
 }
 
 export default function UserRoles() {
   const { toast } = useToast();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [editingAssignment, setEditingAssignment] = useState<UserRoleAssignment | null>(null);
+  const [editingAssignment, setEditingAssignment] = useState<UserRoleAssignmentWithBranch | null>(null);
   const [newEmail, setNewEmail] = useState("");
   const [newRole, setNewRole] = useState("user");
+  const [newBranchId, setNewBranchId] = useState<number | null>(null);
 
   const { data: myPermissions } = useQuery<MyPermissions>({
     queryKey: ["/api/my-permissions"],
   });
 
-  const { data: assignments = [], isLoading: loadingAssignments } = useQuery<UserRoleAssignment[]>({
+  const { data: assignments = [], isLoading: loadingAssignments } = useQuery<UserRoleAssignmentWithBranch[]>({
     queryKey: ["/api/user-role-assignments"],
   });
 
@@ -77,16 +83,21 @@ export default function UserRoles() {
     queryKey: ["/api/role-permissions"],
   });
 
+  const { data: branches = [] } = useQuery<Branch[]>({
+    queryKey: ["/api/branches"],
+  });
+
   const isSuperUser = myPermissions?.role === "super_user";
 
   const createMutation = useMutation({
-    mutationFn: (data: { email: string; role: string }) =>
+    mutationFn: (data: { email: string; role: string; branchId?: number | null }) =>
       apiRequest("POST", "/api/user-role-assignments", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user-role-assignments"] });
       setIsAddDialogOpen(false);
       setNewEmail("");
       setNewRole("user");
+      setNewBranchId(null);
       toast({ title: "User role assigned successfully" });
     },
     onError: (error: any) => {
@@ -99,7 +110,7 @@ export default function UserRoles() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { email: string; role: string } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { email: string; role: string; branchId?: number | null } }) =>
       apiRequest("PUT", `/api/user-role-assignments/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user-role-assignments"] });
@@ -149,14 +160,14 @@ export default function UserRoles() {
       toast({ title: "Email is required", variant: "destructive" });
       return;
     }
-    createMutation.mutate({ email: newEmail.trim(), role: newRole });
+    createMutation.mutate({ email: newEmail.trim(), role: newRole, branchId: newBranchId });
   };
 
   const handleUpdateAssignment = () => {
     if (!editingAssignment) return;
     updateMutation.mutate({
       id: editingAssignment.id,
-      data: { email: editingAssignment.email, role: editingAssignment.role },
+      data: { email: editingAssignment.email, role: editingAssignment.role, branchId: editingAssignment.branchId },
     });
   };
 
@@ -252,6 +263,29 @@ export default function UserRoles() {
                         </SelectContent>
                       </Select>
                     </div>
+                    <div className="space-y-2">
+                      <Label>Assigned Branch (optional)</Label>
+                      <Select 
+                        value={newBranchId?.toString() || "none"} 
+                        onValueChange={(val) => setNewBranchId(val === "none" ? null : parseInt(val))}
+                      >
+                        <SelectTrigger data-testid="select-branch">
+                          <Building2 className="h-4 w-4 mr-2" />
+                          <SelectValue placeholder="All branches" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">All branches (no restriction)</SelectItem>
+                          {branches.map((branch) => (
+                            <SelectItem key={branch.id} value={branch.id.toString()}>
+                              {branch.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">
+                        If assigned to a branch, user can only access that branch
+                      </p>
+                    </div>
                     <Button
                       onClick={handleCreateAssignment}
                       disabled={createMutation.isPending}
@@ -277,6 +311,7 @@ export default function UserRoles() {
                     <TableRow>
                       <TableHead>Email</TableHead>
                       <TableHead>Role</TableHead>
+                      <TableHead>Branch</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -305,6 +340,37 @@ export default function UserRoles() {
                             <Badge variant="secondary">
                               {ROLE_LABELS[assignment.role] || assignment.role}
                             </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {editingAssignment?.id === assignment.id ? (
+                            <Select
+                              value={editingAssignment.branchId?.toString() || "none"}
+                              onValueChange={(val) =>
+                                setEditingAssignment({ 
+                                  ...editingAssignment, 
+                                  branchId: val === "none" ? null : parseInt(val) 
+                                })
+                              }
+                            >
+                              <SelectTrigger className="w-40">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">All branches</SelectItem>
+                                {branches.map((branch) => (
+                                  <SelectItem key={branch.id} value={branch.id.toString()}>
+                                    {branch.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="text-sm">
+                              {assignment.branch?.name || (
+                                <span className="text-muted-foreground">All branches</span>
+                              )}
+                            </span>
                           )}
                         </TableCell>
                         <TableCell className="text-right">

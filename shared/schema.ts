@@ -495,12 +495,21 @@ export const userRoleAssignments = pgTable("user_role_assignments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   email: text("email").notNull().unique(),
   role: text("role").notNull().default("user"),
+  branchId: integer("branch_id").references(() => branches.id),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const userRoleAssignmentsRelations = relations(userRoleAssignments, ({ one }) => ({
+  branch: one(branches, {
+    fields: [userRoleAssignments.branchId],
+    references: [branches.id],
+  }),
+}));
 
 export const insertUserRoleAssignmentSchema = createInsertSchema(userRoleAssignments).omit({ id: true, createdAt: true });
 export type InsertUserRoleAssignment = z.infer<typeof insertUserRoleAssignmentSchema>;
 export type UserRoleAssignment = typeof userRoleAssignments.$inferSelect;
+export type UserRoleAssignmentWithBranch = UserRoleAssignment & { branch?: Branch };
 
 // ==================== DISCOUNT MODULE ====================
 

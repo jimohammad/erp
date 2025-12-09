@@ -1016,11 +1016,12 @@ export async function registerRoutes(
     try {
       const userEmail = req.user?.claims?.email;
       if (!userEmail) {
-        return res.json({ role: "user", modules: MODULE_NAMES });
+        return res.json({ role: "user", modules: MODULE_NAMES, assignedBranchId: null });
       }
       const role = await storage.getRoleForEmail(userEmail);
       const modules = await storage.getModulesForRole(role);
-      res.json({ role, modules });
+      const assignedBranchId = await storage.getBranchIdForEmail(userEmail);
+      res.json({ role, modules, assignedBranchId });
     } catch (error) {
       console.error("Error fetching user permissions:", error);
       res.status(500).json({ error: "Failed to fetch user permissions" });

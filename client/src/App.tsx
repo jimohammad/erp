@@ -451,11 +451,12 @@ function AppSidebar() {
 }
 
 function BranchSelectorHeader() {
-  const { currentBranchId, setCurrentBranchId } = useBranch();
+  const { currentBranchId, setCurrentBranchId, isLockedToBranch } = useBranch();
   return (
     <BranchSelector
       selectedBranchId={currentBranchId}
       onBranchChange={setCurrentBranchId}
+      disabled={isLockedToBranch}
     />
   );
 }

@@ -63,6 +63,7 @@ import {
   type InsertRolePermission,
   type UserRoleAssignment,
   type InsertUserRoleAssignment,
+  type UserRoleAssignmentWithBranch,
   type Discount,
   type InsertDiscount,
   type DiscountWithDetails,
@@ -1104,8 +1105,14 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== USER ROLE ASSIGNMENTS ====================
 
-  async getUserRoleAssignments(): Promise<UserRoleAssignment[]> {
-    return await db.select().from(userRoleAssignments).orderBy(userRoleAssignments.email);
+  async getUserRoleAssignments(): Promise<UserRoleAssignmentWithBranch[]> {
+    const result = await db.query.userRoleAssignments.findMany({
+      with: {
+        branch: true,
+      },
+      orderBy: [userRoleAssignments.email],
+    });
+    return result as UserRoleAssignmentWithBranch[];
   }
 
   async createUserRoleAssignment(assignment: InsertUserRoleAssignment): Promise<UserRoleAssignment> {
@@ -1130,6 +1137,12 @@ export class DatabaseStorage implements IStorage {
     const [assignment] = await db.select().from(userRoleAssignments)
       .where(eq(userRoleAssignments.email, email.toLowerCase()));
     return assignment?.role || "user";
+  }
+
+  async getBranchIdForEmail(email: string): Promise<number | null> {
+    const [assignment] = await db.select().from(userRoleAssignments)
+      .where(eq(userRoleAssignments.email, email.toLowerCase()));
+    return assignment?.branchId || null;
   }
 
   // ==================== DISCOUNT MODULE ====================
