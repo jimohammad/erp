@@ -337,3 +337,68 @@ export type ExpenseWithDetails = Expense & {
   category: ExpenseCategory | null;
   account: Account | null;
 };
+
+// ==================== RETURNS MODULE ====================
+
+export const RETURN_TYPES = ["sale_return", "purchase_return"] as const;
+export type ReturnType = typeof RETURN_TYPES[number];
+
+export const returns = pgTable("returns", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  returnDate: date("return_date").notNull(),
+  returnNumber: text("return_number"),
+  returnType: text("return_type").notNull().default("sale_return"),
+  customerId: integer("customer_id").references(() => customers.id),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
+  totalKwd: numeric("total_kwd", { precision: 12, scale: 3 }),
+  reason: text("reason"),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const returnsRelations = relations(returns, ({ one, many }) => ({
+  customer: one(customers, {
+    fields: [returns.customerId],
+    references: [customers.id],
+  }),
+  supplier: one(suppliers, {
+    fields: [returns.supplierId],
+    references: [suppliers.id],
+  }),
+  lineItems: many(returnLineItems),
+}));
+
+export const insertReturnSchema = createInsertSchema(returns).omit({ 
+  id: true, 
+  createdAt: true,
+});
+export type InsertReturn = z.infer<typeof insertReturnSchema>;
+export type Return = typeof returns.$inferSelect;
+
+export const returnLineItems = pgTable("return_line_items", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  returnId: integer("return_id").references(() => returns.id, { onDelete: "cascade" }).notNull(),
+  itemName: text("item_name").notNull(),
+  quantity: integer("quantity").default(1),
+  priceKwd: numeric("price_kwd", { precision: 12, scale: 3 }),
+  totalKwd: numeric("total_kwd", { precision: 12, scale: 3 }),
+  imeiNumbers: text("imei_numbers").array(),
+});
+
+export const returnLineItemsRelations = relations(returnLineItems, ({ one }) => ({
+  return: one(returns, {
+    fields: [returnLineItems.returnId],
+    references: [returns.id],
+  }),
+}));
+
+export const insertReturnLineItemSchema = createInsertSchema(returnLineItems).omit({ id: true });
+export type InsertReturnLineItem = z.infer<typeof insertReturnLineItemSchema>;
+export type ReturnLineItem = typeof returnLineItems.$inferSelect;
+
+export type ReturnWithDetails = Return & {
+  customer: Customer | null;
+  supplier: Supplier | null;
+  lineItems: ReturnLineItem[];
+};

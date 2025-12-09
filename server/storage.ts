@@ -12,6 +12,8 @@ import {
   accountTransfers,
   expenseCategories,
   expenses,
+  returns,
+  returnLineItems,
   ACCOUNT_NAMES,
   type Supplier, 
   type InsertSupplier,
@@ -44,6 +46,11 @@ import {
   type Expense,
   type InsertExpense,
   type ExpenseWithDetails,
+  type Return,
+  type InsertReturn,
+  type ReturnLineItem,
+  type InsertReturnLineItem,
+  type ReturnWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -115,6 +122,12 @@ export interface IStorage {
   getExpense(id: number): Promise<ExpenseWithDetails | undefined>;
   createExpense(expense: InsertExpense): Promise<ExpenseWithDetails>;
   deleteExpense(id: number): Promise<boolean>;
+
+  // Returns Module
+  getReturns(): Promise<ReturnWithDetails[]>;
+  getReturn(id: number): Promise<ReturnWithDetails | undefined>;
+  createReturn(returnData: InsertReturn, lineItems: Omit<InsertReturnLineItem, 'returnId'>[]): Promise<ReturnWithDetails>;
+  deleteReturn(id: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -742,6 +755,51 @@ export class DatabaseStorage implements IStorage {
 
   async deleteExpense(id: number): Promise<boolean> {
     const result = await db.delete(expenses).where(eq(expenses.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // ==================== RETURNS MODULE ====================
+
+  async getReturns(): Promise<ReturnWithDetails[]> {
+    const returnList = await db.query.returns.findMany({
+      with: {
+        customer: true,
+        supplier: true,
+        lineItems: true,
+      },
+      orderBy: [desc(returns.returnDate), desc(returns.id)],
+    });
+    return returnList as ReturnWithDetails[];
+  }
+
+  async getReturn(id: number): Promise<ReturnWithDetails | undefined> {
+    const returnRecord = await db.query.returns.findFirst({
+      where: eq(returns.id, id),
+      with: {
+        customer: true,
+        supplier: true,
+        lineItems: true,
+      },
+    });
+    return returnRecord as ReturnWithDetails | undefined;
+  }
+
+  async createReturn(returnData: InsertReturn, lineItems: Omit<InsertReturnLineItem, 'returnId'>[]): Promise<ReturnWithDetails> {
+    const [newReturn] = await db.insert(returns).values(returnData).returning();
+    
+    if (lineItems.length > 0) {
+      const lineItemsWithReturnId = lineItems.map(item => ({
+        ...item,
+        returnId: newReturn.id,
+      }));
+      await db.insert(returnLineItems).values(lineItemsWithReturnId);
+    }
+    
+    return this.getReturn(newReturn.id) as Promise<ReturnWithDetails>;
+  }
+
+  async deleteReturn(id: number): Promise<boolean> {
+    const result = await db.delete(returns).where(eq(returns.id, id)).returning();
     return result.length > 0;
   }
 }
