@@ -132,7 +132,7 @@ export interface IStorage {
   deletePayment(id: number): Promise<boolean>;
 
   // Reports
-  getStockBalance(): Promise<{ itemName: string; purchased: number; sold: number; balance: number }[]>;
+  getStockBalance(): Promise<{ itemName: string; purchased: number; sold: number; openingStock: number; balance: number }[]>;
   getDailyCashFlow(startDate?: string, endDate?: string): Promise<{ date: string; inAmount: number; outAmount: number; net: number; runningBalance: number }[]>;
   getCustomerReport(): Promise<{ customerId: number; customerName: string; totalSales: number; totalPayments: number; balance: number }[]>;
   getPartyStatement(partyId: number, startDate?: string, endDate?: string): Promise<{ id: number; date: string; type: string; reference: string; description: string; debit: number; credit: number; balance: number }[]>;
@@ -577,7 +577,7 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== REPORTS ====================
 
-  async getStockBalance(): Promise<{ itemName: string; purchased: number; sold: number; balance: number }[]> {
+  async getStockBalance(): Promise<{ itemName: string; purchased: number; sold: number; openingStock: number; balance: number }[]> {
     const result = await db.execute(sql`
       WITH purchased AS (
         SELECT item_name, COALESCE(SUM(quantity), 0) as qty
@@ -589,22 +589,32 @@ export class DatabaseStorage implements IStorage {
         FROM sales_order_line_items
         GROUP BY item_name
       ),
+      opening_stock AS (
+        SELECT i.name as item_name, COALESCE(SUM(ia.quantity), 0) as qty
+        FROM inventory_adjustments ia
+        JOIN items i ON ia.item_id = i.id
+        GROUP BY i.name
+      ),
       all_items AS (
         SELECT item_name FROM purchased
         UNION
         SELECT item_name FROM sold
+        UNION
+        SELECT item_name FROM opening_stock
       )
       SELECT 
         ai.item_name as "itemName",
         COALESCE(p.qty, 0)::integer as purchased,
         COALESCE(s.qty, 0)::integer as sold,
-        (COALESCE(p.qty, 0) - COALESCE(s.qty, 0))::integer as balance
+        COALESCE(o.qty, 0)::integer as "openingStock",
+        (COALESCE(o.qty, 0) + COALESCE(p.qty, 0) - COALESCE(s.qty, 0))::integer as balance
       FROM all_items ai
       LEFT JOIN purchased p ON ai.item_name = p.item_name
       LEFT JOIN sold s ON ai.item_name = s.item_name
+      LEFT JOIN opening_stock o ON ai.item_name = o.item_name
       ORDER BY ai.item_name
     `);
-    return result.rows as { itemName: string; purchased: number; sold: number; balance: number }[];
+    return result.rows as { itemName: string; purchased: number; sold: number; openingStock: number; balance: number }[];
   }
 
   async getDailyCashFlow(startDate?: string, endDate?: string): Promise<{ date: string; inAmount: number; outAmount: number; net: number; runningBalance: number }[]> {
@@ -1379,7 +1389,7 @@ export class DatabaseStorage implements IStorage {
     const currentMonth = currentDate.getMonth() + 1;
     const currentYear = currentDate.getFullYear();
 
-    // Get total stock amount (value in KWD based on purchase prices)
+    // Get total stock amount (value in KWD based on purchase prices + opening stock)
     const stockResult = await db.execute(sql`
       WITH purchased AS (
         SELECT item_name, 
@@ -1407,21 +1417,35 @@ export class DatabaseStorage implements IStorage {
         WHERE r.return_type = 'purchase'
         GROUP BY rl.item_name
       ),
+      opening_stock AS (
+        SELECT i.name as item_name, 
+               COALESCE(SUM(ia.quantity), 0) as qty,
+               COALESCE(SUM(ia.quantity * CAST(COALESCE(ia.unit_cost_kwd, '0') AS DECIMAL)), 0) as amount
+        FROM inventory_adjustments ia
+        JOIN items i ON ia.item_id = i.id
+        GROUP BY i.name
+      ),
       all_items AS (
         SELECT item_name FROM purchased
         UNION SELECT item_name FROM sold
         UNION SELECT item_name FROM sale_returns
         UNION SELECT item_name FROM purchase_returns
+        UNION SELECT item_name FROM opening_stock
       ),
       stock_qty AS (
         SELECT ai.item_name,
-               COALESCE(p.qty, 0) - COALESCE(s.qty, 0) + COALESCE(sr.qty, 0) - COALESCE(pr.qty, 0) as net_qty,
-               CASE WHEN COALESCE(p.qty, 0) > 0 THEN p.amount / p.qty ELSE 0 END as avg_cost
+               COALESCE(os.qty, 0) + COALESCE(p.qty, 0) - COALESCE(s.qty, 0) + COALESCE(sr.qty, 0) - COALESCE(pr.qty, 0) as net_qty,
+               CASE 
+                 WHEN COALESCE(os.qty, 0) + COALESCE(p.qty, 0) > 0 
+                 THEN (COALESCE(os.amount, 0) + COALESCE(p.amount, 0)) / (COALESCE(os.qty, 0) + COALESCE(p.qty, 0))
+                 ELSE 0 
+               END as avg_cost
         FROM all_items ai
         LEFT JOIN purchased p ON ai.item_name = p.item_name
         LEFT JOIN sold s ON ai.item_name = s.item_name
         LEFT JOIN sale_returns sr ON ai.item_name = sr.item_name
         LEFT JOIN purchase_returns pr ON ai.item_name = pr.item_name
+        LEFT JOIN opening_stock os ON ai.item_name = os.item_name
       )
       SELECT COALESCE(SUM(GREATEST(net_qty, 0) * avg_cost), 0)::float as total
       FROM stock_qty

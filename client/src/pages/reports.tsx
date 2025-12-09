@@ -29,6 +29,7 @@ type StockBalanceItem = {
   itemName: string;
   purchased: number;
   sold: number;
+  openingStock: number;
   balance: number;
 };
 
@@ -94,11 +95,12 @@ export default function ReportsPage() {
 
   const stockTotals = stockBalance.reduce(
     (acc, item) => ({
+      openingStock: acc.openingStock + (item.openingStock || 0),
       purchased: acc.purchased + item.purchased,
       sold: acc.sold + item.sold,
       balance: acc.balance + item.balance,
     }),
-    { purchased: 0, sold: 0, balance: 0 }
+    { openingStock: 0, purchased: 0, sold: 0, balance: 0 }
   );
 
   const cashFlowTotals = cashFlow.reduce(
@@ -173,7 +175,8 @@ export default function ReportsPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[40%]">Item Name</TableHead>
+                          <TableHead className="w-[30%]">Item Name</TableHead>
+                          <TableHead className="text-right">Opening</TableHead>
                           <TableHead className="text-right">Purchased</TableHead>
                           <TableHead className="text-right">Sold</TableHead>
                           <TableHead className="text-right">Balance</TableHead>
@@ -183,6 +186,11 @@ export default function ReportsPage() {
                         {stockBalance.map((item, index) => (
                           <TableRow key={index} data-testid={`row-stock-${index}`}>
                             <TableCell className="font-medium">{item.itemName}</TableCell>
+                            <TableCell className="text-right">
+                              <Badge variant="outline" className="font-mono">
+                                {item.openingStock || 0}
+                              </Badge>
+                            </TableCell>
                             <TableCell className="text-right">
                               <Badge variant="secondary" className="font-mono">
                                 {item.purchased}
@@ -205,6 +213,7 @@ export default function ReportsPage() {
                         ))}
                         <TableRow className="bg-muted/50 font-semibold">
                           <TableCell>Total</TableCell>
+                          <TableCell className="text-right">{stockTotals.openingStock}</TableCell>
                           <TableCell className="text-right">{stockTotals.purchased}</TableCell>
                           <TableCell className="text-right">{stockTotals.sold}</TableCell>
                           <TableCell className="text-right">{stockTotals.balance}</TableCell>
