@@ -108,10 +108,10 @@ export function SalesLineItemRow({
   return (
     <>
       <div 
-        className="flex flex-wrap items-center gap-2 p-2 rounded-md bg-muted/30"
+        className="flex items-center gap-2 p-2 rounded-md bg-muted/30"
         data-testid={`sales-line-item-row-${index}`}
       >
-        <div className="flex-1 min-w-[180px]">
+        <div className="flex-1 min-w-[140px]">
           <Select
             value={item.itemName || "none"}
             onValueChange={handleItemChange}
@@ -130,7 +130,7 @@ export function SalesLineItemRow({
           </Select>
         </div>
         
-        <div className="w-20">
+        <div className="w-14">
           <Input
             type="number"
             min="1"
@@ -143,7 +143,7 @@ export function SalesLineItemRow({
           />
         </div>
         
-        <div className="w-28">
+        <div className="w-20">
           <Input
             type="text"
             readOnly
@@ -154,11 +154,11 @@ export function SalesLineItemRow({
           />
         </div>
         
-        <div className="w-28">
+        <div className="w-24">
           <Input
             type="text"
             readOnly
-            value={`${item.totalKwd || "0.000"} KWD`}
+            value={`${item.totalKwd || "0.000"}`}
             className="text-center text-sm bg-muted/50"
             data-testid={`text-sales-line-total-${index}`}
           />
@@ -181,16 +181,18 @@ export function SalesLineItemRow({
           )}
         </Button>
         
-        <Button
-          type="button"
-          size="icon"
-          variant="ghost"
-          onClick={() => onRemove(item.id)}
-          disabled={!canRemove}
-          data-testid={`button-remove-sales-item-${index}`}
-        >
-          <Trash2 className="h-4 w-4 text-destructive" />
-        </Button>
+        <div className="ml-auto">
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            onClick={() => onRemove(item.id)}
+            disabled={!canRemove}
+            data-testid={`button-remove-sales-item-${index}`}
+          >
+            <Trash2 className="h-4 w-4 text-destructive" />
+          </Button>
+        </div>
       </div>
 
       <Dialog open={imeiDialogOpen} onOpenChange={setImeiDialogOpen}>
