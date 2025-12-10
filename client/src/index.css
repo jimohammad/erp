@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -43,7 +45,7 @@
   --chart-3: 222 47% 55%;
   --chart-4: 45 70% 60%;
   --chart-5: 200 70% 52%;
-  --font-sans: "Outfit", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans: "Roboto", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: "SF Mono", Monaco, "Cascadia Code", Menlo, monospace;
   --radius: .5rem;
