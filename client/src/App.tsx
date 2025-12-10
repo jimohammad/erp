@@ -59,6 +59,7 @@ const StockTransfersPage = lazy(() => import("@/pages/stock-transfers"));
 const BranchesPage = lazy(() => import("@/pages/branches"));
 const OpeningBalancesPage = lazy(() => import("@/pages/opening-balances"));
 const PurchaseOrdersPage = lazy(() => import("@/pages/purchase-orders"));
+const StockLookupPage = lazy(() => import("@/pages/stock-lookup"));
 const Landing = lazy(() => import("@/pages/landing"));
 const PublicStatementPage = lazy(() => import("@/pages/public-statement"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -232,6 +233,21 @@ function AppSidebar() {
                     <Link href="/" data-testid="link-dashboard">
                       <LayoutDashboard className="h-4 w-4" />
                       <span>Dashboard</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
+              {/* Stock Lookup - quick access */}
+              {canAccess("reports") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/stock-lookup"}
+                  >
+                    <Link href="/stock-lookup" data-testid="link-stock-lookup">
+                      <Package className="h-4 w-4" />
+                      <span>Stock Lookup</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -519,6 +535,8 @@ function AuthenticatedLayout() {
         return "Branch Management";
       case "/stock-transfers":
         return "Stock Transfers";
+      case "/stock-lookup":
+        return "Stock Lookup";
       default:
         return "";
     }
@@ -575,6 +593,7 @@ function AuthenticatedLayout() {
                 <Route path="/settings/branches" component={BranchesPage} />
                 <Route path="/settings/opening-balances" component={OpeningBalancesPage} />
                 <Route path="/stock-transfers" component={StockTransfersPage} />
+                <Route path="/stock-lookup" component={StockLookupPage} />
                 <Route component={NotFound} />
               </Switch>
             </Suspense>
