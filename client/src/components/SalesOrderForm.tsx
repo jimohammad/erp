@@ -54,7 +54,7 @@ export function SalesOrderForm({
     }
   }, [nextInvoiceData]);
   const [lineItems, setLineItems] = useState<SalesLineItemData[]>([
-    { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", totalKwd: "0.000", imeiNumbers: [] },
+    { id: generateItemId(), itemName: "", quantity: 0, priceKwd: "", totalKwd: "0.000", imeiNumbers: [] },
   ]);
 
   const [totalKwd, setTotalKwd] = useState("0.000");
@@ -120,7 +120,7 @@ export function SalesOrderForm({
   const handleAddRow = () => {
     setLineItems(prev => [
       ...prev,
-      { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", totalKwd: "0.000", imeiNumbers: [] },
+      { id: generateItemId(), itemName: "", quantity: 0, priceKwd: "", totalKwd: "0.000", imeiNumbers: [] },
     ]);
   };
 
@@ -133,7 +133,7 @@ export function SalesOrderForm({
     setInvoiceNumber("");
     setCustomerId("");
     setLineItems([
-      { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", totalKwd: "0.000", imeiNumbers: [] },
+      { id: generateItemId(), itemName: "", quantity: 0, priceKwd: "", totalKwd: "0.000", imeiNumbers: [] },
     ]);
     if (refetchInvoiceNumber) {
       queryClient.invalidateQueries({ queryKey: ["/api/sales-orders/next-invoice-number"] });
@@ -225,7 +225,7 @@ export function SalesOrderForm({
           </div>
 
           <div className="space-y-3">
-            <Label>Line Items</Label>
+            <Label>Items</Label>
             
             <div className="space-y-2">
               {lineItems.map((item, index) => {
@@ -257,7 +257,7 @@ export function SalesOrderForm({
             </Button>
           </div>
 
-          <div className="p-4 bg-muted/50 rounded-md">
+          <div className="p-4 bg-amber-100 dark:bg-amber-900/30 rounded-md">
             <div className="flex justify-end">
               <div className="text-right space-y-1">
                 <Label className="text-xs text-muted-foreground">Total (KWD)</Label>
