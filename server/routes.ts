@@ -1267,6 +1267,111 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== PURCHASE ORDER DRAFT ROUTES ====================
+
+  app.get("/api/purchase-order-drafts", isAuthenticated, async (req, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const branchId = req.query.branchId ? parseInt(req.query.branchId as string) : undefined;
+      const pods = await storage.getPurchaseOrderDrafts({ status, branchId });
+      res.json(pods);
+    } catch (error) {
+      console.error("Error fetching PO drafts:", error);
+      res.status(500).json({ error: "Failed to fetch purchase order drafts" });
+    }
+  });
+
+  app.get("/api/purchase-order-drafts/next-number", isAuthenticated, async (req, res) => {
+    try {
+      const poNumber = await storage.getNextPONumber();
+      res.json({ poNumber });
+    } catch (error) {
+      console.error("Error getting next PO number:", error);
+      res.status(500).json({ error: "Failed to get next PO number" });
+    }
+  });
+
+  app.get("/api/purchase-order-drafts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const pod = await storage.getPurchaseOrderDraft(id);
+      if (!pod) {
+        return res.status(404).json({ error: "Purchase order draft not found" });
+      }
+      res.json(pod);
+    } catch (error) {
+      console.error("Error fetching PO draft:", error);
+      res.status(500).json({ error: "Failed to fetch purchase order draft" });
+    }
+  });
+
+  app.post("/api/purchase-order-drafts", isAuthenticated, async (req, res) => {
+    try {
+      const { lineItems, ...podData } = req.body;
+      const pod = await storage.createPurchaseOrderDraft(podData, lineItems || []);
+      res.status(201).json(pod);
+    } catch (error) {
+      console.error("Error creating PO draft:", error);
+      res.status(500).json({ error: "Failed to create purchase order draft" });
+    }
+  });
+
+  app.put("/api/purchase-order-drafts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { lineItems, ...podData } = req.body;
+      const pod = await storage.updatePurchaseOrderDraft(id, podData, lineItems);
+      if (!pod) {
+        return res.status(404).json({ error: "Purchase order draft not found" });
+      }
+      res.json(pod);
+    } catch (error) {
+      console.error("Error updating PO draft:", error);
+      res.status(500).json({ error: "Failed to update purchase order draft" });
+    }
+  });
+
+  app.patch("/api/purchase-order-drafts/:id/status", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { status } = req.body;
+      const pod = await storage.updatePurchaseOrderDraftStatus(id, status);
+      if (!pod) {
+        return res.status(404).json({ error: "Purchase order draft not found" });
+      }
+      res.json(pod);
+    } catch (error) {
+      console.error("Error updating PO draft status:", error);
+      res.status(500).json({ error: "Failed to update purchase order draft status" });
+    }
+  });
+
+  app.post("/api/purchase-order-drafts/:id/convert", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { invoiceNumber, grnDate } = req.body;
+      const purchaseOrder = await storage.convertPurchaseOrderDraftToBill(id, { invoiceNumber, grnDate });
+      res.json(purchaseOrder);
+    } catch (error: any) {
+      console.error("Error converting PO draft to bill:", error);
+      res.status(400).json({ error: error.message || "Failed to convert purchase order draft to bill" });
+    }
+  });
+
+  app.delete("/api/purchase-order-drafts/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deletePurchaseOrderDraft(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Purchase order draft not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting PO draft:", error);
+      res.status(500).json({ error: "Failed to delete purchase order draft" });
+    }
+  });
+
   // ==================== BRANCH ROUTES ====================
 
   app.get("/api/branches", isAuthenticated, async (req, res) => {
