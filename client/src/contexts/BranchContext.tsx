@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Branch {
   id: number;
@@ -26,6 +27,7 @@ interface BranchContextType {
 const BranchContext = createContext<BranchContextType | undefined>(undefined);
 
 export function BranchProvider({ children }: { children: ReactNode }) {
+  const { user, isLoading: authLoading } = useAuth();
   const [currentBranchId, setCurrentBranchIdState] = useState<number | null>(() => {
     const saved = localStorage.getItem("selectedBranchId");
     return saved ? parseInt(saved) : null;
@@ -33,11 +35,13 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
   const { data: branches = [], isLoading: branchesLoading } = useQuery<Branch[]>({
     queryKey: ["/api/branches"],
+    enabled: !!user && !authLoading, // Only fetch after user is authenticated
   });
 
   const { data: permissions, isLoading: permissionsLoading } = useQuery<MyPermissions>({
     queryKey: ["/api/my-permissions"],
     retry: false,
+    enabled: !!user && !authLoading, // Only fetch after user is authenticated
   });
 
   const { data: defaultBranch } = useQuery<Branch | null>({

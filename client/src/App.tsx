@@ -77,10 +77,11 @@ interface MyPermissions {
 
 function AppSidebar() {
   const [location, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   
   const { data: permissions, isLoading: permissionsLoading } = useQuery<MyPermissions>({
     queryKey: ["/api/my-permissions"],
+    enabled: !!user && !authLoading, // Only fetch after user is authenticated
   });
 
   const canAccess = (moduleName: string) => {
