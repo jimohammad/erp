@@ -42,7 +42,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, Search, Eye, Trash2, FileText, Plus, Send, Package, ArrowRightLeft, Pencil } from "lucide-react";
 import { format } from "date-fns";
-import PurchaseOrderForm from "@/components/PurchaseOrderForm";
+import PODraftForm from "@/components/PODraftForm";
 
 interface PODraftLineItem {
   id: number;
@@ -197,7 +197,7 @@ export default function PurchaseOrdersPage() {
 
   if (showForm || editingPO) {
     return (
-      <PurchaseOrderForm
+      <PODraftForm
         editingPO={editingPO}
         onClose={() => {
           setShowForm(false);
