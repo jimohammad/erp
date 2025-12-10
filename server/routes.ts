@@ -1762,5 +1762,52 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== APP SETTINGS ====================
+  
+  app.get("/api/settings/transaction-password-status", isAuthenticated, async (req, res) => {
+    try {
+      const password = await storage.getSetting('transaction_password');
+      res.json({ isSet: !!password });
+    } catch (error) {
+      console.error("Error checking transaction password:", error);
+      res.status(500).json({ error: "Failed to check password status" });
+    }
+  });
+
+  app.post("/api/settings/transaction-password", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { password } = req.body;
+      if (!password || typeof password !== 'string') {
+        return res.status(400).json({ error: "Password is required" });
+      }
+      await storage.setSetting('transaction_password', password);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error setting transaction password:", error);
+      res.status(500).json({ error: "Failed to set password" });
+    }
+  });
+
+  app.delete("/api/settings/transaction-password", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.setSetting('transaction_password', '');
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing transaction password:", error);
+      res.status(500).json({ error: "Failed to remove password" });
+    }
+  });
+
+  app.post("/api/settings/verify-transaction-password", isAuthenticated, async (req, res) => {
+    try {
+      const { password } = req.body;
+      const isValid = await storage.verifyTransactionPassword(password || '');
+      res.json({ valid: isValid });
+    } catch (error) {
+      console.error("Error verifying transaction password:", error);
+      res.status(500).json({ error: "Failed to verify password" });
+    }
+  });
+
   return httpServer;
 }

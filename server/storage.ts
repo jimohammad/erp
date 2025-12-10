@@ -89,6 +89,8 @@ import {
   type PODraftItem,
   type InsertPODraftItem,
   type PurchaseOrderDraftWithDetails,
+  appSettings,
+  type AppSetting,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -245,6 +247,11 @@ export interface IStorage {
   deletePurchaseOrderDraft(id: number): Promise<boolean>;
   convertPurchaseOrderDraftToBill(id: number, additionalData: { invoiceNumber?: string; grnDate?: string }): Promise<PurchaseOrderWithDetails>;
   getNextPONumber(): Promise<string>;
+
+  // App Settings
+  getSetting(key: string): Promise<string | null>;
+  setSetting(key: string, value: string): Promise<void>;
+  verifyTransactionPassword(password: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2262,6 +2269,35 @@ export class DatabaseStorage implements IStorage {
     }).where(eq(purchaseOrderDrafts.id, id));
 
     return purchaseOrder;
+  }
+
+  // App Settings
+  async getSetting(key: string): Promise<string | null> {
+    const [setting] = await db.select().from(appSettings).where(eq(appSettings.settingKey, key));
+    return setting?.settingValue ?? null;
+  }
+
+  async setSetting(key: string, value: string): Promise<void> {
+    const existing = await this.getSetting(key);
+    if (existing !== null) {
+      await db.update(appSettings).set({
+        settingValue: value,
+        updatedAt: new Date(),
+      }).where(eq(appSettings.settingKey, key));
+    } else {
+      await db.insert(appSettings).values({
+        settingKey: key,
+        settingValue: value,
+      });
+    }
+  }
+
+  async verifyTransactionPassword(password: string): Promise<boolean> {
+    const storedPassword = await this.getSetting('transaction_password');
+    if (!storedPassword) {
+      return true; // No password set, allow all operations
+    }
+    return password === storedPassword;
   }
 }
 

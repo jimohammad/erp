@@ -754,3 +754,16 @@ export type OpeningBalanceWithDetails = OpeningBalance & {
   branch?: Branch;
   partyName?: string;
 };
+
+// ==================== APP SETTINGS ====================
+
+export const appSettings = pgTable("app_settings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  settingKey: text("setting_key").notNull().unique(),
+  settingValue: text("setting_value"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertAppSettingSchema = createInsertSchema(appSettings).omit({ id: true, updatedAt: true });
+export type InsertAppSetting = z.infer<typeof insertAppSettingSchema>;
+export type AppSetting = typeof appSettings.$inferSelect;
