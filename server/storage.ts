@@ -595,23 +595,43 @@ export class DatabaseStorage implements IStorage {
         JOIN items i ON ia.item_id = i.id
         GROUP BY i.name
       ),
+      sale_returns AS (
+        SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
+        FROM return_line_items rl
+        JOIN returns r ON rl.return_id = r.id
+        WHERE r.return_type = 'sale'
+        GROUP BY rl.item_name
+      ),
+      purchase_returns AS (
+        SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
+        FROM return_line_items rl
+        JOIN returns r ON rl.return_id = r.id
+        WHERE r.return_type = 'purchase'
+        GROUP BY rl.item_name
+      ),
       all_items AS (
         SELECT item_name FROM purchased
         UNION
         SELECT item_name FROM sold
         UNION
         SELECT item_name FROM opening_stock
+        UNION
+        SELECT item_name FROM sale_returns
+        UNION
+        SELECT item_name FROM purchase_returns
       )
       SELECT 
         ai.item_name as "itemName",
         COALESCE(p.qty, 0)::integer as purchased,
         COALESCE(s.qty, 0)::integer as sold,
         COALESCE(o.qty, 0)::integer as "openingStock",
-        (COALESCE(o.qty, 0) + COALESCE(p.qty, 0) - COALESCE(s.qty, 0))::integer as balance
+        (COALESCE(o.qty, 0) + COALESCE(p.qty, 0) + COALESCE(sr.qty, 0) - COALESCE(s.qty, 0) - COALESCE(pr.qty, 0))::integer as balance
       FROM all_items ai
       LEFT JOIN purchased p ON ai.item_name = p.item_name
       LEFT JOIN sold s ON ai.item_name = s.item_name
       LEFT JOIN opening_stock o ON ai.item_name = o.item_name
+      LEFT JOIN sale_returns sr ON ai.item_name = sr.item_name
+      LEFT JOIN purchase_returns pr ON ai.item_name = pr.item_name
       ORDER BY ai.item_name
     `);
     return result.rows as { itemName: string; purchased: number; sold: number; openingStock: number; balance: number }[];
