@@ -76,12 +76,19 @@ import {
   type StockTransferWithDetails,
   inventoryAdjustments,
   openingBalances,
+  purchaseOrderDrafts,
+  purchaseOrderDraftItems,
   type InventoryAdjustment,
   type InsertInventoryAdjustment,
   type InventoryAdjustmentWithDetails,
   type OpeningBalance,
   type InsertOpeningBalance,
   type OpeningBalanceWithDetails,
+  type PurchaseOrderDraft,
+  type InsertPurchaseOrderDraft,
+  type PODraftItem,
+  type InsertPODraftItem,
+  type PurchaseOrderDraftWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -228,6 +235,16 @@ export interface IStorage {
   createOpeningBalance(balance: InsertOpeningBalance): Promise<OpeningBalance>;
   updateOpeningBalance(id: number, balance: Partial<InsertOpeningBalance>): Promise<OpeningBalance | undefined>;
   deleteOpeningBalance(id: number): Promise<boolean>;
+
+  // Purchase Order Drafts (PO workflow)
+  getPurchaseOrderDrafts(options?: { status?: string; branchId?: number }): Promise<PurchaseOrderDraftWithDetails[]>;
+  getPurchaseOrderDraft(id: number): Promise<PurchaseOrderDraftWithDetails | undefined>;
+  createPurchaseOrderDraft(pod: InsertPurchaseOrderDraft, lineItems: Omit<InsertPODraftItem, 'purchaseOrderDraftId'>[]): Promise<PurchaseOrderDraftWithDetails>;
+  updatePurchaseOrderDraft(id: number, pod: Partial<InsertPurchaseOrderDraft>, lineItems?: Omit<InsertPODraftItem, 'purchaseOrderDraftId'>[]): Promise<PurchaseOrderDraftWithDetails | undefined>;
+  updatePurchaseOrderDraftStatus(id: number, status: string): Promise<PurchaseOrderDraft | undefined>;
+  deletePurchaseOrderDraft(id: number): Promise<boolean>;
+  convertPurchaseOrderDraftToBill(id: number, additionalData: { invoiceNumber?: string; grnDate?: string }): Promise<PurchaseOrderWithDetails>;
+  getNextPONumber(): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2010,6 +2027,156 @@ export class DatabaseStorage implements IStorage {
   async deleteOpeningBalance(id: number): Promise<boolean> {
     const result = await db.delete(openingBalances).where(eq(openingBalances.id, id)).returning();
     return result.length > 0;
+  }
+
+  // ==================== PURCHASE ORDER DRAFTS ====================
+
+  async getNextPONumber(): Promise<string> {
+    const [result] = await db
+      .select({ maxNum: sql<number>`COALESCE(MAX(CAST(SUBSTRING(po_number FROM 4) AS INTEGER)), 0)` })
+      .from(purchaseOrderDrafts);
+    const nextNum = (result?.maxNum || 0) + 1;
+    return `PO-${String(nextNum).padStart(5, '0')}`;
+  }
+
+  async getPurchaseOrderDrafts(options?: { status?: string; branchId?: number }): Promise<PurchaseOrderDraftWithDetails[]> {
+    let query = db.select().from(purchaseOrderDrafts).orderBy(desc(purchaseOrderDrafts.poDate));
+    
+    const conditions = [];
+    if (options?.status) {
+      conditions.push(eq(purchaseOrderDrafts.status, options.status));
+    }
+    if (options?.branchId) {
+      conditions.push(eq(purchaseOrderDrafts.branchId, options.branchId));
+    }
+    
+    const pods = conditions.length > 0
+      ? await db.select().from(purchaseOrderDrafts).where(and(...conditions)).orderBy(desc(purchaseOrderDrafts.poDate))
+      : await db.select().from(purchaseOrderDrafts).orderBy(desc(purchaseOrderDrafts.poDate));
+
+    const result: PurchaseOrderDraftWithDetails[] = [];
+    for (const pod of pods) {
+      const supplier = pod.supplierId ? await this.getSupplier(pod.supplierId) : null;
+      const lineItems = await db.select().from(purchaseOrderDraftItems).where(eq(purchaseOrderDraftItems.purchaseOrderDraftId, pod.id));
+      result.push({
+        ...pod,
+        supplier,
+        lineItems,
+      });
+    }
+    return result;
+  }
+
+  async getPurchaseOrderDraft(id: number): Promise<PurchaseOrderDraftWithDetails | undefined> {
+    const [pod] = await db.select().from(purchaseOrderDrafts).where(eq(purchaseOrderDrafts.id, id));
+    if (!pod) return undefined;
+
+    const supplier = pod.supplierId ? await this.getSupplier(pod.supplierId) : null;
+    const lineItems = await db.select().from(purchaseOrderDraftItems).where(eq(purchaseOrderDraftItems.purchaseOrderDraftId, pod.id));
+
+    return {
+      ...pod,
+      supplier,
+      lineItems,
+    };
+  }
+
+  async createPurchaseOrderDraft(pod: InsertPurchaseOrderDraft, lineItems: Omit<InsertPODraftItem, 'purchaseOrderDraftId'>[]): Promise<PurchaseOrderDraftWithDetails> {
+    const [newPod] = await db.insert(purchaseOrderDrafts).values(pod).returning();
+
+    const insertedLineItems: PODraftItem[] = [];
+    for (const item of lineItems) {
+      const [insertedItem] = await db.insert(purchaseOrderDraftItems).values({
+        ...item,
+        purchaseOrderDraftId: newPod.id,
+      }).returning();
+      insertedLineItems.push(insertedItem);
+    }
+
+    const supplier = newPod.supplierId ? await this.getSupplier(newPod.supplierId) : null;
+
+    return {
+      ...newPod,
+      supplier,
+      lineItems: insertedLineItems,
+    };
+  }
+
+  async updatePurchaseOrderDraft(id: number, pod: Partial<InsertPurchaseOrderDraft>, lineItems?: Omit<InsertPODraftItem, 'purchaseOrderDraftId'>[]): Promise<PurchaseOrderDraftWithDetails | undefined> {
+    const [updatedPod] = await db.update(purchaseOrderDrafts).set({
+      ...pod,
+      updatedAt: new Date(),
+    }).where(eq(purchaseOrderDrafts.id, id)).returning();
+
+    if (!updatedPod) return undefined;
+
+    if (lineItems) {
+      await db.delete(purchaseOrderDraftItems).where(eq(purchaseOrderDraftItems.purchaseOrderDraftId, id));
+      for (const item of lineItems) {
+        await db.insert(purchaseOrderDraftItems).values({
+          ...item,
+          purchaseOrderDraftId: id,
+        });
+      }
+    }
+
+    return this.getPurchaseOrderDraft(id);
+  }
+
+  async updatePurchaseOrderDraftStatus(id: number, status: string): Promise<PurchaseOrderDraft | undefined> {
+    const [updated] = await db.update(purchaseOrderDrafts).set({
+      status,
+      updatedAt: new Date(),
+    }).where(eq(purchaseOrderDrafts.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deletePurchaseOrderDraft(id: number): Promise<boolean> {
+    const result = await db.delete(purchaseOrderDrafts).where(eq(purchaseOrderDrafts.id, id)).returning();
+    return result.length > 0;
+  }
+
+  async convertPurchaseOrderDraftToBill(id: number, additionalData: { invoiceNumber?: string; grnDate?: string }): Promise<PurchaseOrderWithDetails> {
+    const pod = await this.getPurchaseOrderDraft(id);
+    if (!pod) {
+      throw new Error("Purchase Order Draft not found");
+    }
+
+    if (pod.status === "converted") {
+      throw new Error("This PO has already been converted to a bill");
+    }
+
+    // Create Purchase Order (bill) from draft
+    const purchaseOrder = await this.createPurchaseOrder(
+      {
+        purchaseDate: pod.poDate,
+        invoiceNumber: additionalData.invoiceNumber || pod.poNumber,
+        supplierId: pod.supplierId,
+        totalKwd: pod.totalKwd,
+        fxCurrency: pod.fxCurrency,
+        fxRate: pod.fxRate,
+        totalFx: pod.totalFx,
+        branchId: pod.branchId,
+        createdBy: pod.createdBy,
+        grnDate: additionalData.grnDate || null,
+      },
+      pod.lineItems.map(item => ({
+        itemName: item.itemName,
+        quantity: item.quantity,
+        priceKwd: item.priceKwd,
+        fxPrice: item.fxPrice,
+        totalKwd: item.totalKwd,
+      }))
+    );
+
+    // Update draft status to converted
+    await db.update(purchaseOrderDrafts).set({
+      status: "converted",
+      convertedToPurchaseId: purchaseOrder.id,
+      updatedAt: new Date(),
+    }).where(eq(purchaseOrderDrafts.id, id));
+
+    return purchaseOrder;
   }
 }
 
