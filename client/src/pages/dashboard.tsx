@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Package, DollarSign, TrendingUp, TrendingDown, ShoppingCart, Search, Loader2, ArrowRight, Wallet, Building2 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+
+const LazySalesChart = lazy(() => import("@/components/SalesChart"));
 
 interface DashboardStats {
   stockAmount: number;
@@ -245,35 +246,13 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="p-4 pt-0">
               <div className="h-48">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={salesComparisonData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis 
-                      dataKey="name" 
-                      tick={{ fontSize: 11 }}
-                      className="text-muted-foreground"
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 11 }}
-                      tickFormatter={(value) => `${(value / 1000).toFixed(0)}K`}
-                      className="text-muted-foreground"
-                      width={40}
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => [`${formatCurrency(value)} KWD`, "Sales"]}
-                      contentStyle={{ 
-                        backgroundColor: 'hsl(var(--card))', 
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: '6px',
-                        fontSize: '12px'
-                      }}
-                    />
-                    <Bar dataKey="sales" radius={[6, 6, 0, 0]}>
-                      <Cell fill="hsl(var(--muted-foreground))" />
-                      <Cell fill="hsl(var(--primary))" />
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <Suspense fallback={
+                  <div className="h-full flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                }>
+                  <LazySalesChart data={salesComparisonData} formatCurrency={formatCurrency} />
+                </Suspense>
               </div>
               <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t">
                 <div className="text-center">
