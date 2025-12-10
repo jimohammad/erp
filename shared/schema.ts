@@ -144,6 +144,84 @@ export type PurchaseOrderWithDetails = PurchaseOrder & {
   lineItems: LineItem[];
 };
 
+// ==================== PURCHASE ORDER DRAFTS (PO before conversion to bill) ====================
+
+export const poStatusEnum = ["draft", "sent", "received", "converted"] as const;
+export type POStatus = typeof poStatusEnum[number];
+
+export const purchaseOrderDrafts = pgTable("purchase_order_drafts", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  poNumber: text("po_number").notNull(),
+  poDate: date("po_date").notNull(),
+  supplierId: integer("supplier_id").references(() => suppliers.id),
+  status: text("status").default("draft").notNull(),
+  convertedToPurchaseId: integer("converted_to_purchase_id").references(() => purchaseOrders.id),
+  totalKwd: numeric("total_kwd", { precision: 12, scale: 3 }),
+  fxCurrency: text("fx_currency").default("AED"),
+  fxRate: numeric("fx_rate", { precision: 10, scale: 4 }),
+  totalFx: numeric("total_fx", { precision: 12, scale: 2 }),
+  notes: text("notes"),
+  branchId: integer("branch_id").references(() => branches.id),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_pod_branch").on(table.branchId),
+  index("idx_pod_date").on(table.poDate),
+  index("idx_pod_supplier").on(table.supplierId),
+  index("idx_pod_status").on(table.status),
+]);
+
+export const purchaseOrderDraftsRelations = relations(purchaseOrderDrafts, ({ one, many }) => ({
+  supplier: one(suppliers, {
+    fields: [purchaseOrderDrafts.supplierId],
+    references: [suppliers.id],
+  }),
+  convertedPurchase: one(purchaseOrders, {
+    fields: [purchaseOrderDrafts.convertedToPurchaseId],
+    references: [purchaseOrders.id],
+  }),
+  lineItems: many(purchaseOrderDraftItems),
+}));
+
+export const insertPurchaseOrderDraftSchema = createInsertSchema(purchaseOrderDrafts).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true,
+  convertedToPurchaseId: true,
+});
+export type InsertPurchaseOrderDraft = z.infer<typeof insertPurchaseOrderDraftSchema>;
+export type PurchaseOrderDraft = typeof purchaseOrderDrafts.$inferSelect;
+
+export const purchaseOrderDraftItems = pgTable("purchase_order_draft_items", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  purchaseOrderDraftId: integer("purchase_order_draft_id").references(() => purchaseOrderDrafts.id, { onDelete: "cascade" }).notNull(),
+  itemName: text("item_name").notNull(),
+  quantity: integer("quantity").default(1),
+  priceKwd: numeric("price_kwd", { precision: 12, scale: 3 }),
+  fxPrice: numeric("fx_price", { precision: 12, scale: 2 }),
+  totalKwd: numeric("total_kwd", { precision: 12, scale: 3 }),
+}, (table) => [
+  index("idx_pod_line_item").on(table.itemName),
+  index("idx_pod_line_order").on(table.purchaseOrderDraftId),
+]);
+
+export const purchaseOrderDraftItemsRelations = relations(purchaseOrderDraftItems, ({ one }) => ({
+  purchaseOrderDraft: one(purchaseOrderDrafts, {
+    fields: [purchaseOrderDraftItems.purchaseOrderDraftId],
+    references: [purchaseOrderDrafts.id],
+  }),
+}));
+
+export const insertPODraftItemSchema = createInsertSchema(purchaseOrderDraftItems).omit({ id: true });
+export type InsertPODraftItem = z.infer<typeof insertPODraftItemSchema>;
+export type PODraftItem = typeof purchaseOrderDraftItems.$inferSelect;
+
+export type PurchaseOrderDraftWithDetails = PurchaseOrderDraft & {
+  supplier: Supplier | null;
+  lineItems: PODraftItem[];
+};
+
 // ==================== SALES MODULE ====================
 
 export const customers = pgTable("customers", {
