@@ -52,6 +52,25 @@ export default function ItemMaster() {
     queryKey: ["/api/items"],
   });
 
+  // Fetch stock balance to show available qty per item
+  type StockBalanceItem = {
+    itemName: string;
+    purchased: number;
+    sold: number;
+    openingStock: number;
+    balance: number;
+  };
+  
+  const { data: stockBalance = [] } = useQuery<StockBalanceItem[]>({
+    queryKey: ["/api/reports/stock-balance"],
+  });
+
+  // Create a map of item name to available qty
+  const stockMap = new Map<string, number>();
+  stockBalance.forEach((item) => {
+    stockMap.set(item.itemName, item.balance);
+  });
+
   type ItemFormData = {
     code: string | null;
     name: string;
@@ -224,6 +243,7 @@ export default function ItemMaster() {
                     <TableHead className="w-16">ID</TableHead>
                     <TableHead className="w-32">Item Code</TableHead>
                     <TableHead>Item Name</TableHead>
+                    <TableHead className="w-24 text-right">Avail Qty</TableHead>
                     <TableHead className="w-28 text-right">Purchase KWD</TableHead>
                     <TableHead className="w-20">FX</TableHead>
                     <TableHead className="w-28 text-right">Selling KWD</TableHead>
@@ -241,6 +261,9 @@ export default function ItemMaster() {
                       </TableCell>
                       <TableCell className="font-medium" data-testid={`text-item-name-${item.id}`}>
                         {item.name}
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`text-avail-qty-${item.id}`}>
+                        {stockMap.get(item.name) ?? 0}
                       </TableCell>
                       <TableCell className="text-right font-mono" data-testid={`text-purchase-price-${item.id}`}>
                         {item.purchasePriceKwd ? parseFloat(item.purchasePriceKwd).toFixed(3) : "-"}
