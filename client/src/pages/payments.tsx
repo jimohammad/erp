@@ -390,6 +390,11 @@ export default function PaymentsPage() {
       return;
     }
 
+    if (direction === "IN" && !customerId) {
+      toast({ title: "Please select a customer", variant: "destructive" });
+      return;
+    }
+
     createPaymentMutation.mutate({
       paymentDate,
       direction,
@@ -397,7 +402,7 @@ export default function PaymentsPage() {
       supplierId: direction === "OUT" && supplierId ? parseInt(supplierId) : null,
       paymentType,
       amount,
-      reference: reference || null,
+      reference: null,
       notes: notes || null,
     });
   };
@@ -752,14 +757,13 @@ export default function PaymentsPage() {
               <div className="space-y-2">
                 <Label htmlFor="customer" className="flex items-center gap-2">
                   <User className="h-4 w-4" />
-                  Customer (Received from)
+                  Customer
                 </Label>
                 <Select value={customerId} onValueChange={setCustomerId}>
                   <SelectTrigger data-testid="select-payment-customer">
-                    <SelectValue placeholder="Select customer (optional)" />
+                    <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">-- No customer --</SelectItem>
                     {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id.toString()}>
                         {customer.name}
@@ -802,17 +806,6 @@ export default function PaymentsPage() {
                 placeholder="0.000"
                 required
                 data-testid="input-payment-amount"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="reference">Reference (Optional)</Label>
-              <Input
-                id="reference"
-                value={reference}
-                onChange={(e) => setReference(e.target.value)}
-                placeholder="Transaction ID, check number, etc."
-                data-testid="input-payment-reference"
               />
             </div>
 
