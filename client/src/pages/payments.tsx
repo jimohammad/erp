@@ -171,212 +171,156 @@ export default function PaymentsPage() {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Payment Receipt - Iqbal Electronics</title>
+          <title>Payment Receipt</title>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
             
             * { margin: 0; padding: 0; box-sizing: border-box; }
             
             body { 
-              font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+              font-family: 'Courier New', monospace;
               background: #fff;
-              color: #1a1a2e;
-              line-height: 1.5;
-              font-size: 14px;
+              color: #000;
+              line-height: 1.3;
+              font-size: 10pt;
+              width: 80mm;
+              margin: 0;
+              padding: 0;
             }
             
-            .receipt-container {
-              max-width: 400px;
-              margin: 0 auto;
-              padding: 30px;
+            .receipt {
+              width: 80mm;
+              padding: 2mm 3mm;
             }
             
-            .receipt-header {
+            .header {
               text-align: center;
-              margin-bottom: 30px;
-              padding-bottom: 20px;
-              border-bottom: 2px solid #1a1a2e;
+              padding-bottom: 2mm;
+              border-bottom: 1px dashed #000;
+              margin-bottom: 2mm;
             }
             
             .company-name {
-              font-size: 24px;
-              font-weight: 700;
-              color: #1a1a2e;
-              margin-bottom: 4px;
+              font-size: 12pt;
+              font-weight: bold;
             }
             
             .company-sub {
-              color: #64748b;
-              font-size: 12px;
+              font-size: 8pt;
             }
             
-            .receipt-badge {
+            .badge {
               display: inline-block;
-              margin-top: 15px;
-              padding: 8px 20px;
-              font-size: 12px;
-              font-weight: 600;
-              letter-spacing: 2px;
-              text-transform: uppercase;
-              border-radius: 4px;
-              ${payment.direction === "IN" 
-                ? "background: #d1fae5; color: #065f46;" 
-                : "background: #fee2e2; color: #991b1b;"}
+              margin-top: 2mm;
+              padding: 1mm 3mm;
+              font-size: 9pt;
+              font-weight: bold;
+              border: 1px solid #000;
             }
             
-            .receipt-details {
-              margin-bottom: 25px;
+            .details {
+              margin-bottom: 2mm;
             }
             
-            .detail-row {
+            .row {
               display: flex;
               justify-content: space-between;
-              padding: 12px 0;
-              border-bottom: 1px solid #f1f5f9;
+              padding: 1mm 0;
+              font-size: 9pt;
             }
             
-            .detail-label {
-              color: #64748b;
-              font-size: 13px;
+            .row-label {
+              color: #333;
             }
             
-            .detail-value {
-              font-weight: 500;
+            .row-value {
+              font-weight: bold;
               text-align: right;
             }
             
-            .amount-section {
+            .amount-box {
               text-align: center;
-              padding: 25px;
-              margin: 25px 0;
-              background: ${payment.direction === "IN" ? "#ecfdf5" : "#fef2f2"};
-              border-radius: 8px;
+              padding: 3mm 0;
+              margin: 2mm 0;
+              border-top: 1px dashed #000;
+              border-bottom: 1px dashed #000;
             }
             
             .amount-label {
-              font-size: 12px;
-              color: #64748b;
+              font-size: 8pt;
               text-transform: uppercase;
-              letter-spacing: 1px;
-              margin-bottom: 8px;
             }
             
             .amount-value {
-              font-size: 32px;
-              font-weight: 700;
-              color: ${payment.direction === "IN" ? "#059669" : "#dc2626"};
-              font-family: 'SF Mono', Monaco, monospace;
+              font-size: 16pt;
+              font-weight: bold;
             }
             
-            .amount-currency {
-              font-size: 16px;
-              color: #64748b;
-              margin-left: 4px;
+            .notes {
+              font-size: 8pt;
+              padding: 2mm;
+              background: #f0f0f0;
+              margin-bottom: 2mm;
             }
             
-            .notes-section {
-              padding: 15px;
-              background: #f8fafc;
-              border-radius: 6px;
-              margin-bottom: 25px;
-            }
-            
-            .notes-label {
-              font-size: 10px;
-              font-weight: 600;
-              text-transform: uppercase;
-              letter-spacing: 1px;
-              color: #94a3b8;
-              margin-bottom: 8px;
-            }
-            
-            .notes-text {
-              font-size: 13px;
-              color: #475569;
-            }
-            
-            .receipt-footer {
+            .footer {
               text-align: center;
-              padding-top: 20px;
-              border-top: 1px dashed #e2e8f0;
-            }
-            
-            .thank-you {
-              font-weight: 600;
-              color: #1a1a2e;
-              margin-bottom: 4px;
-            }
-            
-            .footer-note {
-              font-size: 11px;
-              color: #94a3b8;
+              padding-top: 2mm;
+              border-top: 1px dashed #000;
+              font-size: 8pt;
             }
             
             @media print {
               body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-              .receipt-container { padding: 15px; }
             }
-            
-            @page { margin: 0.5cm; }
           </style>
         </head>
         <body>
-          <div class="receipt-container">
-            <div class="receipt-header">
+          <div class="receipt">
+            <div class="header">
               <div class="company-name">Iqbal Electronics</div>
               <div class="company-sub">Co. WLL - Kuwait</div>
-              <div class="receipt-badge">
-                Payment ${payment.direction === "IN" ? "Received" : "Made"}
-              </div>
+              <div class="badge">${payment.direction === "IN" ? "PAYMENT IN" : "PAYMENT OUT"}</div>
             </div>
             
-            <div class="receipt-details">
-              <div class="detail-row">
-                <span class="detail-label">Date</span>
-                <span class="detail-value">${formatDate(payment.paymentDate)}</span>
+            <div class="details">
+              <div class="row">
+                <span class="row-label">Date:</span>
+                <span class="row-value">${formatDate(payment.paymentDate)}</span>
               </div>
-              <div class="detail-row">
-                <span class="detail-label">${partyLabel}</span>
-                <span class="detail-value">${partyName}</span>
+              <div class="row">
+                <span class="row-label">${partyLabel}:</span>
+                <span class="row-value">${partyName}</span>
               </div>
-              <div class="detail-row">
-                <span class="detail-label">Payment Method</span>
-                <span class="detail-value">${payment.paymentType}</span>
+              <div class="row">
+                <span class="row-label">Method:</span>
+                <span class="row-value">${payment.paymentType}</span>
               </div>
               ${payment.reference ? `
-              <div class="detail-row">
-                <span class="detail-label">Reference</span>
-                <span class="detail-value" style="font-family: monospace;">${payment.reference}</span>
+              <div class="row">
+                <span class="row-label">Ref:</span>
+                <span class="row-value">${payment.reference}</span>
               </div>
               ` : ""}
             </div>
             
-            <div class="amount-section">
+            <div class="amount-box">
               <div class="amount-label">Amount ${payment.direction === "IN" ? "Received" : "Paid"}</div>
-              <div class="amount-value">
-                ${payment.direction === "OUT" ? "-" : ""}${parseFloat(payment.amount).toFixed(3)}
-                <span class="amount-currency">KWD</span>
-              </div>
+              <div class="amount-value">${payment.direction === "OUT" ? "-" : ""}${parseFloat(payment.amount).toFixed(3)} KWD</div>
             </div>
             
-            ${payment.notes ? `
-            <div class="notes-section">
-              <div class="notes-label">Notes</div>
-              <div class="notes-text">${payment.notes}</div>
-            </div>
-            ` : ""}
+            ${payment.notes ? `<div class="notes">Notes: ${payment.notes}</div>` : ""}
             
-            <div class="receipt-footer">
-              <div class="thank-you">Thank You!</div>
-              <div class="footer-note">This is a computer-generated receipt.</div>
+            <div class="footer">
+              Thank You!<br/>
+              Computer Generated Receipt
             </div>
           </div>
           
-          <script>
-            window.onload = function() { 
-              setTimeout(function() { window.print(); }, 300);
-            }
-          </script>
+          <script>window.onload = function() { setTimeout(function() { window.print(); }, 300); }</script>
         </body>
       </html>
     `);

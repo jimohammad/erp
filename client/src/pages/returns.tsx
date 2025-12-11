@@ -337,18 +337,16 @@ export default function ReturnsPage() {
       ? ret.customer?.name || "Not specified"
       : ret.supplier?.name || "Not specified";
     const partyLabel = ret.returnType === "sale_return" ? "Customer" : "Supplier";
-    const returnTypeLabel = ret.returnType === "sale_return" ? "Sale Return" : "Purchase Return";
+    const returnTypeLabel = ret.returnType === "sale_return" ? "SALE RETURN" : "PURCHASE RETURN";
 
     const grandTotal = ret.lineItems?.reduce((sum, item) => sum + (parseFloat(item.totalKwd || "0")), 0) || 0;
 
     const lineItemsHtml = ret.lineItems?.map(item => `
-      <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(item.itemName)}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${parseFloat(item.priceKwd || "0").toFixed(3)} KWD</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${parseFloat(item.totalKwd || "0").toFixed(3)} KWD</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #6b7280;">${item.imeiNumbers?.length ? item.imeiNumbers.map(imei => escapeHtml(imei)).join(", ") : "-"}</td>
-      </tr>
+      <div class="item-row">
+        <div class="item-name">${escapeHtml(item.itemName)}</div>
+        <div class="item-details">${item.quantity} x ${parseFloat(item.priceKwd || "0").toFixed(3)} = ${parseFloat(item.totalKwd || "0").toFixed(3)}</div>
+        ${item.imeiNumbers?.length ? `<div class="item-imei">IMEI: ${item.imeiNumbers.map(imei => escapeHtml(imei)).join(", ")}</div>` : ""}
+      </div>
     `).join("") || "";
 
     printWindow.document.write(`
@@ -357,52 +355,147 @@ export default function ReturnsPage() {
         <head>
           <title>Return - ${escapeHtml(ret.returnNumber)}</title>
           <style>
-            body { font-family: Inter, system-ui, sans-serif; padding: 20px; }
-            .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-            .company { font-size: 24px; font-weight: bold; color: #0f172a; }
-            .return-title { font-size: 14px; color: #64748b; text-transform: uppercase; }
-            .return-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-top: 8px;
-              ${ret.returnType === "sale_return" ? "background: #dbeafe; color: #1e40af;" : "background: #fef3c7; color: #92400e;"} }
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-            .info-item { font-size: 14px; }
-            .info-label { color: #64748b; margin-right: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th { background: #f1f5f9; padding: 10px 8px; text-align: left; font-size: 12px; text-transform: uppercase; }
-            .total { font-size: 18px; font-weight: bold; text-align: right; }
-            @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+            
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            
+            body { 
+              font-family: 'Courier New', monospace;
+              background: #fff;
+              color: #000;
+              line-height: 1.3;
+              font-size: 10pt;
+              width: 80mm;
+              margin: 0;
+              padding: 0;
+            }
+            
+            .receipt {
+              width: 80mm;
+              padding: 2mm 3mm;
+            }
+            
+            .header {
+              text-align: center;
+              padding-bottom: 2mm;
+              border-bottom: 1px dashed #000;
+              margin-bottom: 2mm;
+            }
+            
+            .company-name {
+              font-size: 12pt;
+              font-weight: bold;
+            }
+            
+            .company-sub {
+              font-size: 8pt;
+            }
+            
+            .badge {
+              display: inline-block;
+              margin-top: 2mm;
+              padding: 1mm 3mm;
+              font-size: 9pt;
+              font-weight: bold;
+              border: 1px solid #000;
+            }
+            
+            .info {
+              margin-bottom: 2mm;
+              font-size: 9pt;
+            }
+            
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 1mm 0;
+            }
+            
+            .items {
+              border-top: 1px dashed #000;
+              border-bottom: 1px dashed #000;
+              padding: 2mm 0;
+              margin: 2mm 0;
+            }
+            
+            .item-row {
+              margin-bottom: 2mm;
+              font-size: 9pt;
+            }
+            
+            .item-name {
+              font-weight: bold;
+            }
+            
+            .item-details {
+              text-align: right;
+            }
+            
+            .item-imei {
+              font-size: 7pt;
+              color: #333;
+              word-break: break-all;
+            }
+            
+            .total-box {
+              text-align: right;
+              padding: 2mm 0;
+              font-size: 12pt;
+              font-weight: bold;
+            }
+            
+            .footer {
+              text-align: center;
+              padding-top: 2mm;
+              border-top: 1px dashed #000;
+              font-size: 8pt;
+            }
+            
+            @media print {
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div>
-              <div class="company">Iqbal Electronics</div>
-              <div style="color: #64748b; font-size: 12px;">Kuwait</div>
+          <div class="receipt">
+            <div class="header">
+              <div class="company-name">Iqbal Electronics</div>
+              <div class="company-sub">Co. WLL - Kuwait</div>
+              <div class="badge">${returnTypeLabel}</div>
             </div>
-            <div style="text-align: right;">
-              <div class="return-title">Return Receipt</div>
-              <div style="font-size: 18px; font-weight: bold;">${escapeHtml(ret.returnNumber)}</div>
-              <div class="return-badge">${returnTypeLabel}</div>
+            
+            <div class="info">
+              <div class="info-row">
+                <span>Return #:</span>
+                <span style="font-weight:bold">${escapeHtml(ret.returnNumber)}</span>
+              </div>
+              <div class="info-row">
+                <span>Date:</span>
+                <span>${format(new Date(ret.returnDate), "dd/MM/yyyy")}</span>
+              </div>
+              <div class="info-row">
+                <span>${partyLabel}:</span>
+                <span>${escapeHtml(partyName)}</span>
+              </div>
             </div>
-          </div>
-          <div class="info-grid">
-            <div class="info-item"><span class="info-label">Date:</span> ${format(new Date(ret.returnDate), "dd/MM/yyyy")}</div>
-            <div class="info-item"><span class="info-label">${partyLabel}:</span> ${escapeHtml(partyName)}</div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th style="text-align: center;">Qty</th>
-                <th style="text-align: right;">Price</th>
-                <th style="text-align: right;">Total</th>
-                <th>IMEI Numbers</th>
-              </tr>
-            </thead>
-            <tbody>
+            
+            <div class="items">
               ${lineItemsHtml}
-            </tbody>
-          </table>
-          <div class="total">Grand Total: ${grandTotal.toFixed(3)} KWD</div>
+            </div>
+            
+            <div class="total-box">
+              TOTAL: ${grandTotal.toFixed(3)} KWD
+            </div>
+            
+            <div class="footer">
+              Thank You!<br/>
+              Computer Generated Receipt
+            </div>
+          </div>
+          
           <script>window.onload = function() { window.print(); }</script>
         </body>
       </html>
