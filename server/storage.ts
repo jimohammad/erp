@@ -92,6 +92,14 @@ import {
   type PurchaseOrderDraftWithDetails,
   appSettings,
   type AppSetting,
+  imeiInventory,
+  imeiEvents,
+  type ImeiInventory,
+  type InsertImeiInventory,
+  type ImeiEvent,
+  type InsertImeiEvent,
+  type ImeiInventoryWithDetails,
+  type ImeiEventWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -253,6 +261,17 @@ export interface IStorage {
   getSetting(key: string): Promise<string | null>;
   setSetting(key: string, value: string): Promise<void>;
   verifyTransactionPassword(password: string): Promise<boolean>;
+
+  // IMEI Tracking
+  searchImei(query: string): Promise<ImeiInventoryWithDetails[]>;
+  getImeiByNumber(imei: string): Promise<ImeiInventoryWithDetails | undefined>;
+  getImeiHistory(imeiId: number): Promise<ImeiEventWithDetails[]>;
+  createImeiRecord(data: InsertImeiInventory): Promise<ImeiInventory>;
+  updateImeiRecord(id: number, data: Partial<InsertImeiInventory>): Promise<ImeiInventory | undefined>;
+  addImeiEvent(event: InsertImeiEvent): Promise<ImeiEvent>;
+  processImeiFromPurchase(imeiNumbers: string[], itemName: string, purchaseOrderId: number, supplierId: number | null, purchaseDate: string, priceKwd: string | null, branchId: number | null, createdBy: string | null): Promise<void>;
+  processImeiFromSale(imeiNumbers: string[], itemName: string, salesOrderId: number, customerId: number | null, saleDate: string, priceKwd: string | null, branchId: number | null, createdBy: string | null): Promise<void>;
+  processImeiFromReturn(imeiNumbers: string[], returnType: string, returnId: number, customerId: number | null, supplierId: number | null, branchId: number | null, createdBy: string | null): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2316,6 +2335,279 @@ export class DatabaseStorage implements IStorage {
       return false; // Password required but not provided
     }
     return await bcrypt.compare(password, storedHash);
+  }
+
+  // IMEI Tracking Module
+  async searchImei(query: string): Promise<ImeiInventoryWithDetails[]> {
+    const searchPattern = `%${query}%`;
+    const results = await db
+      .select()
+      .from(imeiInventory)
+      .leftJoin(items, eq(imeiInventory.itemId, items.id))
+      .leftJoin(branches, eq(imeiInventory.currentBranchId, branches.id))
+      .leftJoin(suppliers, eq(imeiInventory.supplierId, suppliers.id))
+      .leftJoin(customers, eq(imeiInventory.customerId, customers.id))
+      .where(
+        sql`${imeiInventory.imei} ILIKE ${searchPattern} OR ${imeiInventory.itemName} ILIKE ${searchPattern}`
+      )
+      .orderBy(desc(imeiInventory.createdAt))
+      .limit(50);
+
+    return results.map(r => ({
+      ...r.imei_inventory,
+      item: r.items || null,
+      currentBranch: r.branches || null,
+      supplier: r.suppliers || null,
+      customer: r.customers || null,
+    }));
+  }
+
+  async getImeiByNumber(imei: string): Promise<ImeiInventoryWithDetails | undefined> {
+    const results = await db
+      .select()
+      .from(imeiInventory)
+      .leftJoin(items, eq(imeiInventory.itemId, items.id))
+      .leftJoin(branches, eq(imeiInventory.currentBranchId, branches.id))
+      .leftJoin(suppliers, eq(imeiInventory.supplierId, suppliers.id))
+      .leftJoin(customers, eq(imeiInventory.customerId, customers.id))
+      .leftJoin(purchaseOrders, eq(imeiInventory.purchaseOrderId, purchaseOrders.id))
+      .leftJoin(salesOrders, eq(imeiInventory.salesOrderId, salesOrders.id))
+      .where(eq(imeiInventory.imei, imei))
+      .limit(1);
+
+    if (results.length === 0) return undefined;
+
+    const r = results[0];
+    const events = await this.getImeiHistory(r.imei_inventory.id);
+    
+    return {
+      ...r.imei_inventory,
+      item: r.items || null,
+      currentBranch: r.branches || null,
+      supplier: r.suppliers || null,
+      customer: r.customers || null,
+      purchaseOrder: r.purchase_orders || null,
+      salesOrder: r.sales_orders || null,
+      events,
+    };
+  }
+
+  async getImeiHistory(imeiId: number): Promise<ImeiEventWithDetails[]> {
+    const results = await db
+      .select()
+      .from(imeiEvents)
+      .leftJoin(branches, eq(imeiEvents.fromBranchId, branches.id))
+      .leftJoin(customers, eq(imeiEvents.customerId, customers.id))
+      .leftJoin(suppliers, eq(imeiEvents.supplierId, suppliers.id))
+      .where(eq(imeiEvents.imeiId, imeiId))
+      .orderBy(desc(imeiEvents.eventDate));
+
+    // Need to do a separate join for toBranch
+    const eventIds = results.map(r => r.imei_events.id);
+    const toBranchResults = eventIds.length > 0 
+      ? await db.select().from(imeiEvents).leftJoin(branches, eq(imeiEvents.toBranchId, branches.id)).where(sql`${imeiEvents.id} IN ${eventIds}`)
+      : [];
+    
+    const toBranchMap = new Map(toBranchResults.map(r => [r.imei_events.id, r.branches]));
+
+    return results.map(r => ({
+      ...r.imei_events,
+      fromBranch: r.branches || null,
+      toBranch: toBranchMap.get(r.imei_events.id) || null,
+      customer: r.customers || null,
+      supplier: r.suppliers || null,
+    }));
+  }
+
+  async createImeiRecord(data: InsertImeiInventory): Promise<ImeiInventory> {
+    const [record] = await db.insert(imeiInventory).values(data).returning();
+    return record;
+  }
+
+  async updateImeiRecord(id: number, data: Partial<InsertImeiInventory>): Promise<ImeiInventory | undefined> {
+    const [updated] = await db.update(imeiInventory).set({
+      ...data,
+      updatedAt: new Date(),
+    }).where(eq(imeiInventory.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async addImeiEvent(event: InsertImeiEvent): Promise<ImeiEvent> {
+    const [created] = await db.insert(imeiEvents).values(event).returning();
+    return created;
+  }
+
+  async processImeiFromPurchase(
+    imeiNumbers: string[], 
+    itemName: string, 
+    purchaseOrderId: number, 
+    supplierId: number | null, 
+    purchaseDate: string, 
+    priceKwd: string | null,
+    branchId: number | null,
+    createdBy: string | null
+  ): Promise<void> {
+    // Find item ID by name
+    const [item] = await db.select().from(items).where(eq(items.name, itemName)).limit(1);
+    const itemId = item?.id || null;
+
+    for (const imei of imeiNumbers) {
+      if (!imei || imei.trim() === '') continue;
+      
+      const trimmedImei = imei.trim();
+      
+      // Check if IMEI already exists
+      const existing = await db.select().from(imeiInventory).where(eq(imeiInventory.imei, trimmedImei)).limit(1);
+      
+      if (existing.length === 0) {
+        // Create new IMEI record
+        const [record] = await db.insert(imeiInventory).values({
+          imei: trimmedImei,
+          itemName,
+          itemId,
+          status: 'in_stock',
+          currentBranchId: branchId,
+          purchaseOrderId,
+          purchaseDate,
+          purchasePriceKwd: priceKwd,
+          supplierId,
+        }).returning();
+
+        // Add purchase event
+        await db.insert(imeiEvents).values({
+          imeiId: record.id,
+          eventType: 'purchased',
+          eventDate: new Date(),
+          referenceType: 'purchase_order',
+          referenceId: purchaseOrderId,
+          toBranchId: branchId,
+          supplierId,
+          priceKwd,
+          notes: `Purchased from supplier`,
+          createdBy,
+        });
+      }
+    }
+  }
+
+  async processImeiFromSale(
+    imeiNumbers: string[], 
+    itemName: string, 
+    salesOrderId: number, 
+    customerId: number | null, 
+    saleDate: string, 
+    priceKwd: string | null,
+    branchId: number | null,
+    createdBy: string | null
+  ): Promise<void> {
+    for (const imei of imeiNumbers) {
+      if (!imei || imei.trim() === '') continue;
+      
+      const trimmedImei = imei.trim();
+      
+      // Find existing IMEI record
+      const [existing] = await db.select().from(imeiInventory).where(eq(imeiInventory.imei, trimmedImei)).limit(1);
+      
+      if (existing) {
+        // Update IMEI record
+        await db.update(imeiInventory).set({
+          status: 'sold',
+          salesOrderId,
+          saleDate,
+          salePriceKwd: priceKwd,
+          customerId,
+          updatedAt: new Date(),
+        }).where(eq(imeiInventory.id, existing.id));
+
+        // Add sale event
+        await db.insert(imeiEvents).values({
+          imeiId: existing.id,
+          eventType: 'sold',
+          eventDate: new Date(),
+          referenceType: 'sales_order',
+          referenceId: salesOrderId,
+          fromBranchId: branchId,
+          customerId,
+          priceKwd,
+          notes: `Sold to customer`,
+          createdBy,
+        });
+      } else {
+        // IMEI not in system yet - create it and mark as sold
+        const [item] = await db.select().from(items).where(eq(items.name, itemName)).limit(1);
+        const itemId = item?.id || null;
+
+        const [record] = await db.insert(imeiInventory).values({
+          imei: trimmedImei,
+          itemName,
+          itemId,
+          status: 'sold',
+          currentBranchId: branchId,
+          salesOrderId,
+          saleDate,
+          salePriceKwd: priceKwd,
+          customerId,
+        }).returning();
+
+        await db.insert(imeiEvents).values({
+          imeiId: record.id,
+          eventType: 'sold',
+          eventDate: new Date(),
+          referenceType: 'sales_order',
+          referenceId: salesOrderId,
+          fromBranchId: branchId,
+          customerId,
+          priceKwd,
+          notes: `Sold to customer (IMEI created at sale)`,
+          createdBy,
+        });
+      }
+    }
+  }
+
+  async processImeiFromReturn(
+    imeiNumbers: string[], 
+    returnType: string, 
+    returnId: number, 
+    customerId: number | null, 
+    supplierId: number | null,
+    branchId: number | null,
+    createdBy: string | null
+  ): Promise<void> {
+    const eventType = returnType === 'sale_return' ? 'sale_returned' : 'purchase_returned';
+    const newStatus = returnType === 'sale_return' ? 'returned' : 'returned';
+
+    for (const imei of imeiNumbers) {
+      if (!imei || imei.trim() === '') continue;
+      
+      const trimmedImei = imei.trim();
+      
+      // Find existing IMEI record
+      const [existing] = await db.select().from(imeiInventory).where(eq(imeiInventory.imei, trimmedImei)).limit(1);
+      
+      if (existing) {
+        // Update IMEI status
+        await db.update(imeiInventory).set({
+          status: newStatus,
+          currentBranchId: returnType === 'sale_return' ? branchId : null,
+          updatedAt: new Date(),
+        }).where(eq(imeiInventory.id, existing.id));
+
+        // Add return event
+        await db.insert(imeiEvents).values({
+          imeiId: existing.id,
+          eventType,
+          eventDate: new Date(),
+          referenceType: 'return',
+          referenceId: returnId,
+          toBranchId: returnType === 'sale_return' ? branchId : null,
+          customerId: returnType === 'sale_return' ? customerId : null,
+          supplierId: returnType === 'purchase_return' ? supplierId : null,
+          notes: returnType === 'sale_return' ? 'Returned by customer' : 'Returned to supplier',
+          createdBy,
+        });
+      }
+    }
   }
 }
 
