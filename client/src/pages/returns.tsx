@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Plus, Trash2, RotateCcw, X, Smartphone, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, RotateCcw, X, Smartphone, ChevronUp, Printer, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,16 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { ReturnWithDetails, Customer, Supplier, Item } from "@shared/schema";
+
+const escapeHtml = (str: string | null | undefined): string => {
+  if (!str) return "";
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
 
 const returnFormSchema = z.object({
   returnDate: z.string().min(1, "Date is required"),
@@ -319,6 +329,176 @@ export default function ReturnsPage() {
     createReturnMutation.mutate(data);
   };
 
+  const handlePrintReturn = (ret: ReturnWithDetails) => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const partyName = ret.returnType === "sale_return" 
+      ? ret.customer?.name || "Not specified"
+      : ret.supplier?.name || "Not specified";
+    const partyLabel = ret.returnType === "sale_return" ? "Customer" : "Supplier";
+    const returnTypeLabel = ret.returnType === "sale_return" ? "Sale Return" : "Purchase Return";
+
+    const grandTotal = ret.lineItems?.reduce((sum, item) => sum + (parseFloat(item.totalKwd || "0")), 0) || 0;
+
+    const lineItemsHtml = ret.lineItems?.map(item => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(item.itemName)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${parseFloat(item.priceKwd || "0").toFixed(3)} KWD</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${parseFloat(item.totalKwd || "0").toFixed(3)} KWD</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #6b7280;">${item.imeiNumbers?.length ? item.imeiNumbers.map(imei => escapeHtml(imei)).join(", ") : "-"}</td>
+      </tr>
+    `).join("") || "";
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Return - ${escapeHtml(ret.returnNumber)}</title>
+          <style>
+            body { font-family: Inter, system-ui, sans-serif; padding: 20px; }
+            .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+            .company { font-size: 24px; font-weight: bold; color: #0f172a; }
+            .return-title { font-size: 14px; color: #64748b; text-transform: uppercase; }
+            .return-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-top: 8px;
+              ${ret.returnType === "sale_return" ? "background: #dbeafe; color: #1e40af;" : "background: #fef3c7; color: #92400e;"} }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+            .info-item { font-size: 14px; }
+            .info-label { color: #64748b; margin-right: 4px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th { background: #f1f5f9; padding: 10px 8px; text-align: left; font-size: 12px; text-transform: uppercase; }
+            .total { font-size: 18px; font-weight: bold; text-align: right; }
+            @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div>
+              <div class="company">Iqbal Electronics</div>
+              <div style="color: #64748b; font-size: 12px;">Kuwait</div>
+            </div>
+            <div style="text-align: right;">
+              <div class="return-title">Return Receipt</div>
+              <div style="font-size: 18px; font-weight: bold;">${escapeHtml(ret.returnNumber)}</div>
+              <div class="return-badge">${returnTypeLabel}</div>
+            </div>
+          </div>
+          <div class="info-grid">
+            <div class="info-item"><span class="info-label">Date:</span> ${format(new Date(ret.returnDate), "dd/MM/yyyy")}</div>
+            <div class="info-item"><span class="info-label">${partyLabel}:</span> ${escapeHtml(partyName)}</div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th style="text-align: center;">Qty</th>
+                <th style="text-align: right;">Price</th>
+                <th style="text-align: right;">Total</th>
+                <th>IMEI Numbers</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${lineItemsHtml}
+            </tbody>
+          </table>
+          <div class="total">Grand Total: ${grandTotal.toFixed(3)} KWD</div>
+          <script>window.onload = function() { window.print(); }</script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
+  const handleDownloadPDF = (ret: ReturnWithDetails) => {
+    const pdfWindow = window.open("", "_blank");
+    if (!pdfWindow) return;
+
+    const partyName = ret.returnType === "sale_return" 
+      ? ret.customer?.name || "Not specified"
+      : ret.supplier?.name || "Not specified";
+    const partyLabel = ret.returnType === "sale_return" ? "Customer" : "Supplier";
+    const returnTypeLabel = ret.returnType === "sale_return" ? "Sale Return" : "Purchase Return";
+
+    const grandTotal = ret.lineItems?.reduce((sum, item) => sum + (parseFloat(item.totalKwd || "0")), 0) || 0;
+
+    const lineItemsHtml = ret.lineItems?.map(item => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(item.itemName)}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${parseFloat(item.priceKwd || "0").toFixed(3)} KWD</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${parseFloat(item.totalKwd || "0").toFixed(3)} KWD</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #6b7280;">${item.imeiNumbers?.length ? item.imeiNumbers.map(imei => escapeHtml(imei)).join(", ") : "-"}</td>
+      </tr>
+    `).join("") || "";
+
+    pdfWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Return - ${escapeHtml(ret.returnNumber)}</title>
+          <style>
+            body { font-family: Inter, system-ui, sans-serif; padding: 20px; }
+            .pdf-instructions { text-align: center; padding: 16px; background: #fef3c7; border: 2px solid #f59e0b; border-radius: 8px; margin-bottom: 20px; }
+            .pdf-instructions strong { display: block; font-size: 16px; margin-bottom: 8px; color: #92400e; }
+            .pdf-instructions span { color: #92400e; }
+            .shortcut { display: inline-block; background: #fff; border: 1px solid #d97706; padding: 4px 12px; border-radius: 4px; font-family: monospace; font-weight: 600; margin: 4px; }
+            .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+            .company { font-size: 24px; font-weight: bold; color: #0f172a; }
+            .return-title { font-size: 14px; color: #64748b; text-transform: uppercase; }
+            .return-badge { display: inline-block; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; margin-top: 8px;
+              ${ret.returnType === "sale_return" ? "background: #dbeafe; color: #1e40af;" : "background: #fef3c7; color: #92400e;"} }
+            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+            .info-item { font-size: 14px; }
+            .info-label { color: #64748b; margin-right: 4px; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            th { background: #f1f5f9; padding: 10px 8px; text-align: left; font-size: 12px; text-transform: uppercase; }
+            .total { font-size: 18px; font-weight: bold; text-align: right; }
+            @media print { .pdf-instructions { display: none !important; } body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+          </style>
+        </head>
+        <body>
+          <div class="pdf-instructions">
+            <strong>Save Return as PDF</strong>
+            <span>Press <span class="shortcut">Ctrl + P</span> (Windows) or <span class="shortcut">Cmd + P</span> (Mac)</span><br/>
+            <span>Then select "Save as PDF" as the destination</span>
+          </div>
+          <div class="header">
+            <div>
+              <div class="company">Iqbal Electronics</div>
+              <div style="color: #64748b; font-size: 12px;">Kuwait</div>
+            </div>
+            <div style="text-align: right;">
+              <div class="return-title">Return Receipt</div>
+              <div style="font-size: 18px; font-weight: bold;">${escapeHtml(ret.returnNumber)}</div>
+              <div class="return-badge">${returnTypeLabel}</div>
+            </div>
+          </div>
+          <div class="info-grid">
+            <div class="info-item"><span class="info-label">Date:</span> ${format(new Date(ret.returnDate), "dd/MM/yyyy")}</div>
+            <div class="info-item"><span class="info-label">${partyLabel}:</span> ${escapeHtml(partyName)}</div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th style="text-align: center;">Qty</th>
+                <th style="text-align: right;">Price</th>
+                <th style="text-align: right;">Total</th>
+                <th>IMEI Numbers</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${lineItemsHtml}
+            </tbody>
+          </table>
+          <div class="total">Grand Total: ${grandTotal.toFixed(3)} KWD</div>
+        </body>
+      </html>
+    `);
+    pdfWindow.document.close();
+  };
+
   const filteredReturns = returns.filter(r => r.returnType === returnType);
 
   const grandTotal = lineItems.reduce((sum, item) => sum + (parseFloat(item.totalKwd) || 0), 0);
@@ -362,33 +542,6 @@ export default function ReturnsPage() {
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="returnDate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Return Date</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field} data-testid="input-return-date" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="returnNumber"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Return Number</FormLabel>
-                        <FormControl>
-                          <Input {...field} readOnly className="bg-muted" data-testid="input-return-number" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
                   {returnType === "sale_return" ? (
                     <FormField
                       control={form.control}
@@ -440,6 +593,33 @@ export default function ReturnsPage() {
                       )}
                     />
                   )}
+
+                  <FormField
+                    control={form.control}
+                    name="returnDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Return Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} data-testid="input-return-date" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="returnNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Return Number</FormLabel>
+                        <FormControl>
+                          <Input {...field} readOnly className="bg-muted" data-testid="input-return-number" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -686,15 +866,35 @@ export default function ReturnsPage() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteReturnMutation.mutate(ret.id)}
-                        disabled={deleteReturnMutation.isPending}
-                        data-testid={`button-delete-return-${ret.id}`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handlePrintReturn(ret)}
+                          title="Print"
+                          data-testid={`button-print-return-${ret.id}`}
+                        >
+                          <Printer className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDownloadPDF(ret)}
+                          title="Export PDF"
+                          data-testid={`button-pdf-return-${ret.id}`}
+                        >
+                          <FileDown className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => deleteReturnMutation.mutate(ret.id)}
+                          disabled={deleteReturnMutation.isPending}
+                          data-testid={`button-delete-return-${ret.id}`}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
