@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import logoImage from "@assets/erpLogo_1765462537842.png";
+import logoImage from "@assets/erpLogo_2_1765470830494.png";
 
 export default function Landing() {
   const handleLogin = () => {
