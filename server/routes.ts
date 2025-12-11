@@ -1809,5 +1809,52 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== IMEI TRACKING ====================
+
+  app.get("/api/imei/search", isAuthenticated, async (req, res) => {
+    try {
+      const query = (req.query.q as string) || "";
+      if (!query || query.length < 2) {
+        return res.json([]);
+      }
+      const results = await storage.searchImei(query);
+      res.json(results);
+    } catch (error) {
+      console.error("Error searching IMEI:", error);
+      res.status(500).json({ error: "Failed to search IMEI" });
+    }
+  });
+
+  app.get("/api/imei/:imei", isAuthenticated, async (req, res) => {
+    try {
+      const imei = req.params.imei;
+      if (!imei) {
+        return res.status(400).json({ error: "IMEI number required" });
+      }
+      const record = await storage.getImeiByNumber(imei);
+      if (!record) {
+        return res.status(404).json({ error: "IMEI not found" });
+      }
+      res.json(record);
+    } catch (error) {
+      console.error("Error fetching IMEI:", error);
+      res.status(500).json({ error: "Failed to fetch IMEI" });
+    }
+  });
+
+  app.get("/api/imei/:id/history", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid IMEI ID" });
+      }
+      const history = await storage.getImeiHistory(id);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching IMEI history:", error);
+      res.status(500).json({ error: "Failed to fetch IMEI history" });
+    }
+  });
+
   return httpServer;
 }
