@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BranchProvider, useBranch } from "@/contexts/BranchContext";
 import { BranchSelector } from "@/components/BranchSelector";
-import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown, RotateCcw, FileText, Settings, Percent, LayoutDashboard, ArrowLeftRight, Building2 } from "lucide-react";
+import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown, RotateCcw, FileText, Settings, Percent, LayoutDashboard, ArrowLeftRight, Building2, Smartphone } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,6 +61,7 @@ const OpeningBalancesPage = lazy(() => import("@/pages/opening-balances"));
 const PurchaseOrdersPage = lazy(() => import("@/pages/purchase-orders"));
 const StockLookupPage = lazy(() => import("@/pages/stock-lookup"));
 const SecuritySettingsPage = lazy(() => import("@/pages/security-settings"));
+const ImeiHistoryPage = lazy(() => import("@/pages/imei-history"));
 const Landing = lazy(() => import("@/pages/landing"));
 const PublicStatementPage = lazy(() => import("@/pages/public-statement"));
 const NotFound = lazy(() => import("@/pages/not-found"));
@@ -250,6 +251,21 @@ function AppSidebar() {
                     <Link href="/stock-lookup" data-testid="link-stock-lookup">
                       <Package className="h-4 w-4" />
                       <span>Stock</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
+              {/* IMEI History - track device lifecycle */}
+              {canAccess("reports") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/imei-history"}
+                  >
+                    <Link href="/imei-history" data-testid="link-imei-history">
+                      <Smartphone className="h-4 w-4" />
+                      <span>IMEI History</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -597,6 +613,7 @@ function AuthenticatedLayout() {
                 <Route path="/settings/security" component={SecuritySettingsPage} />
                 <Route path="/stock-transfers" component={StockTransfersPage} />
                 <Route path="/stock-lookup" component={StockLookupPage} />
+                <Route path="/imei-history" component={ImeiHistoryPage} />
                 <Route component={NotFound} />
               </Switch>
             </Suspense>
