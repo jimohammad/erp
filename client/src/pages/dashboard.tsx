@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Package, DollarSign, TrendingUp, TrendingDown, ShoppingCart, Search, Loader2, ArrowRight, Wallet, Building2 } from "lucide-react";
+import { Package, DollarSign, TrendingUp, TrendingDown, ShoppingCart, Search, Loader2, ArrowRight, Wallet, Building2, Receipt } from "lucide-react";
 import Sparkline from "@/components/Sparkline";
 
 const LazySalesChart = lazy(() => import("@/components/SalesChart"));
@@ -20,6 +20,7 @@ interface DashboardStats {
   monthlyPurchases: number;
   salesTrend: number[];
   purchasesTrend: number[];
+  totalExpenses: number;
 }
 
 interface SearchResult {
@@ -233,6 +234,19 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card data-testid="card-total-expenses" className="p-0">
+              <CardHeader className="flex flex-row items-center justify-between gap-1 p-3 pb-1">
+                <CardTitle className="text-xs font-medium text-muted-foreground">Total Expenses</CardTitle>
+                <Receipt className="h-3.5 w-3.5 text-orange-600" />
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="text-xl font-light text-orange-600" data-testid="text-total-expenses">
+                  {formatCurrency(stats?.totalExpenses || 0)}
+                </div>
+                <p className="text-[10px] text-muted-foreground">KWD</p>
               </CardContent>
             </Card>
           </div>

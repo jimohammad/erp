@@ -197,7 +197,7 @@ export interface IStorage {
   getExportImei(filters: { customerId?: number; itemName?: string; invoiceNumber?: string; dateFrom?: string; dateTo?: string }): Promise<{ imei: string; itemName: string; customerName: string; invoiceNumber: string; saleDate: string }[]>;
 
   // Dashboard
-  getDashboardStats(): Promise<{ stockAmount: number; totalCredit: number; totalDebit: number; cashBalance: number; bankAccountsBalance: number; monthlySales: number; lastMonthSales: number; monthlyPurchases: number; salesTrend: number[]; purchasesTrend: number[] }>;
+  getDashboardStats(): Promise<{ stockAmount: number; totalCredit: number; totalDebit: number; cashBalance: number; bankAccountsBalance: number; monthlySales: number; lastMonthSales: number; monthlyPurchases: number; salesTrend: number[]; purchasesTrend: number[]; totalExpenses: number }>;
   globalSearch(query: string): Promise<{ type: string; id: number; title: string; subtitle: string; url: string }[]>;
   
   // Profit and Loss
@@ -1553,6 +1553,7 @@ export class DatabaseStorage implements IStorage {
     monthlyPurchases: number;
     salesTrend: number[];
     purchasesTrend: number[];
+    totalExpenses: number;
   }> {
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth() + 1;
@@ -1759,7 +1760,14 @@ export class DatabaseStorage implements IStorage {
       purchasesTrend.push(purchasesTrendMap.get(dateStr) || 0);
     }
 
-    return { stockAmount, totalCredit, totalDebit, cashBalance, bankAccountsBalance, monthlySales, lastMonthSales, monthlyPurchases, salesTrend, purchasesTrend };
+    // Get total expenses
+    const expensesResult = await db.execute(sql`
+      SELECT COALESCE(SUM(CAST(amount AS DECIMAL)), 0)::float as total
+      FROM expenses
+    `);
+    const totalExpenses = (expensesResult.rows[0] as { total: number })?.total || 0;
+
+    return { stockAmount, totalCredit, totalDebit, cashBalance, bankAccountsBalance, monthlySales, lastMonthSales, monthlyPurchases, salesTrend, purchasesTrend, totalExpenses };
   }
 
   async globalSearch(query: string): Promise<{ type: string; id: number; title: string; subtitle: string; url: string }[]> {
