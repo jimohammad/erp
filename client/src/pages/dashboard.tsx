@@ -158,7 +158,7 @@ export default function DashboardPage() {
                 <Package className="h-3.5 w-3.5 text-muted-foreground" />
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold" data-testid="text-stock-amount">
+                <div className="text-lg font-light" data-testid="text-stock-amount">
                   {formatCurrency(stats?.stockAmount || 0)}
                 </div>
                 <p className="text-[10px] text-muted-foreground">KWD</p>
@@ -171,7 +171,7 @@ export default function DashboardPage() {
                 <TrendingUp className="h-3.5 w-3.5 text-green-600" />
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold text-green-600" data-testid="text-total-credit">
+                <div className="text-lg font-light text-green-600" data-testid="text-total-credit">
                   {formatCurrency(stats?.totalCredit || 0)}
                 </div>
                 <p className="text-[10px] text-muted-foreground">KWD</p>
@@ -184,7 +184,7 @@ export default function DashboardPage() {
                 <TrendingDown className="h-3.5 w-3.5 text-red-600" />
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold text-red-600" data-testid="text-total-debit">
+                <div className="text-lg font-light text-red-600" data-testid="text-total-debit">
                   {formatCurrency(stats?.totalDebit || 0)}
                 </div>
                 <p className="text-[10px] text-muted-foreground">KWD</p>
@@ -197,7 +197,7 @@ export default function DashboardPage() {
                 <Wallet className="h-3.5 w-3.5 text-muted-foreground" />
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold" data-testid="text-cash-balance">
+                <div className="text-lg font-light" data-testid="text-cash-balance">
                   {formatCurrency(stats?.cashBalance || 0)}
                 </div>
                 <p className="text-[10px] text-muted-foreground">KWD</p>
@@ -210,7 +210,7 @@ export default function DashboardPage() {
                 <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold" data-testid="text-bank-accounts">
+                <div className="text-lg font-light" data-testid="text-bank-accounts">
                   {formatCurrency(stats?.bankAccountsBalance || 0)}
                 </div>
                 <p className="text-[10px] text-muted-foreground">KWD</p>
@@ -223,7 +223,7 @@ export default function DashboardPage() {
                 <ShoppingCart className="h-3.5 w-3.5 text-muted-foreground" />
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <div className="text-lg font-bold" data-testid="text-monthly-purchases">
+                <div className="text-lg font-light" data-testid="text-monthly-purchases">
                   {formatCurrency(stats?.monthlyPurchases || 0)}
                 </div>
                 <div className="flex items-center justify-between gap-2">
@@ -231,6 +231,34 @@ export default function DashboardPage() {
                   {stats?.purchasesTrend && stats.purchasesTrend.length > 0 && (
                     <div className="w-16">
                       <Sparkline data={stats.purchasesTrend} color="hsl(var(--secondary))" height={20} />
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            </div>
+
+          <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+            <Card data-testid="card-monthly-sales" className="p-0">
+              <CardHeader className="flex flex-row items-center justify-between gap-1 p-3 pb-1">
+                <div>
+                  <CardTitle className="text-xs font-medium text-muted-foreground">This Month Sales</CardTitle>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Last 7 days trend</p>
+                </div>
+                <DollarSign className="h-4 w-4 text-secondary" />
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="flex items-end justify-between gap-4">
+                  <div>
+                    <div className="text-xl font-light" data-testid="text-monthly-sales">
+                      {formatCurrency(stats?.monthlySales || 0)}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">KWD in {currentMonthName}</p>
+                  </div>
+                  {stats?.salesTrend && stats.salesTrend.length > 0 && (
+                    <div className="flex-1 max-w-32">
+                      <Sparkline data={stats.salesTrend} color="hsl(var(--primary))" height={32} />
                     </div>
                   )}
                 </div>
@@ -247,33 +275,6 @@ export default function DashboardPage() {
                   {formatCurrency(stats?.totalExpenses || 0)}
                 </div>
                 <p className="text-[10px] text-muted-foreground">KWD</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
-            <Card data-testid="card-monthly-sales" className="p-0">
-              <CardHeader className="flex flex-row items-center justify-between gap-1 p-3 pb-1">
-                <div>
-                  <CardTitle className="text-xs font-medium text-muted-foreground">This Month Sales</CardTitle>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Last 7 days trend</p>
-                </div>
-                <DollarSign className="h-4 w-4 text-secondary" />
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="flex items-end justify-between gap-4">
-                  <div>
-                    <div className="text-xl font-bold" data-testid="text-monthly-sales">
-                      {formatCurrency(stats?.monthlySales || 0)}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">KWD in {currentMonthName}</p>
-                  </div>
-                  {stats?.salesTrend && stats.salesTrend.length > 0 && (
-                    <div className="flex-1 max-w-32">
-                      <Sparkline data={stats.salesTrend} color="hsl(var(--primary))" height={32} />
-                    </div>
-                  )}
-                </div>
               </CardContent>
             </Card>
           </div>
