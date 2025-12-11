@@ -324,46 +324,60 @@ export function SalesOrderForm({
                 if (printWindow) {
                   const customerName = selectedCustomer?.name || "Customer";
                   const itemRows = lineItems.filter(li => li.itemName).map(li => 
-                    `<tr><td>${li.itemName}</td><td>${li.quantity}</td><td>${li.priceKwd}</td><td>${li.totalKwd}</td></tr>`
+                    `<div class="item-row"><div class="item-name">${li.itemName}</div><div class="item-details">${li.quantity} x ${li.priceKwd} = ${li.totalKwd}</div></div>`
                   ).join("");
+                  const prevBal = customerBalance?.balance || 0;
+                  const invAmt = parseFloat(totalKwd) || 0;
+                  const currBal = prevBal + invAmt;
                   printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>
                     <head>
                       <title>Sales Invoice</title>
                       <style>
-                        body { font-family: Arial, sans-serif; padding: 20px; }
-                        .header { text-align: center; margin-bottom: 20px; }
-                        .company { font-size: 24px; font-weight: bold; }
-                        .title { font-size: 18px; margin-top: 10px; }
-                        .details { margin: 20px 0; }
-                        .row { display: flex; justify-content: space-between; padding: 4px 0; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                        th { background: #f5f5f5; }
-                        .total { font-size: 18px; font-weight: bold; margin-top: 20px; text-align: right; }
+                        @page { size: 80mm auto; margin: 0; }
+                        * { margin: 0; padding: 0; box-sizing: border-box; }
+                        html, body { height: auto; min-height: 0; }
+                        body { font-family: 'Courier New', monospace; font-size: 10pt; width: 80mm; line-height: 1.3; }
+                        .receipt { width: 80mm; padding: 2mm 3mm; }
+                        .header { text-align: center; padding-bottom: 2mm; border-bottom: 1px dashed #000; margin-bottom: 2mm; }
+                        .company-name { font-size: 12pt; font-weight: bold; }
+                        .company-sub { font-size: 8pt; }
+                        .doc-type { font-size: 10pt; font-weight: bold; margin-top: 1mm; }
+                        .info { margin-bottom: 2mm; font-size: 9pt; }
+                        .info-row { display: flex; justify-content: space-between; padding: 1mm 0; }
+                        .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2mm 0; margin: 2mm 0; }
+                        .item-row { margin-bottom: 2mm; font-size: 9pt; }
+                        .item-name { font-weight: bold; }
+                        .item-details { text-align: right; }
+                        .balance-section { font-size: 8pt; margin: 2mm 0; padding: 2mm 0; border-bottom: 1px dashed #000; }
+                        .balance-row { display: flex; justify-content: space-between; padding: 0.5mm 0; }
+                        .total-box { text-align: center; padding: 2mm; margin: 2mm 0; background: #000; color: #fff; }
+                        .total-label { font-size: 8pt; }
+                        .total-value { font-size: 14pt; font-weight: bold; }
+                        .footer { text-align: center; padding-top: 2mm; font-size: 8pt; }
+                        @media print { html, body { height: auto; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
                       </style>
                     </head>
                     <body>
-                      <div class="header">
-                        <div class="company">Iqbal Electronics Co. WLL</div>
-                        <div class="title">Sales Invoice</div>
-                      </div>
-                      <div class="details">
-                        <div class="row"><span>Date:</span><span>${saleDate}</span></div>
-                        <div class="row"><span>Invoice:</span><span>${invoiceNumber || "N/A"}</span></div>
-                        <div class="row"><span>Customer:</span><span>${customerName}</span></div>
-                      </div>
-                      <table>
-                        <thead><tr><th>Item</th><th>Qty</th><th>Price (KWD)</th><th>Total (KWD)</th></tr></thead>
-                        <tbody>${itemRows}</tbody>
-                      </table>
-                      <div class="totals-section" style="margin-top: 20px; text-align: right;">
-                        ${customerId ? `<div style="padding: 4px 0;"><span>Previous Balance:</span> <span style="font-weight: 500;">${(customerBalance?.balance || 0).toFixed(3)} KWD</span></div>` : ''}
-                        <div style="padding: 4px 0;"><span>Invoice Amount:</span> <span style="font-weight: 500;">${totalKwd} KWD</span></div>
-                        <div style="padding: 12px; margin-top: 8px; background: #1a1a2e; color: white; border-radius: 6px;">
-                          <span>Current Balance:</span> <span style="font-size: 18px; font-weight: bold;">${customerId ? ((customerBalance?.balance || 0) + parseFloat(totalKwd)).toFixed(3) : totalKwd} KWD</span>
+                      <div class="receipt">
+                        <div class="header">
+                          <div class="company-name">Iqbal Electronics Co.</div>
+                          <div class="company-sub">WLL</div>
+                          <div class="doc-type">Sales Invoice</div>
                         </div>
+                        <div class="info">
+                          <div class="info-row"><span>Date:</span><span>${saleDate}</span></div>
+                          <div class="info-row"><span>Invoice:</span><span style="font-weight:bold">${invoiceNumber || "N/A"}</span></div>
+                          <div class="info-row"><span>Customer:</span><span>${customerName}</span></div>
+                        </div>
+                        <div class="items">${itemRows}</div>
+                        ${customerId ? `<div class="balance-section"><div class="balance-row"><span>Previous Balance:</span><span>${prevBal.toFixed(3)} KWD</span></div><div class="balance-row"><span>Invoice Amount:</span><span>${invAmt.toFixed(3)} KWD</span></div></div>` : ''}
+                        <div class="total-box">
+                          <div class="total-label">${customerId ? 'Current Balance' : 'Total Amount'}</div>
+                          <div class="total-value">${customerId ? currBal.toFixed(3) : totalKwd} KWD</div>
+                        </div>
+                        <div class="footer">Thank You!</div>
                       </div>
                     </body>
                     </html>

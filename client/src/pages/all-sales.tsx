@@ -131,13 +131,14 @@ export default function AllSalesPage() {
     if (!printWindow) return;
 
     const lineItemsHtml = selectedSO.lineItems.map(item => `
-      <tr>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(item.itemName)}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.unitPrice)}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #6b7280;">${item.imeiNumbers?.length ? item.imeiNumbers.map(imei => escapeHtml(imei)).join(", ") : "-"}</td>
-      </tr>
+      <div class="item-row">
+        <div class="item-name">${escapeHtml(item.itemName)}</div>
+        <div class="item-details">${item.quantity} x ${formatCurrency(item.unitPrice)} = ${formatCurrency(parseFloat(item.unitPrice || "0") * item.quantity)}</div>
+        ${item.imeiNumbers?.length ? `<div class="item-imei">IMEI: ${item.imeiNumbers.map(imei => escapeHtml(imei)).join(", ")}</div>` : ""}
+      </div>
     `).join("");
+
+    const invoiceAmount = parseFloat(selectedSO.totalKwd || "0");
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -145,46 +146,159 @@ export default function AllSalesPage() {
         <head>
           <title>Invoice - ${escapeHtml(selectedSO.invoiceNumber) || "No Number"}</title>
           <style>
-            body { font-family: Inter, system-ui, sans-serif; padding: 20px; }
-            .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-            .company { font-size: 24px; font-weight: bold; color: #0f172a; }
-            .invoice-title { font-size: 14px; color: #64748b; text-transform: uppercase; }
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-            .info-item { font-size: 14px; }
-            .info-label { color: #64748b; margin-right: 4px; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-            th { background: #f1f5f9; padding: 10px 8px; text-align: left; font-size: 12px; text-transform: uppercase; }
-            .total { font-size: 18px; font-weight: bold; text-align: right; }
-            @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+            @page {
+              size: 80mm auto;
+              margin: 0;
+            }
+            
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            
+            html, body {
+              height: auto;
+              min-height: 0;
+            }
+            
+            body { 
+              font-family: 'Courier New', monospace;
+              background: #fff;
+              color: #000;
+              line-height: 1.3;
+              font-size: 10pt;
+              width: 80mm;
+              margin: 0;
+              padding: 0;
+            }
+            
+            .receipt {
+              width: 80mm;
+              padding: 2mm 3mm;
+            }
+            
+            .header {
+              text-align: center;
+              padding-bottom: 2mm;
+              border-bottom: 1px dashed #000;
+              margin-bottom: 2mm;
+            }
+            
+            .company-name {
+              font-size: 12pt;
+              font-weight: bold;
+            }
+            
+            .company-sub {
+              font-size: 8pt;
+            }
+            
+            .doc-type {
+              font-size: 10pt;
+              font-weight: bold;
+              margin-top: 1mm;
+            }
+            
+            .info {
+              margin-bottom: 2mm;
+              font-size: 9pt;
+            }
+            
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              padding: 1mm 0;
+            }
+            
+            .items {
+              border-top: 1px dashed #000;
+              border-bottom: 1px dashed #000;
+              padding: 2mm 0;
+              margin: 2mm 0;
+            }
+            
+            .item-row {
+              margin-bottom: 2mm;
+              font-size: 9pt;
+            }
+            
+            .item-name {
+              font-weight: bold;
+            }
+            
+            .item-details {
+              text-align: right;
+            }
+            
+            .item-imei {
+              font-size: 7pt;
+              color: #333;
+              word-break: break-all;
+            }
+            
+            .total-box {
+              text-align: center;
+              padding: 2mm;
+              margin: 2mm 0;
+              background: #000;
+              color: #fff;
+            }
+            
+            .total-label {
+              font-size: 8pt;
+            }
+            
+            .total-value {
+              font-size: 14pt;
+              font-weight: bold;
+            }
+            
+            .footer {
+              text-align: center;
+              padding-top: 2mm;
+              font-size: 8pt;
+            }
+            
+            @media print {
+              html, body { height: auto; }
+              body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            }
           </style>
         </head>
         <body>
-          <div class="header">
-            <div>
-              <div class="company">Iqbal Electronics</div>
-              <div style="color: #64748b; font-size: 12px;">Kuwait</div>
+          <div class="receipt">
+            <div class="header">
+              <div class="company-name">Iqbal Electronics Co.</div>
+              <div class="company-sub">WLL</div>
+              <div class="doc-type">Sales Invoice</div>
             </div>
-            <div style="text-align: right;">
-              <div class="invoice-title">Sales Invoice</div>
-              <div style="font-size: 18px; font-weight: bold;">${escapeHtml(selectedSO.invoiceNumber)}</div>
+            
+            <div class="info">
+              <div class="info-row">
+                <span>Date:</span>
+                <span>${format(new Date(selectedSO.saleDate), "dd-MM-yyyy")}</span>
+              </div>
+              <div class="info-row">
+                <span>Invoice:</span>
+                <span style="font-weight:bold">${escapeHtml(selectedSO.invoiceNumber)}</span>
+              </div>
+              <div class="info-row">
+                <span>Customer:</span>
+                <span>${escapeHtml(selectedSO.customer?.name)}</span>
+              </div>
+            </div>
+            
+            <div class="items">
+              ${lineItemsHtml}
+            </div>
+            
+            <div class="total-box">
+              <div class="total-label">Total Amount</div>
+              <div class="total-value">${invoiceAmount.toFixed(3)} KWD</div>
+            </div>
+            
+            <div class="footer">
+              Thank You!
             </div>
           </div>
-          <div class="info-grid">
-            <div class="info-item"><span class="info-label">Date:</span> ${format(new Date(selectedSO.saleDate), "dd/MM/yyyy")}</div>
-            <div class="info-item"><span class="info-label">Customer:</span> ${escapeHtml(selectedSO.customer?.name)}</div>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th style="text-align: center;">Qty</th>
-                <th style="text-align: right;">Unit Price</th>
-                <th>IMEI Numbers</th>
-              </tr>
-            </thead>
-            <tbody>${lineItemsHtml}</tbody>
-          </table>
-          <div class="total">Total: ${formatCurrency(selectedSO.totalKwd)} KWD</div>
+          
           <script>window.onload = function() { setTimeout(function() { window.print(); }, 300); }</script>
         </body>
       </html>
