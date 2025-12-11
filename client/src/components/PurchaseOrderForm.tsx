@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -52,31 +52,8 @@ export function PurchaseOrderForm({
   const [deliveryNoteFile, setDeliveryNoteFile] = useState<File | null>(null);
   const [ttCopyFile, setTtCopyFile] = useState<File | null>(null);
   const [lineItems, setLineItems] = useState<LineItemData[]>([
-    { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", fxPrice: "", totalKwd: "0.000" },
+    { id: generateItemId(), itemName: "", quantity: 0, priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
   ]);
-
-  const calculateTotals = useCallback(() => {
-    let totalKwd = 0;
-    const rate = parseFloat(fxRate) || 0;
-
-    const updatedItems = lineItems.map(item => {
-      const qty = item.quantity || 0;
-      const price = parseFloat(item.priceKwd) || 0;
-      const itemTotal = qty * price;
-      totalKwd += itemTotal;
-      return {
-        ...item,
-        totalKwd: itemTotal.toFixed(3),
-      };
-    });
-
-    setLineItems(updatedItems);
-    
-    return {
-      totalKwd: totalKwd.toFixed(3),
-      totalFx: rate ? (totalKwd * rate).toFixed(2) : "",
-    };
-  }, [lineItems, fxRate]);
 
   const [totals, setTotals] = useState({ totalKwd: "0.000", totalFx: "" });
 
@@ -96,7 +73,7 @@ export function PurchaseOrderForm({
     });
   }, [lineItems, fxRate]);
 
-  const handleLineItemChange = (id: string, field: keyof LineItemData, value: string | number) => {
+  const handleLineItemChange = (id: string, field: keyof LineItemData, value: string | number | string[]) => {
     setLineItems(prev => prev.map(item => {
       if (item.id !== id) return item;
       
@@ -115,7 +92,7 @@ export function PurchaseOrderForm({
   const handleAddRow = () => {
     setLineItems(prev => [
       ...prev,
-      { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", fxPrice: "", totalKwd: "0.000" },
+      { id: generateItemId(), itemName: "", quantity: 0, priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
     ]);
   };
 
@@ -134,7 +111,7 @@ export function PurchaseOrderForm({
     setDeliveryNoteFile(null);
     setTtCopyFile(null);
     setLineItems([
-      { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", fxPrice: "", totalKwd: "0.000" },
+      { id: generateItemId(), itemName: "", quantity: 0, priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
     ]);
   };
 
