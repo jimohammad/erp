@@ -2609,6 +2609,196 @@ export class DatabaseStorage implements IStorage {
       }
     }
   }
+
+  // ==================== STOCK AGING REPORT ====================
+
+  async getStockAging(filters?: { 
+    itemName?: string; 
+    supplierId?: number;
+    branchId?: number;
+  }): Promise<{
+    summary: {
+      bucket0to30: { quantity: number; value: number };
+      bucket31to60: { quantity: number; value: number };
+      bucket61to90: { quantity: number; value: number };
+      bucket90plus: { quantity: number; value: number };
+      total: { quantity: number; value: number };
+    };
+    details: Array<{
+      itemName: string;
+      supplierName: string | null;
+      totalQty: number;
+      totalValue: number;
+      qty0to30: number;
+      value0to30: number;
+      qty31to60: number;
+      value31to60: number;
+      qty61to90: number;
+      value61to90: number;
+      qty90plus: number;
+      value90plus: number;
+      oldestDate: string | null;
+    }>;
+  }> {
+    const today = new Date();
+    
+    // Build filter conditions
+    let itemFilter = '';
+    let supplierFilter = '';
+    
+    if (filters?.itemName) {
+      itemFilter = `AND poli.item_name ILIKE '%${filters.itemName}%'`;
+    }
+    if (filters?.supplierId) {
+      supplierFilter = `AND po.supplier_id = ${filters.supplierId}`;
+    }
+
+    // Calculate stock aging using FIFO approach
+    // Get all purchase lots with their dates and remaining quantities
+    const result = await db.execute(sql.raw(`
+      WITH purchase_lots AS (
+        SELECT 
+          poli.item_name,
+          po.supplier_id,
+          s.name as supplier_name,
+          COALESCE(po.grn_date, po.purchase_date) as received_date,
+          poli.quantity as purchased_qty,
+          COALESCE(CAST(poli.price_kwd AS DECIMAL), 0) as unit_price,
+          COALESCE(CAST(poli.total_kwd AS DECIMAL), 0) as total_amount,
+          ROW_NUMBER() OVER (PARTITION BY poli.item_name ORDER BY COALESCE(po.grn_date, po.purchase_date)) as lot_order
+        FROM purchase_order_line_items poli
+        JOIN purchase_orders po ON poli.purchase_order_id = po.id
+        LEFT JOIN suppliers s ON po.supplier_id = s.id
+        WHERE 1=1 ${itemFilter} ${supplierFilter}
+      ),
+      sold_qty AS (
+        SELECT item_name, COALESCE(SUM(quantity), 0) as qty
+        FROM sales_order_line_items
+        GROUP BY item_name
+      ),
+      purchase_returns_qty AS (
+        SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
+        FROM return_line_items rl
+        JOIN returns r ON rl.return_id = r.id
+        WHERE r.return_type = 'purchase'
+        GROUP BY rl.item_name
+      ),
+      sale_returns_qty AS (
+        SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
+        FROM return_line_items rl
+        JOIN returns r ON rl.return_id = r.id
+        WHERE r.return_type = 'sale'
+        GROUP BY rl.item_name
+      ),
+      net_consumed AS (
+        SELECT 
+          COALESCE(s.item_name, pr.item_name, sr.item_name) as item_name,
+          COALESCE(s.qty, 0) + COALESCE(pr.qty, 0) - COALESCE(sr.qty, 0) as consumed_qty
+        FROM sold_qty s
+        FULL OUTER JOIN purchase_returns_qty pr ON s.item_name = pr.item_name
+        FULL OUTER JOIN sale_returns_qty sr ON COALESCE(s.item_name, pr.item_name) = sr.item_name
+      ),
+      remaining_stock AS (
+        SELECT 
+          pl.item_name,
+          pl.supplier_name,
+          pl.received_date,
+          pl.unit_price,
+          pl.purchased_qty,
+          pl.lot_order,
+          COALESCE(nc.consumed_qty, 0) as total_consumed,
+          SUM(pl.purchased_qty) OVER (PARTITION BY pl.item_name ORDER BY pl.lot_order) as cumulative_purchased
+        FROM purchase_lots pl
+        LEFT JOIN net_consumed nc ON pl.item_name = nc.item_name
+      ),
+      stock_with_remaining AS (
+        SELECT 
+          item_name,
+          supplier_name,
+          received_date,
+          unit_price,
+          purchased_qty,
+          total_consumed,
+          cumulative_purchased,
+          GREATEST(0, LEAST(purchased_qty, cumulative_purchased - total_consumed)) as remaining_qty,
+          CASE 
+            WHEN cumulative_purchased <= total_consumed THEN 0
+            WHEN cumulative_purchased - purchased_qty >= total_consumed THEN purchased_qty
+            ELSE cumulative_purchased - total_consumed
+          END as fifo_remaining
+        FROM remaining_stock
+      ),
+      aged_stock AS (
+        SELECT 
+          item_name,
+          supplier_name,
+          received_date,
+          unit_price,
+          fifo_remaining as qty,
+          fifo_remaining * unit_price as value,
+          EXTRACT(DAY FROM (CURRENT_DATE - received_date::date)) as age_days
+        FROM stock_with_remaining
+        WHERE fifo_remaining > 0
+      )
+      SELECT 
+        item_name as "itemName",
+        supplier_name as "supplierName",
+        SUM(qty)::integer as "totalQty",
+        COALESCE(SUM(value), 0)::float as "totalValue",
+        COALESCE(SUM(CASE WHEN age_days <= 30 THEN qty ELSE 0 END), 0)::integer as "qty0to30",
+        COALESCE(SUM(CASE WHEN age_days <= 30 THEN value ELSE 0 END), 0)::float as "value0to30",
+        COALESCE(SUM(CASE WHEN age_days > 30 AND age_days <= 60 THEN qty ELSE 0 END), 0)::integer as "qty31to60",
+        COALESCE(SUM(CASE WHEN age_days > 30 AND age_days <= 60 THEN value ELSE 0 END), 0)::float as "value31to60",
+        COALESCE(SUM(CASE WHEN age_days > 60 AND age_days <= 90 THEN qty ELSE 0 END), 0)::integer as "qty61to90",
+        COALESCE(SUM(CASE WHEN age_days > 60 AND age_days <= 90 THEN value ELSE 0 END), 0)::float as "value61to90",
+        COALESCE(SUM(CASE WHEN age_days > 90 THEN qty ELSE 0 END), 0)::integer as "qty90plus",
+        COALESCE(SUM(CASE WHEN age_days > 90 THEN value ELSE 0 END), 0)::float as "value90plus",
+        MIN(received_date) as "oldestDate"
+      FROM aged_stock
+      GROUP BY item_name, supplier_name
+      ORDER BY item_name
+    `));
+
+    const details = result.rows as Array<{
+      itemName: string;
+      supplierName: string | null;
+      totalQty: number;
+      totalValue: number;
+      qty0to30: number;
+      value0to30: number;
+      qty31to60: number;
+      value31to60: number;
+      qty61to90: number;
+      value61to90: number;
+      qty90plus: number;
+      value90plus: number;
+      oldestDate: string | null;
+    }>;
+
+    // Calculate summary totals
+    const summary = {
+      bucket0to30: { quantity: 0, value: 0 },
+      bucket31to60: { quantity: 0, value: 0 },
+      bucket61to90: { quantity: 0, value: 0 },
+      bucket90plus: { quantity: 0, value: 0 },
+      total: { quantity: 0, value: 0 },
+    };
+
+    for (const row of details) {
+      summary.bucket0to30.quantity += row.qty0to30 || 0;
+      summary.bucket0to30.value += row.value0to30 || 0;
+      summary.bucket31to60.quantity += row.qty31to60 || 0;
+      summary.bucket31to60.value += row.value31to60 || 0;
+      summary.bucket61to90.quantity += row.qty61to90 || 0;
+      summary.bucket61to90.value += row.value61to90 || 0;
+      summary.bucket90plus.quantity += row.qty90plus || 0;
+      summary.bucket90plus.value += row.value90plus || 0;
+      summary.total.quantity += row.totalQty || 0;
+      summary.total.value += row.totalValue || 0;
+    }
+
+    return { summary, details };
+  }
 }
 
 export const storage = new DatabaseStorage();
