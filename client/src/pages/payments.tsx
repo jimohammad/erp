@@ -95,7 +95,14 @@ export default function PaymentsPage() {
   const [notes, setNotes] = useState("");
 
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery<{ data: PaymentWithDetails[]; total: number }>({
-    queryKey: ["/api/payments", { limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }],
+    queryKey: ["/api/payments", page],
+    queryFn: async () => {
+      const res = await fetch(`/api/payments?limit=${PAGE_SIZE}&offset=${(page - 1) * PAGE_SIZE}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch payments");
+      return res.json();
+    },
   });
   
   const payments = paymentsData?.data ?? [];
