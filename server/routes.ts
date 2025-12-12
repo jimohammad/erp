@@ -2131,5 +2131,71 @@ export async function registerRoutes(
     }
   });
 
+  // WhatsApp Business API Integration
+  const { 
+    sendWhatsAppMessage, 
+    buildSalesInvoiceMessage, 
+    buildPaymentReceiptMessage,
+    isWhatsAppConfigured 
+  } = await import("./whatsappService");
+
+  app.get("/api/whatsapp/status", isAuthenticated, (req, res) => {
+    res.json({ configured: isWhatsAppConfigured() });
+  });
+
+  app.post("/api/whatsapp/send-invoice", isAuthenticated, async (req: any, res) => {
+    try {
+      const { salesOrderId, phoneNumber } = req.body;
+      
+      if (!salesOrderId || !phoneNumber) {
+        return res.status(400).json({ error: "Sales order ID and phone number are required" });
+      }
+
+      const order = await storage.getSalesOrderWithDetails(salesOrderId);
+      if (!order) {
+        return res.status(404).json({ error: "Sales order not found" });
+      }
+
+      const message = buildSalesInvoiceMessage(order);
+      const result = await sendWhatsAppMessage(phoneNumber, message);
+
+      if (result.success) {
+        res.json({ success: true, messageId: result.messageId });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error("WhatsApp invoice send error:", error);
+      res.status(500).json({ error: "Failed to send invoice via WhatsApp" });
+    }
+  });
+
+  app.post("/api/whatsapp/send-payment-receipt", isAuthenticated, async (req: any, res) => {
+    try {
+      const { paymentId, phoneNumber } = req.body;
+      
+      if (!paymentId || !phoneNumber) {
+        return res.status(400).json({ error: "Payment ID and phone number are required" });
+      }
+
+      const payment = await storage.getPaymentWithDetails(paymentId);
+      if (!payment) {
+        return res.status(404).json({ error: "Payment not found" });
+      }
+
+      const message = buildPaymentReceiptMessage(payment);
+      const result = await sendWhatsAppMessage(phoneNumber, message);
+
+      if (result.success) {
+        res.json({ success: true, messageId: result.messageId });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error("WhatsApp payment receipt send error:", error);
+      res.status(500).json({ error: "Failed to send payment receipt via WhatsApp" });
+    }
+  });
+
   return httpServer;
 }
