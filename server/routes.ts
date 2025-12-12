@@ -430,6 +430,9 @@ export async function registerRoutes(
       const { lineItems, ...orderData } = req.body;
       const userId = req.user?.claims?.sub;
       
+      // Default to Head Office (id: 1) if no branchId provided
+      const branchId = orderData.branchId || 1;
+      
       const order = await storage.createSalesOrder(
         {
           saleDate: orderData.saleDate,
@@ -443,6 +446,7 @@ export async function registerRoutes(
           deliveryNoteFilePath: orderData.deliveryNoteFilePath,
           paymentReceiptFilePath: orderData.paymentReceiptFilePath,
           deliveryDate: orderData.deliveryDate,
+          branchId: branchId,
           createdBy: userId,
         },
         lineItems || []
