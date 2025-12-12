@@ -1,12 +1,46 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Download, Loader2, Database, Shield, Clock } from "lucide-react";
+import { Download, Loader2, Database, Shield, Clock, CheckCircle, RefreshCw, CloudDownload, History } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { format } from "date-fns";
+
+interface BackupFile {
+  name: string;
+  size: number;
+  created: string;
+}
 
 export default function BackupPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const { toast } = useToast();
+
+  const { data: backups = [], isLoading: isLoadingBackups } = useQuery<BackupFile[]>({
+    queryKey: ["/api/backup/list"],
+  });
+
+  const createBackupMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/backup/create");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Backup Created",
+        description: `Backup saved as ${data.filename}`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/backup/list"] });
+    },
+    onError: () => {
+      toast({
+        title: "Backup Failed",
+        description: "Could not create backup. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleDownloadBackup = async () => {
     setIsDownloading(true);
@@ -53,107 +87,180 @@ export default function BackupPage() {
     }
   };
 
+  const handleDownloadStoredBackup = async (filename: string) => {
+    try {
+      const response = await fetch(`/api/backup/stored/${encodeURIComponent(filename)}`);
+      if (!response.ok) {
+        throw new Error("Failed to get backup URL");
+      }
+      const { url } = await response.json();
+      window.open(url, "_blank");
+    } catch (error) {
+      console.error("Download error:", error);
+      toast({
+        title: "Download Failed",
+        description: "Could not download backup file.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold" data-testid="heading-backup">Database Backup</h1>
-        <p className="text-muted-foreground">Download a complete backup of your business data</p>
+        <p className="text-muted-foreground">Automatic daily backups with manual download option</p>
       </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Database className="h-5 w-5" />
-            Full Database Backup
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            Auto-Backup Enabled
           </CardTitle>
           <CardDescription>
-            Download all your data in Excel format for safekeeping
+            Your data is automatically backed up daily at midnight
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-3">
             <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+              <Clock className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div>
+                <p className="font-medium text-sm">Daily Schedule</p>
+                <p className="text-xs text-muted-foreground">Runs automatically at midnight</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
               <Shield className="h-5 w-5 text-green-600 mt-0.5" />
               <div>
-                <p className="font-medium text-sm">Complete Data</p>
-                <p className="text-xs text-muted-foreground">All tables exported including purchases, sales, payments, parties, and more</p>
+                <p className="font-medium text-sm">30 Day Retention</p>
+                <p className="text-xs text-muted-foreground">Keeps last 30 backup files</p>
               </div>
             </div>
             <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-              <Download className="h-5 w-5 text-blue-600 mt-0.5" />
+              <Database className="h-5 w-5 text-orange-600 mt-0.5" />
               <div>
-                <p className="font-medium text-sm">Excel Format</p>
-                <p className="text-xs text-muted-foreground">Easy to open in Excel or Google Sheets for review</p>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-              <Clock className="h-5 w-5 text-orange-600 mt-0.5" />
-              <div>
-                <p className="font-medium text-sm">Timestamped</p>
-                <p className="text-xs text-muted-foreground">Each backup file includes date and time in filename</p>
+                <p className="font-medium text-sm">Cloud Storage</p>
+                <p className="text-xs text-muted-foreground">Stored securely in object storage</p>
               </div>
             </div>
           </div>
 
-          <div className="border-t pt-4">
-            <h4 className="font-medium mb-2">Data Included:</h4>
-            <div className="flex flex-wrap gap-2">
-              {[
-                "Branches", "Users", "Parties", "Items", "Customers",
-                "Purchases", "Sales", "Payments", "Expenses", "Returns",
-                "Stock Transfers", "Account Transfers", "Opening Balances", "Discounts"
-              ].map((item) => (
-                <span key={item} className="px-2 py-1 bg-muted rounded text-xs">
-                  {item}
-                </span>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-3 pt-2">
+            <Button
+              onClick={() => createBackupMutation.mutate()}
+              disabled={createBackupMutation.isPending}
+              variant="outline"
+              data-testid="button-create-backup"
+            >
+              {createBackupMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Create Backup Now
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={handleDownloadBackup}
+              disabled={isDownloading}
+              data-testid="button-download-backup"
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Preparing...
+                </>
+              ) : (
+                <>
+                  <Download className="mr-2 h-4 w-4" />
+                  Download Now
+                </>
+              )}
+            </Button>
           </div>
-
-          <Button
-            onClick={handleDownloadBackup}
-            disabled={isDownloading}
-            className="w-full md:w-auto"
-            data-testid="button-download-backup"
-          >
-            {isDownloading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Preparing Backup...
-              </>
-            ) : (
-              <>
-                <Download className="mr-2 h-4 w-4" />
-                Download Backup
-              </>
-            )}
-          </Button>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader>
-          <CardTitle>Backup Tips</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Backup History
+          </CardTitle>
+          <CardDescription>
+            Previously saved backup files (last 30 days)
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            <li className="flex items-start gap-2">
-              <span className="text-primary font-bold">1.</span>
-              Download backups regularly (daily or weekly recommended)
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-primary font-bold">2.</span>
-              Store backup files in a secure location (cloud storage, external drive)
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-primary font-bold">3.</span>
-              Keep multiple backup versions (at least last 7 days)
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-primary font-bold">4.</span>
-              Test your backups occasionally by opening the Excel file
-            </li>
-          </ul>
+          {isLoadingBackups ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : backups.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Database className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>No backup history yet</p>
+              <p className="text-sm">Backups will appear here after the first automatic or manual backup</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {backups.map((backup) => (
+                <div
+                  key={backup.name}
+                  className="flex items-center justify-between p-3 rounded-lg border hover-elevate"
+                >
+                  <div className="flex items-center gap-3">
+                    <Database className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="font-medium text-sm">{backup.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(backup.created), "PPP 'at' p")} - {formatFileSize(backup.size)}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleDownloadStoredBackup(backup.name)}
+                    data-testid={`button-download-${backup.name}`}
+                  >
+                    <CloudDownload className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Data Included in Backups</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {[
+              "Branches", "Users", "Parties", "Items", "Customers",
+              "Purchases", "Sales", "Payments", "Expenses", "Returns",
+              "Stock Transfers", "Account Transfers", "Opening Balances", "Discounts"
+            ].map((item) => (
+              <span key={item} className="px-2 py-1 bg-muted rounded text-xs">
+                {item}
+              </span>
+            ))}
+          </div>
         </CardContent>
       </Card>
     </div>

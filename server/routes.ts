@@ -4,12 +4,16 @@ import { storage } from "./storage";
 import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, insertLineItemSchema, insertCustomerSchema, insertSalesOrderSchema, insertSalesLineItemSchema, insertPaymentSchema, PAYMENT_TYPES, PAYMENT_DIRECTIONS, insertExpenseCategorySchema, insertExpenseSchema, insertAccountTransferSchema, insertReturnSchema, insertReturnLineItemSchema, insertUserRoleAssignmentSchema, insertDiscountSchema, insertBranchSchema, insertStockTransferSchema, insertStockTransferLineItemSchema, insertInventoryAdjustmentSchema, insertOpeningBalanceSchema, ROLE_TYPES, MODULE_NAMES } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupAuth, isAuthenticated, isAdmin } from "./replitAuth";
+import { startBackupScheduler, listBackups, getBackupDownloadUrl, createBackup } from "./backupScheduler";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   await setupAuth(app);
+  
+  // Start daily backup scheduler
+  startBackupScheduler();
   
   const objectStorageService = new ObjectStorageService();
 
@@ -2035,6 +2039,47 @@ export async function registerRoutes(
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.send(buffer);
+    } catch (error) {
+      console.error("Error creating backup:", error);
+      res.status(500).json({ error: "Failed to create backup" });
+    }
+  });
+
+  // List saved backups from object storage
+  app.get("/api/backup/list", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const backups = await listBackups();
+      res.json(backups);
+    } catch (error) {
+      console.error("Error listing backups:", error);
+      res.status(500).json({ error: "Failed to list backups" });
+    }
+  });
+
+  // Download a specific backup from object storage
+  app.get("/api/backup/stored/:filename", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { filename } = req.params;
+      const url = await getBackupDownloadUrl(filename);
+      if (!url) {
+        return res.status(404).json({ error: "Backup not found" });
+      }
+      res.json({ url });
+    } catch (error) {
+      console.error("Error getting backup URL:", error);
+      res.status(500).json({ error: "Failed to get backup URL" });
+    }
+  });
+
+  // Trigger manual backup (saves to object storage)
+  app.post("/api/backup/create", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const result = await createBackup();
+      if (result.success) {
+        res.json({ success: true, filename: result.filename });
+      } else {
+        res.status(500).json({ error: result.error || "Failed to create backup" });
+      }
     } catch (error) {
       console.error("Error creating backup:", error);
       res.status(500).json({ error: "Failed to create backup" });
