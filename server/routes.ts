@@ -433,11 +433,14 @@ export async function registerRoutes(
       // Default to Head Office (id: 1) if no branchId provided
       const branchId = orderData.branchId || 1;
       
+      // Ensure customerId is null if not a valid positive number
+      const customerId = orderData.customerId && orderData.customerId > 0 ? orderData.customerId : null;
+      
       const order = await storage.createSalesOrder(
         {
           saleDate: orderData.saleDate,
           invoiceNumber: orderData.invoiceNumber,
-          customerId: orderData.customerId,
+          customerId: customerId,
           totalKwd: orderData.totalKwd,
           fxCurrency: orderData.fxCurrency,
           fxRate: orderData.fxRate,

@@ -74,7 +74,7 @@ export default function SalesPage() {
       const payload = {
         saleDate: formData.saleDate,
         invoiceNumber: formData.invoiceNumber || null,
-        customerId: formData.customerId,
+        customerId: formData.customerId && formData.customerId > 0 ? formData.customerId : null,
         totalKwd: formData.totalKwd,
         lineItems: formData.lineItems
           .filter(item => item.itemName)
