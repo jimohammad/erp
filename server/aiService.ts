@@ -31,7 +31,8 @@ const dataResolvers: DataResolver[] = [
         : orders;
       const total = filtered.reduce((sum, o) => sum + Number(o.totalKwd || 0), 0);
       const count = filtered.length;
-      return `Total sales: ${count} orders worth KWD ${total.toFixed(3)}`;
+      const branchNote = context.branchId ? " (your branch)" : " (all branches)";
+      return `Total sales${branchNote}: ${count} orders worth KWD ${total.toFixed(3)}`;
     }
   },
   {
@@ -45,7 +46,8 @@ const dataResolvers: DataResolver[] = [
         : orders;
       const total = filtered.reduce((sum, o) => sum + Number(o.totalKwd || 0), 0);
       const count = filtered.length;
-      return `Total purchases: ${count} orders worth KWD ${total.toFixed(3)}`;
+      const branchNote = context.branchId ? " (your branch)" : " (all branches)";
+      return `Total purchases${branchNote}: ${count} orders worth KWD ${total.toFixed(3)}`;
     }
   },
   {
@@ -71,20 +73,39 @@ const dataResolvers: DataResolver[] = [
     resolve: async (context) => {
       const items = await storage.getItems();
       const branches = await storage.getBranches();
+      
+      // Get purchase orders and filter by branch if needed
+      const purchaseOrders = await storage.getAllPurchaseOrders();
+      const filteredPurchaseOrders = context.branchId 
+        ? purchaseOrders.filter(o => o.branchId === context.branchId)
+        : purchaseOrders;
+      const purchaseOrderIds = new Set(filteredPurchaseOrders.map(o => o.id));
       const purchaseLineItems = await storage.getAllPurchaseLineItems();
+      const filteredPurchaseLineItems = purchaseLineItems.filter(li => purchaseOrderIds.has(li.purchaseOrderId!));
+      
+      // Get sales orders and filter by branch if needed
+      const salesOrders = await storage.getAllSalesOrders();
+      const filteredSalesOrders = context.branchId 
+        ? salesOrders.filter(o => o.branchId === context.branchId)
+        : salesOrders;
+      const salesOrderIds = new Set(filteredSalesOrders.map(o => o.id));
       const salesLineItems = await storage.getAllSalesLineItems();
+      const filteredSalesLineItems = salesLineItems.filter(li => salesOrderIds.has(li.saleId!));
       
       let summary = `Total items in catalog: ${items.length}\n`;
       
-      const purchased = purchaseLineItems.reduce((sum, li) => sum + (li.quantity || 0), 0);
-      const sold = salesLineItems.reduce((sum, li) => sum + (li.quantity || 0), 0);
+      const purchased = filteredPurchaseLineItems.reduce((sum, li) => sum + (li.quantity || 0), 0);
+      const sold = filteredSalesLineItems.reduce((sum, li) => sum + (li.quantity || 0), 0);
       const inStock = purchased - sold;
       
-      summary += `\nStock Overview:\n`;
+      const branchNote = context.branchId 
+        ? `(for ${branches.find(b => b.id === context.branchId)?.name || "selected branch"})` 
+        : "(all branches)";
+      
+      summary += `\nStock Overview ${branchNote}:\n`;
       summary += `- Total units purchased: ${purchased}\n`;
       summary += `- Total units sold: ${sold}\n`;
-      summary += `- Estimated units in stock: ${inStock}\n`;
-      summary += `- Branches: ${branches.map(b => b.name).join(", ")}`;
+      summary += `- Estimated units in stock: ${inStock}`;
       
       return summary;
     }
@@ -171,13 +192,29 @@ const dataResolvers: DataResolver[] = [
       const purchases = await storage.getAllPurchaseOrders();
       const payments = await storage.getAllPayments();
       
+      // Filter by branch if needed
+      const filteredSales = context.branchId 
+        ? sales.filter(s => s.branchId === context.branchId)
+        : sales;
+      const filteredPurchases = context.branchId 
+        ? purchases.filter(p => p.branchId === context.branchId)
+        : purchases;
+      const filteredPayments = context.branchId 
+        ? payments.filter(p => p.branchId === context.branchId)
+        : payments;
+      
       const today = new Date().toISOString().split("T")[0];
       
-      const todaySales = sales.filter(s => s.saleDate === today);
-      const todayPurchases = purchases.filter(p => p.purchaseDate === today);
-      const todayPayments = payments.filter(p => p.paymentDate === today);
+      const todaySales = filteredSales.filter(s => s.saleDate === today);
+      const todayPurchases = filteredPurchases.filter(p => p.purchaseDate === today);
+      const todayPayments = filteredPayments.filter(p => p.paymentDate === today);
       
-      return `Today's activity:\n- Sales: ${todaySales.length} orders\n- Purchases: ${todayPurchases.length} orders\n- Payments: ${todayPayments.length} transactions`;
+      const branches = await storage.getBranches();
+      const branchNote = context.branchId 
+        ? `(for ${branches.find(b => b.id === context.branchId)?.name || "selected branch"})` 
+        : "(all branches)";
+      
+      return `Today's activity ${branchNote}:\n- Sales: ${todaySales.length} orders\n- Purchases: ${todayPurchases.length} orders\n- Payments: ${todayPayments.length} transactions`;
     }
   }
 ];
