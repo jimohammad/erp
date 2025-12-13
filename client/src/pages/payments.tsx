@@ -486,6 +486,11 @@ export default function PaymentsPage() {
     .filter(p => p.direction === "OUT")
     .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
+  const today = new Date().toISOString().split("T")[0];
+  const todayTotalIn = payments
+    .filter(p => p.direction === "IN" && p.paymentDate === today)
+    .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
   if (paymentsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -504,9 +509,9 @@ export default function PaymentsPage() {
                 <ArrowDownLeft className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Payment In</p>
+                <p className="text-sm text-muted-foreground">Today's Payment In</p>
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-total-payment-in">
-                  {totalIn.toFixed(3)} KWD
+                  {todayTotalIn.toFixed(3)} KWD
                 </p>
               </div>
             </div>
