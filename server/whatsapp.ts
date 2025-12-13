@@ -27,27 +27,36 @@ interface SaleDetails {
 }
 
 /**
- * Format phone number to WhatsApp format (with country code, no spaces/dashes)
+ * Format phone number to WhatsApp format (E.164 format: country code + number, no + sign)
  * Assumes Kuwait numbers if no country code provided
+ * Kuwait mobile: 8 digits starting with 5, 6, 9
+ * Kuwait landline: 8 digits starting with 2
  */
 function formatPhoneNumber(phone: string): string | null {
   if (!phone) return null;
   
-  // Remove all non-digit characters
+  // Remove all non-digit characters (including + sign)
   let cleaned = phone.replace(/\D/g, '');
   
-  // If it starts with 00, replace with +
+  // If it starts with 00, remove that prefix (international dialing format)
   if (cleaned.startsWith('00')) {
     cleaned = cleaned.substring(2);
   }
   
-  // If it's a Kuwait number without country code (8 digits starting with certain prefixes)
-  if (cleaned.length === 8 && /^[5-9]/.test(cleaned)) {
+  // If it's a Kuwait number without country code (8 digits)
+  // Mobile: starts with 5, 6, 9
+  // Landline: starts with 2
+  if (cleaned.length === 8 && /^[2569]/.test(cleaned)) {
     cleaned = '965' + cleaned;
   }
   
-  // If it's already a full international number
-  if (cleaned.length >= 10) {
+  // If already has Kuwait country code (965) + 8 digits = 11 digits
+  if (cleaned.startsWith('965') && cleaned.length === 11) {
+    return cleaned;
+  }
+  
+  // Accept any valid international number (10+ digits with country code)
+  if (cleaned.length >= 10 && cleaned.length <= 15) {
     return cleaned;
   }
   
