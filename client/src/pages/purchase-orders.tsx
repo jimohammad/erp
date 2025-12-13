@@ -41,7 +41,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Search, Eye, Trash2, FileText, Plus, Send, Package, ArrowRightLeft, Pencil } from "lucide-react";
+import { Loader2, Search, Eye, Trash2, FileText, Send, Package, ArrowRightLeft, Pencil } from "lucide-react";
 import { format } from "date-fns";
 import PODraftForm from "@/components/PODraftForm";
 
@@ -101,7 +101,6 @@ export default function PurchaseOrdersPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedPO, setSelectedPO] = useState<PurchaseOrderDraft | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [showForm, setShowForm] = useState(false);
   const [editingPO, setEditingPO] = useState<PurchaseOrderDraft | null>(null);
   const [convertDialogPO, setConvertDialogPO] = useState<PurchaseOrderDraft | null>(null);
   const [convertInvoiceNumber, setConvertInvoiceNumber] = useState("");
@@ -210,25 +209,18 @@ export default function PurchaseOrdersPage() {
     );
   }
 
-  if (showForm || editingPO) {
-    return (
-      <PODraftForm
-        editingPO={editingPO}
-        onClose={() => {
-          setShowForm(false);
-          setEditingPO(null);
-        }}
-      />
-    );
-  }
-
   return (
     <div className="p-4 space-y-4">
+      <PODraftForm
+        editingPO={editingPO}
+        onEditComplete={() => setEditingPO(null)}
+      />
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 pb-2">
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Purchase Orders
+            Purchase Orders List
           </CardTitle>
           <div className="flex items-center gap-2">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -253,14 +245,10 @@ export default function PurchaseOrdersPage() {
                 data-testid="input-search-po"
               />
             </div>
-            <Button onClick={() => setShowForm(true)} data-testid="button-new-po">
-              <Plus className="h-4 w-4 mr-2" />
-              New PO
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <ScrollArea className="h-[calc(100vh-220px)]">
+          <ScrollArea className="h-[calc(100vh-580px)]">
             <Table>
               <TableHeader>
                 <TableRow>
