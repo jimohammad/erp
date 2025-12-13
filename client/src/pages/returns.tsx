@@ -631,20 +631,18 @@ export default function ReturnsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Customer</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger ref={customerSelectRef} data-testid="select-customer">
-                                <SelectValue placeholder="Select customer" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {customers.map((customer) => (
-                                <SelectItem key={customer.id} value={customer.id.toString()}>
-                                  {customer.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <SearchableSelect
+                            options={customers.map((customer) => ({
+                              value: customer.id.toString(),
+                              label: customer.name,
+                            }))}
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            placeholder="Select customer"
+                            searchPlaceholder="Type to search customers..."
+                            emptyText="No customers found."
+                            data-testid="select-customer"
+                          />
                           <FormMessage />
                         </FormItem>
                       )}
@@ -656,20 +654,18 @@ export default function ReturnsPage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Supplier</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger ref={supplierSelectRef} data-testid="select-supplier">
-                                <SelectValue placeholder="Select supplier" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {suppliers.map((supplier) => (
-                                <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                                  {supplier.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          <SearchableSelect
+                            options={suppliers.map((supplier) => ({
+                              value: supplier.id.toString(),
+                              label: supplier.name,
+                            }))}
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            placeholder="Select supplier"
+                            searchPlaceholder="Type to search suppliers..."
+                            emptyText="No suppliers found."
+                            data-testid="select-supplier"
+                          />
                           <FormMessage />
                         </FormItem>
                       )}
