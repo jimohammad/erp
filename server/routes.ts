@@ -613,6 +613,8 @@ export async function registerRoutes(
       const userId = req.user?.claims?.sub;
       const paymentData = { ...req.body, createdBy: userId };
       
+      console.log("[Payment] Received payment data:", JSON.stringify(paymentData, null, 2));
+      
       if (!PAYMENT_TYPES.includes(paymentData.paymentType)) {
         return res.status(400).json({ error: `Invalid payment type. Must be one of: ${PAYMENT_TYPES.join(", ")}` });
       }
@@ -623,13 +625,16 @@ export async function registerRoutes(
       
       const parsed = insertPaymentSchema.safeParse(paymentData);
       if (!parsed.success) {
+        console.error("[Payment] Validation error:", parsed.error.message);
         return res.status(400).json({ error: parsed.error.message });
       }
+      
+      console.log("[Payment] Parsed data:", JSON.stringify(parsed.data, null, 2));
       
       const payment = await storage.createPayment(parsed.data);
       res.status(201).json(payment);
     } catch (error) {
-      console.error("Error creating payment:", error);
+      console.error("[Payment] Error creating payment:", error);
       res.status(500).json({ error: "Failed to create payment" });
     }
   });
