@@ -93,7 +93,7 @@ export default function ReturnsPage() {
   const [showForm, setShowForm] = useState(false);
   const [returnType, setReturnType] = useState<"sale_return" | "purchase_return">("sale_return");
   const [lineItems, setLineItems] = useState<ReturnLineItemForm[]>([
-    { itemName: "", quantity: 1, priceKwd: "", totalKwd: "", imeiNumbers: [] },
+    { itemName: "", quantity: 0, priceKwd: "", totalKwd: "", imeiNumbers: [] },
   ]);
   const [imeiDialogOpen, setImeiDialogOpen] = useState(false);
   const [imeiDialogLineIndex, setImeiDialogLineIndex] = useState<number | null>(null);
@@ -171,7 +171,7 @@ export default function ReturnsPage() {
         customerId: "",
         supplierId: "",
       });
-      setLineItems([{ itemName: "", quantity: 1, priceKwd: "", totalKwd: "", imeiNumbers: [] }]);
+      setLineItems([{ itemName: "", quantity: 0, priceKwd: "", totalKwd: "", imeiNumbers: [] }]);
       toast({ title: "Return recorded successfully" });
     },
     onError: (error: any) => {
@@ -200,7 +200,7 @@ export default function ReturnsPage() {
       form.setValue("returnDate", format(new Date(), "yyyy-MM-dd"));
       form.setValue("customerId", "");
       form.setValue("supplierId", "");
-      setLineItems([{ itemName: "", quantity: 1, priceKwd: "", totalKwd: "", imeiNumbers: [] }]);
+      setLineItems([{ itemName: "", quantity: 0, priceKwd: "", totalKwd: "", imeiNumbers: [] }]);
       setShowForm(true);
       setTimeout(() => {
         if (returnType === "sale_return") {
@@ -237,7 +237,7 @@ export default function ReturnsPage() {
       const selectedItem = items.find(i => i.name === value);
       if (selectedItem && selectedItem.sellingPriceKwd) {
         updated[index].priceKwd = selectedItem.sellingPriceKwd;
-        const total = (parseFloat(selectedItem.sellingPriceKwd) || 0) * (updated[index].quantity || 1);
+        const total = (parseFloat(selectedItem.sellingPriceKwd) || 0) * (updated[index].quantity || 0);
         updated[index].totalKwd = total.toFixed(3);
       }
     }
@@ -246,7 +246,7 @@ export default function ReturnsPage() {
   };
 
   const addLineItem = () => {
-    setLineItems([...lineItems, { itemName: "", quantity: 1, priceKwd: "", totalKwd: "", imeiNumbers: [] }]);
+    setLineItems([...lineItems, { itemName: "", quantity: 0, priceKwd: "", totalKwd: "", imeiNumbers: [] }]);
   };
 
   const removeLineItem = (index: number) => {
@@ -759,9 +759,9 @@ export default function ReturnsPage() {
                             <TableCell>
                               <Input
                                 type="number"
-                                min="1"
-                                value={item.quantity}
-                                onChange={(e) => updateLineItem(index, "quantity", parseInt(e.target.value) || 1)}
+                                min="0"
+                                value={item.quantity || ""}
+                                onChange={(e) => updateLineItem(index, "quantity", parseInt(e.target.value) || 0)}
                                 disabled={item.imeiNumbers.length > 0}
                                 data-testid={`input-qty-${index}`}
                               />
