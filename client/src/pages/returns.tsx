@@ -1,10 +1,10 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Plus, Trash2, RotateCcw, X, Smartphone, ChevronUp, Printer, FileDown } from "lucide-react";
+import { Plus, Trash2, RotateCcw, X, Smartphone, Printer, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -90,7 +90,6 @@ interface ReturnLineItemForm {
 
 export default function ReturnsPage() {
   const { toast } = useToast();
-  const [showForm, setShowForm] = useState(false);
   const [returnType, setReturnType] = useState<"sale_return" | "purchase_return">("sale_return");
   const [lineItems, setLineItems] = useState<ReturnLineItemForm[]>([
     { itemName: "", quantity: 0, priceKwd: "", totalKwd: "", imeiNumbers: [] },
@@ -139,6 +138,14 @@ export default function ReturnsPage() {
     },
   });
 
+  // Initialize form with return number on mount
+  useEffect(() => {
+    if (returns.length >= 0) {
+      const newReturnNumber = generateReturnNumber();
+      form.setValue("returnNumber", newReturnNumber);
+    }
+  }, [returns]);
+
   const createReturnMutation = useMutation({
     mutationFn: async (data: ReturnFormValues) => {
       const validLineItems = lineItems.filter(item => item.itemName);
@@ -163,10 +170,10 @@ export default function ReturnsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
-      setShowForm(false);
+      const newReturnNumber = generateReturnNumber();
       form.reset({
         returnDate: format(new Date(), "yyyy-MM-dd"),
-        returnNumber: "",
+        returnNumber: newReturnNumber,
         returnType: returnType,
         customerId: "",
         supplierId: "",
@@ -192,26 +199,21 @@ export default function ReturnsPage() {
     },
   });
 
-  const handleToggleForm = () => {
-    if (!showForm) {
-      const newReturnNumber = generateReturnNumber();
-      form.setValue("returnNumber", newReturnNumber);
-      form.setValue("returnType", returnType);
-      form.setValue("returnDate", format(new Date(), "yyyy-MM-dd"));
-      form.setValue("customerId", "");
-      form.setValue("supplierId", "");
-      setLineItems([{ itemName: "", quantity: 0, priceKwd: "", totalKwd: "", imeiNumbers: [] }]);
-      setShowForm(true);
-      setTimeout(() => {
-        if (returnType === "sale_return") {
-          customerSelectRef.current?.focus();
-        } else {
-          supplierSelectRef.current?.focus();
-        }
-      }, 100);
-    } else {
-      setShowForm(false);
-    }
+  const handleReset = () => {
+    const newReturnNumber = generateReturnNumber();
+    form.setValue("returnNumber", newReturnNumber);
+    form.setValue("returnType", returnType);
+    form.setValue("returnDate", format(new Date(), "yyyy-MM-dd"));
+    form.setValue("customerId", "");
+    form.setValue("supplierId", "");
+    setLineItems([{ itemName: "", quantity: 0, priceKwd: "", totalKwd: "", imeiNumbers: [] }]);
+    setTimeout(() => {
+      if (returnType === "sale_return") {
+        customerSelectRef.current?.focus();
+      } else {
+        supplierSelectRef.current?.focus();
+      }
+    }, 100);
   };
 
   const handleTypeToggle = (checked: boolean) => {
@@ -598,38 +600,24 @@ export default function ReturnsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div className="flex items-center gap-4">
-          <Label className="text-sm font-medium">Sale Return</Label>
-          <Switch
-            checked={returnType === "purchase_return"}
-            onCheckedChange={handleTypeToggle}
-            data-testid="switch-return-type"
-          />
-          <Label className="text-sm font-medium">Purchase Return</Label>
-        </div>
-        
-        <Button onClick={handleToggleForm} data-testid="button-new-return">
-          {showForm ? (
-            <>
-              <ChevronUp className="h-4 w-4 mr-2" />
-              Hide Form
-            </>
-          ) : (
-            <>
-              <Plus className="h-4 w-4 mr-2" />
-              New {returnType === "sale_return" ? "Sale" : "Purchase"} Return
-            </>
-          )}
-        </Button>
-      </div>
-
-      {showForm && (
-        <Card>
-          <CardHeader className="pb-3">
+      <Card>
+          <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-3">
             <CardTitle className="text-base">
               New {returnType === "sale_return" ? "Sale" : "Purchase"} Return
             </CardTitle>
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium">Sale Return</Label>
+              <Switch
+                checked={returnType === "purchase_return"}
+                onCheckedChange={handleTypeToggle}
+                data-testid="switch-return-type"
+              />
+              <Label className="text-sm font-medium">Purchase Return</Label>
+              <Button variant="outline" size="sm" onClick={handleReset} data-testid="button-reset-return">
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Reset
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -819,18 +807,14 @@ export default function ReturnsPage() {
                 </div>
 
                 <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
-                    Cancel
-                  </Button>
                   <Button type="submit" disabled={createReturnMutation.isPending} data-testid="button-submit-return">
-                    {createReturnMutation.isPending ? "Creating..." : "Create Return"}
+                    {createReturnMutation.isPending ? "Saving..." : "Save Return"}
                   </Button>
                 </div>
               </form>
             </Form>
           </CardContent>
         </Card>
-      )}
 
       {/* IMEI Popup Dialog */}
       <Dialog open={imeiDialogOpen} onOpenChange={setImeiDialogOpen}>
