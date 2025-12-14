@@ -556,9 +556,16 @@ export default function PaymentsPage() {
     .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
   const today = new Date().toISOString().split("T")[0];
-  const todayTotalIn = payments
-    .filter(p => p.direction === "IN" && p.paymentDate === today)
-    .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+  const todayPaymentsIn = payments.filter(p => p.direction === "IN" && p.paymentDate === today);
+  const todayTotalIn = todayPaymentsIn.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+  const todayByType = {
+    Cash: todayPaymentsIn.filter(p => p.paymentType === "Cash").reduce((sum, p) => sum + parseFloat(p.amount), 0),
+    "NBK Bank": todayPaymentsIn.filter(p => p.paymentType === "NBK Bank").reduce((sum, p) => sum + parseFloat(p.amount), 0),
+    "CBK Bank": todayPaymentsIn.filter(p => p.paymentType === "CBK Bank").reduce((sum, p) => sum + parseFloat(p.amount), 0),
+    Knet: todayPaymentsIn.filter(p => p.paymentType === "Knet").reduce((sum, p) => sum + parseFloat(p.amount), 0),
+    Wamd: todayPaymentsIn.filter(p => p.paymentType === "Wamd").reduce((sum, p) => sum + parseFloat(p.amount), 0),
+  };
 
   if (paymentsLoading) {
     return (
@@ -572,7 +579,7 @@ export default function PaymentsPage() {
     <div className="space-y-6">
       <Card className="bg-emerald-50 dark:bg-emerald-950 border-emerald-200 dark:border-emerald-800">
         <CardContent className="py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4 flex-wrap">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-md bg-emerald-100 dark:bg-emerald-900">
                 <ArrowDownLeft className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -582,6 +589,33 @@ export default function PaymentsPage() {
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-total-payment-in">
                   {todayTotalIn.toFixed(3)} KWD
                 </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-100 dark:bg-green-900">
+                <Banknote className="h-3.5 w-3.5 text-green-700 dark:text-green-300" />
+                <span className="text-xs text-green-700 dark:text-green-300">Cash</span>
+                <span className="text-sm font-semibold text-green-800 dark:text-green-200" data-testid="text-today-cash">{todayByType.Cash.toFixed(3)}</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900">
+                <Building2 className="h-3.5 w-3.5 text-blue-700 dark:text-blue-300" />
+                <span className="text-xs text-blue-700 dark:text-blue-300">NBK</span>
+                <span className="text-sm font-semibold text-blue-800 dark:text-blue-200" data-testid="text-today-nbk">{todayByType["NBK Bank"].toFixed(3)}</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-100 dark:bg-purple-900">
+                <Building2 className="h-3.5 w-3.5 text-purple-700 dark:text-purple-300" />
+                <span className="text-xs text-purple-700 dark:text-purple-300">CBK</span>
+                <span className="text-sm font-semibold text-purple-800 dark:text-purple-200" data-testid="text-today-cbk">{todayByType["CBK Bank"].toFixed(3)}</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-orange-100 dark:bg-orange-900">
+                <CreditCard className="h-3.5 w-3.5 text-orange-700 dark:text-orange-300" />
+                <span className="text-xs text-orange-700 dark:text-orange-300">Knet</span>
+                <span className="text-sm font-semibold text-orange-800 dark:text-orange-200" data-testid="text-today-knet">{todayByType.Knet.toFixed(3)}</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-pink-100 dark:bg-pink-900">
+                <CreditCard className="h-3.5 w-3.5 text-pink-700 dark:text-pink-300" />
+                <span className="text-xs text-pink-700 dark:text-pink-300">Wamd</span>
+                <span className="text-sm font-semibold text-pink-800 dark:text-pink-200" data-testid="text-today-wamd">{todayByType.Wamd.toFixed(3)}</span>
               </div>
             </div>
           </div>
