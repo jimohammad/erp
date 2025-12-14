@@ -1,11 +1,11 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Plus, RotateCcw, Save, Loader2, AlertTriangle, Share2, Printer } from "lucide-react";
 import { SalesLineItemRow, type SalesLineItemData } from "./SalesLineItemRow";
@@ -43,14 +43,9 @@ export function SalesOrderForm({
   isSubmitting,
   isAdmin = false,
 }: SalesOrderFormProps) {
-  const customerSelectRef = useRef<HTMLButtonElement>(null);
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split("T")[0]);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [customerId, setCustomerId] = useState<string>("");
-
-  useEffect(() => {
-    setTimeout(() => customerSelectRef.current?.focus(), 100);
-  }, []);
 
   // Fetch next invoice number on mount
   const { data: nextInvoiceData } = useQuery<{ invoiceNumber: string }>({
@@ -213,21 +208,18 @@ export function SalesOrderForm({
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="customer">Customer</Label>
-              <div className="flex gap-2">
-                <SearchableSelect
-                  options={customers.map((customer) => ({
-                    value: customer.id.toString(),
-                    label: customer.name,
-                  }))}
-                  value={customerId}
-                  onValueChange={setCustomerId}
-                  placeholder="Select customer"
-                  searchPlaceholder="Type to search customers..."
-                  emptyText="No customers found."
-                  className="flex-1"
-                  data-testid="select-customer"
-                />
-              </div>
+              <Select value={customerId} onValueChange={setCustomerId}>
+                <SelectTrigger data-testid="select-customer">
+                  <SelectValue placeholder="Select customer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id.toString()}>
+                      {customer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {creditLimitInfo.hasLimit && (
                 <p className="text-xs text-muted-foreground" data-testid="text-credit-limit-info">
                   Credit Limit: {creditLimitInfo.limit.toFixed(3)} KWD
