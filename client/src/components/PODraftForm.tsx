@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { SearchableSelect } from "@/components/ui/searchable-select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, RotateCcw, Save, Loader2, Trash2, FileText } from "lucide-react";
 import { CurrencyToggle } from "./CurrencyToggle";
 import type { Supplier, Item } from "@shared/schema";
@@ -284,18 +284,19 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
 
             <div className="space-y-2">
               <Label htmlFor="supplier">Supplier</Label>
-              <SearchableSelect
-                options={suppliers.map((supplier) => ({
-                  value: supplier.id.toString(),
-                  label: supplier.name,
-                }))}
-                value={supplierId}
-                onValueChange={setSupplierId}
-                placeholder="Select supplier"
-                searchPlaceholder="Type to search suppliers..."
-                emptyText="No suppliers found."
-                data-testid="select-supplier"
-              />
+              <Select value={supplierId || "none"} onValueChange={(val) => setSupplierId(val === "none" ? "" : val)}>
+                <SelectTrigger ref={supplierSelectRef} data-testid="select-supplier">
+                  <SelectValue placeholder="-- Select supplier --" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">-- Select supplier --</SelectItem>
+                  {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
