@@ -591,6 +591,30 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/payments/today-summary", isAuthenticated, async (req, res) => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const allPayments = await storage.getPayments({ limit: 10000, offset: 0 });
+      const todayPaymentsIn = allPayments.data.filter(
+        (p: any) => p.direction === "IN" && p.paymentDate === today
+      );
+      
+      const total = todayPaymentsIn.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
+      const byType = {
+        Cash: todayPaymentsIn.filter((p: any) => p.paymentType === "Cash").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0),
+        "NBK Bank": todayPaymentsIn.filter((p: any) => p.paymentType === "NBK Bank").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0),
+        "CBK Bank": todayPaymentsIn.filter((p: any) => p.paymentType === "CBK Bank").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0),
+        Knet: todayPaymentsIn.filter((p: any) => p.paymentType === "Knet").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0),
+        Wamd: todayPaymentsIn.filter((p: any) => p.paymentType === "Wamd").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0),
+      };
+      
+      res.json({ total, byType, date: today });
+    } catch (error) {
+      console.error("Error fetching today payment summary:", error);
+      res.status(500).json({ error: "Failed to fetch today payment summary" });
+    }
+  });
+
   app.get("/api/payments/:id", isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);

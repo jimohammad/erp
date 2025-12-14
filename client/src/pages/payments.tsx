@@ -160,12 +160,11 @@ export default function PaymentsPage() {
       return response.json();
     },
     onSuccess: async (savedPayment: PaymentWithDetails) => {
-      await queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "/api/payments" });
-      await queryClient.refetchQueries({ predicate: (query) => query.queryKey[0] === "/api/payments" });
+      await queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
+      await queryClient.refetchQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
       setPage(1);
       toast({ title: "Payment recorded successfully" });
       resetForm();
-      // Auto-print the receipt immediately
       handlePrintPayment(savedPayment);
     },
     onError: (error: Error) => {
@@ -178,7 +177,7 @@ export default function PaymentsPage() {
       return apiRequest("DELETE", `/api/payments/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ predicate: (query) => query.queryKey[0] === "/api/payments" });
+      queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
       toast({ title: "Payment deleted successfully" });
       setPaymentToDelete(null);
     },
@@ -555,17 +554,12 @@ export default function PaymentsPage() {
     .filter(p => p.direction === "OUT")
     .reduce((sum, p) => sum + parseFloat(p.amount), 0);
 
-  const today = new Date().toISOString().split("T")[0];
-  const todayPaymentsIn = payments.filter(p => p.direction === "IN" && p.paymentDate === today);
-  const todayTotalIn = todayPaymentsIn.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+  const { data: todaySummary } = useQuery<{ total: number; byType: Record<string, number>; date: string }>({
+    queryKey: ["/api/payments/today-summary"],
+  });
 
-  const todayByType = {
-    Cash: todayPaymentsIn.filter(p => p.paymentType === "Cash").reduce((sum, p) => sum + parseFloat(p.amount), 0),
-    "NBK Bank": todayPaymentsIn.filter(p => p.paymentType === "NBK Bank").reduce((sum, p) => sum + parseFloat(p.amount), 0),
-    "CBK Bank": todayPaymentsIn.filter(p => p.paymentType === "CBK Bank").reduce((sum, p) => sum + parseFloat(p.amount), 0),
-    Knet: todayPaymentsIn.filter(p => p.paymentType === "Knet").reduce((sum, p) => sum + parseFloat(p.amount), 0),
-    Wamd: todayPaymentsIn.filter(p => p.paymentType === "Wamd").reduce((sum, p) => sum + parseFloat(p.amount), 0),
-  };
+  const todayTotalIn = todaySummary?.total ?? 0;
+  const todayByType = todaySummary?.byType ?? { Cash: 0, "NBK Bank": 0, "CBK Bank": 0, Knet: 0, Wamd: 0 };
 
   if (paymentsLoading) {
     return (
