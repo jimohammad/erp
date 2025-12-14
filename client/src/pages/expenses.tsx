@@ -233,10 +233,6 @@ export default function ExpensesPage() {
                                 type="date" 
                                 data-testid="input-expense-date" 
                                 {...field} 
-                                ref={(e) => {
-                                  field.ref(e);
-                                  (dateInputRef as any).current = e;
-                                }}
                               />
                             </FormControl>
                             <FormMessage />
