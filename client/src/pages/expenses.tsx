@@ -294,7 +294,7 @@ export default function ExpensesPage() {
                           <FormItem>
                             <FormLabel>Amount (KWD)</FormLabel>
                             <FormControl>
-                              <Input type="number" step="0.001" min="0" className="text-2xl" data-testid="input-expense-amount" {...field} />
+                              <Input type="number" step="0.001" min="0" className="text-3xl h-14" data-testid="input-expense-amount" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
