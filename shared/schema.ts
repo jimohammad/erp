@@ -330,8 +330,12 @@ export const payments = pgTable("payments", {
   direction: text("direction").notNull().default("IN"),
   customerId: integer("customer_id").references(() => customers.id),
   supplierId: integer("supplier_id").references(() => suppliers.id),
+  purchaseOrderId: integer("purchase_order_id").references(() => purchaseOrders.id),
   paymentType: text("payment_type").notNull(),
   amount: numeric("amount", { precision: 12, scale: 3 }).notNull(),
+  fxCurrency: text("fx_currency"),
+  fxRate: numeric("fx_rate", { precision: 10, scale: 4 }),
+  fxAmount: numeric("fx_amount", { precision: 12, scale: 2 }),
   reference: text("reference"),
   notes: text("notes"),
   branchId: integer("branch_id").references(() => branches.id),
@@ -344,6 +348,7 @@ export const payments = pgTable("payments", {
   index("idx_payment_supplier").on(table.supplierId),
   index("idx_payment_direction").on(table.direction),
   index("idx_payment_type").on(table.paymentType),
+  index("idx_payment_po").on(table.purchaseOrderId),
 ]);
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
@@ -354,6 +359,10 @@ export const paymentsRelations = relations(payments, ({ one }) => ({
   supplier: one(suppliers, {
     fields: [payments.supplierId],
     references: [suppliers.id],
+  }),
+  purchaseOrder: one(purchaseOrders, {
+    fields: [payments.purchaseOrderId],
+    references: [purchaseOrders.id],
   }),
 }));
 
@@ -367,6 +376,7 @@ export type Payment = typeof payments.$inferSelect;
 export type PaymentWithDetails = Payment & {
   customer: Customer | null;
   supplier: Supplier | null;
+  purchaseOrder: PurchaseOrder | null;
 };
 
 // ==================== ACCOUNTS MODULE ====================
