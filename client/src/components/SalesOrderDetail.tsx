@@ -554,7 +554,7 @@ export function SalesOrderDetail({
                 ${order.lineItems.map((item, index) => `
                   <tr>
                     <td class="text-center">${index + 1}</td>
-                    <td>${item.itemName}${item.imeiNumbers && item.imeiNumbers.length > 0 ? `<br><small style="color:#666;">IMEI: ${item.imeiNumbers.join(", ")}</small>` : ""}</td>
+                    <td>${item.itemName}</td>
                     <td>—</td>
                     <td class="text-center">${item.quantity}</td>
                     <td class="text-right">KWD ${formatNumber(item.priceKwd, 1)}</td>
@@ -969,7 +969,7 @@ export function SalesOrderDetail({
                 ${order.lineItems.map((item, index) => `
                   <tr>
                     <td class="text-center">${index + 1}</td>
-                    <td>${item.itemName}${item.imeiNumbers && item.imeiNumbers.length > 0 ? `<br><small style="color:#666;">IMEI: ${item.imeiNumbers.join(", ")}</small>` : ""}</td>
+                    <td>${item.itemName}</td>
                     <td>—</td>
                     <td class="text-center">${item.quantity}</td>
                     <td class="text-right">KWD ${formatNumber(item.priceKwd, 1)}</td>
