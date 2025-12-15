@@ -4,8 +4,8 @@ import { rm, readFile } from "fs/promises";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
-// NOTE: Keep this list minimal - heavy deps should be externalized for smaller bundle size
 const allowlist = [
+  "@google-cloud/storage",
   "connect-pg-simple",
   "cors",
   "date-fns",
@@ -15,13 +15,19 @@ const allowlist = [
   "express-rate-limit",
   "express-session",
   "memorystore",
+  "memoizee",
   "nanoid",
+  "openai",
+  "openid-client",
   "passport",
   "passport-local",
+  "pdfkit",
+  "pg",
+  "ws",
+  "xlsx",
   "zod",
   "zod-validation-error",
 ];
-// Heavy deps externalized (not bundled): @google-cloud/storage, openai, pdfkit, xlsx, openid-client, pg, ws
 
 async function buildAll() {
   await rm("dist", { recursive: true, force: true });
