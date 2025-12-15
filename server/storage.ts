@@ -100,6 +100,7 @@ import {
   type InsertImeiEvent,
   type ImeiInventoryWithDetails,
   type ImeiEventWithDetails,
+  type AllTransaction,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
@@ -284,6 +285,18 @@ export interface IStorage {
   getAllPurchaseOrders(): Promise<PurchaseOrder[]>;
   getAllSalesOrders(): Promise<SalesOrder[]>;
   getAllPayments(): Promise<Payment[]>;
+
+  // All Transactions - consolidated view
+  getAllTransactions(options?: {
+    limit?: number;
+    offset?: number;
+    startDate?: string;
+    endDate?: string;
+    modules?: string[];
+    branchId?: number;
+    partyId?: number;
+    search?: string;
+  }): Promise<{ data: AllTransaction[]; total: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2962,6 +2975,337 @@ export class DatabaseStorage implements IStorage {
 
   async getAllPayments(): Promise<Payment[]> {
     return await db.select().from(payments).orderBy(desc(payments.paymentDate));
+  }
+
+  // ==================== ALL TRANSACTIONS ====================
+  
+  async getAllTransactions(options?: {
+    limit?: number;
+    offset?: number;
+    startDate?: string;
+    endDate?: string;
+    modules?: string[];
+    branchId?: number;
+    partyId?: number;
+    search?: string;
+  }): Promise<{ data: AllTransaction[]; total: number }> {
+    const limit = options?.limit ?? 50;
+    const offset = options?.offset ?? 0;
+
+    // Build WHERE conditions
+    let dateFilter = '';
+    let branchFilter = '';
+    let partyFilter = '';
+    let searchFilter = '';
+    let moduleFilter = '';
+
+    if (options?.startDate) {
+      dateFilter += ` AND transaction_date >= '${options.startDate}'`;
+    }
+    if (options?.endDate) {
+      dateFilter += ` AND transaction_date <= '${options.endDate}'`;
+    }
+    if (options?.branchId) {
+      branchFilter = ` AND branch_id = ${options.branchId}`;
+    }
+    if (options?.partyId) {
+      partyFilter = ` AND party_id = ${options.partyId}`;
+    }
+    if (options?.search) {
+      const searchTerm = options.search.replace(/'/g, "''");
+      searchFilter = ` AND (reference ILIKE '%${searchTerm}%' OR party_name ILIKE '%${searchTerm}%' OR notes ILIKE '%${searchTerm}%')`;
+    }
+    if (options?.modules && options.modules.length > 0) {
+      const moduleList = options.modules.map(m => `'${m}'`).join(',');
+      moduleFilter = ` AND module IN (${moduleList})`;
+    }
+
+    const whereClause = `WHERE 1=1 ${dateFilter} ${branchFilter} ${partyFilter} ${searchFilter} ${moduleFilter}`;
+
+    // Union query across all transaction types
+    const unionQuery = `
+      WITH all_transactions AS (
+        -- Sales
+        SELECT 
+          'sales-' || so.id::text as id,
+          so.sale_date::text as transaction_date,
+          'sales' as module,
+          COALESCE(so.invoice_number, 'SO-' || so.id::text) as reference,
+          so.customer_id as party_id,
+          c.name as party_name,
+          'customer' as party_type,
+          so.branch_id,
+          b.name as branch_name,
+          COALESCE(so.total_kwd, '0') as amount_kwd,
+          so.total_fx as amount_fx,
+          so.fx_currency,
+          so.fx_rate::text as fx_rate,
+          so.notes,
+          so.created_by,
+          so.created_at::text
+        FROM sales_orders so
+        LEFT JOIN suppliers c ON so.customer_id = c.id
+        LEFT JOIN branches b ON so.branch_id = b.id
+
+        UNION ALL
+
+        -- Purchases
+        SELECT 
+          'purchase-' || po.id::text as id,
+          po.purchase_date::text as transaction_date,
+          'purchase' as module,
+          COALESCE(po.invoice_number, 'PO-' || po.id::text) as reference,
+          po.supplier_id as party_id,
+          s.name as party_name,
+          'supplier' as party_type,
+          po.branch_id,
+          b.name as branch_name,
+          COALESCE(po.total_kwd, '0') as amount_kwd,
+          po.total_fx::text as amount_fx,
+          po.fx_currency,
+          po.fx_rate::text as fx_rate,
+          NULL as notes,
+          po.created_by,
+          po.created_at::text
+        FROM purchase_orders po
+        LEFT JOIN suppliers s ON po.supplier_id = s.id
+        LEFT JOIN branches b ON po.branch_id = b.id
+
+        UNION ALL
+
+        -- Payment IN
+        SELECT 
+          'payment_in-' || p.id::text as id,
+          p.payment_date::text as transaction_date,
+          'payment_in' as module,
+          COALESCE(p.reference_number, 'PAY-' || p.id::text) as reference,
+          p.party_id,
+          s.name as party_name,
+          p.party_type,
+          p.branch_id,
+          b.name as branch_name,
+          COALESCE(p.amount_kwd, '0') as amount_kwd,
+          p.amount_fx as amount_fx,
+          p.fx_currency,
+          p.fx_rate::text as fx_rate,
+          p.notes,
+          p.created_by,
+          p.created_at::text
+        FROM payments p
+        LEFT JOIN suppliers s ON p.party_id = s.id
+        LEFT JOIN branches b ON p.branch_id = b.id
+        WHERE p.direction = 'in'
+
+        UNION ALL
+
+        -- Payment OUT
+        SELECT 
+          'payment_out-' || p.id::text as id,
+          p.payment_date::text as transaction_date,
+          'payment_out' as module,
+          COALESCE(p.reference_number, 'PAY-' || p.id::text) as reference,
+          p.party_id,
+          s.name as party_name,
+          p.party_type,
+          p.branch_id,
+          b.name as branch_name,
+          COALESCE(p.amount_kwd, '0') as amount_kwd,
+          p.amount_fx as amount_fx,
+          p.fx_currency,
+          p.fx_rate::text as fx_rate,
+          p.notes,
+          p.created_by,
+          p.created_at::text
+        FROM payments p
+        LEFT JOIN suppliers s ON p.party_id = s.id
+        LEFT JOIN branches b ON p.branch_id = b.id
+        WHERE p.direction = 'out'
+
+        UNION ALL
+
+        -- Sale Returns
+        SELECT 
+          'sale_return-' || r.id::text as id,
+          r.return_date::text as transaction_date,
+          'sale_return' as module,
+          COALESCE(r.reference_number, 'RET-' || r.id::text) as reference,
+          r.customer_id as party_id,
+          c.name as party_name,
+          'customer' as party_type,
+          r.branch_id,
+          b.name as branch_name,
+          COALESCE(r.total_amount, '0') as amount_kwd,
+          NULL as amount_fx,
+          NULL as fx_currency,
+          NULL as fx_rate,
+          r.notes,
+          r.created_by,
+          r.created_at::text
+        FROM returns r
+        LEFT JOIN suppliers c ON r.customer_id = c.id
+        LEFT JOIN branches b ON r.branch_id = b.id
+        WHERE r.return_type = 'sale'
+
+        UNION ALL
+
+        -- Purchase Returns
+        SELECT 
+          'purchase_return-' || r.id::text as id,
+          r.return_date::text as transaction_date,
+          'purchase_return' as module,
+          COALESCE(r.reference_number, 'RET-' || r.id::text) as reference,
+          r.supplier_id as party_id,
+          s.name as party_name,
+          'supplier' as party_type,
+          r.branch_id,
+          b.name as branch_name,
+          COALESCE(r.total_amount, '0') as amount_kwd,
+          NULL as amount_fx,
+          NULL as fx_currency,
+          NULL as fx_rate,
+          r.notes,
+          r.created_by,
+          r.created_at::text
+        FROM returns r
+        LEFT JOIN suppliers s ON r.supplier_id = s.id
+        LEFT JOIN branches b ON r.branch_id = b.id
+        WHERE r.return_type = 'purchase'
+
+        UNION ALL
+
+        -- Expenses
+        SELECT 
+          'expense-' || e.id::text as id,
+          e.expense_date::text as transaction_date,
+          'expense' as module,
+          COALESCE(e.reference_number, 'EXP-' || e.id::text) as reference,
+          NULL as party_id,
+          NULL as party_name,
+          NULL as party_type,
+          e.branch_id,
+          b.name as branch_name,
+          COALESCE(e.amount, '0') as amount_kwd,
+          NULL as amount_fx,
+          NULL as fx_currency,
+          NULL as fx_rate,
+          e.description as notes,
+          e.created_by,
+          e.created_at::text
+        FROM expenses e
+        LEFT JOIN branches b ON e.branch_id = b.id
+
+        UNION ALL
+
+        -- Discounts
+        SELECT 
+          'discount-' || d.id::text as id,
+          d.discount_date::text as transaction_date,
+          'discount' as module,
+          'DIS-' || d.id::text as reference,
+          d.customer_id as party_id,
+          s.name as party_name,
+          'customer' as party_type,
+          d.branch_id,
+          b.name as branch_name,
+          COALESCE(d.amount, '0') as amount_kwd,
+          NULL as amount_fx,
+          NULL as fx_currency,
+          NULL as fx_rate,
+          d.notes,
+          d.created_by,
+          d.created_at::text
+        FROM discounts d
+        LEFT JOIN suppliers s ON d.customer_id = s.id
+        LEFT JOIN branches b ON d.branch_id = b.id
+      )
+      SELECT * FROM all_transactions
+      ${whereClause}
+      ORDER BY transaction_date DESC, created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
+    `;
+
+    const countQuery = `
+      WITH all_transactions AS (
+        SELECT so.sale_date as transaction_date, so.customer_id as party_id, COALESCE(so.invoice_number, 'SO-' || so.id::text) as reference, c.name as party_name, so.notes, 'sales' as module, so.branch_id
+        FROM sales_orders so
+        LEFT JOIN suppliers c ON so.customer_id = c.id
+
+        UNION ALL
+
+        SELECT po.purchase_date as transaction_date, po.supplier_id as party_id, COALESCE(po.invoice_number, 'PO-' || po.id::text) as reference, s.name as party_name, NULL as notes, 'purchase' as module, po.branch_id
+        FROM purchase_orders po
+        LEFT JOIN suppliers s ON po.supplier_id = s.id
+
+        UNION ALL
+
+        SELECT p.payment_date as transaction_date, p.party_id, COALESCE(p.reference_number, 'PAY-' || p.id::text) as reference, s.name as party_name, p.notes, 'payment_in' as module, p.branch_id
+        FROM payments p
+        LEFT JOIN suppliers s ON p.party_id = s.id
+        WHERE p.direction = 'in'
+
+        UNION ALL
+
+        SELECT p.payment_date as transaction_date, p.party_id, COALESCE(p.reference_number, 'PAY-' || p.id::text) as reference, s.name as party_name, p.notes, 'payment_out' as module, p.branch_id
+        FROM payments p
+        LEFT JOIN suppliers s ON p.party_id = s.id
+        WHERE p.direction = 'out'
+
+        UNION ALL
+
+        SELECT r.return_date as transaction_date, r.customer_id as party_id, COALESCE(r.reference_number, 'RET-' || r.id::text) as reference, c.name as party_name, r.notes, 'sale_return' as module, r.branch_id
+        FROM returns r
+        LEFT JOIN suppliers c ON r.customer_id = c.id
+        WHERE r.return_type = 'sale'
+
+        UNION ALL
+
+        SELECT r.return_date as transaction_date, r.supplier_id as party_id, COALESCE(r.reference_number, 'RET-' || r.id::text) as reference, s.name as party_name, r.notes, 'purchase_return' as module, r.branch_id
+        FROM returns r
+        LEFT JOIN suppliers s ON r.supplier_id = s.id
+        WHERE r.return_type = 'purchase'
+
+        UNION ALL
+
+        SELECT e.expense_date as transaction_date, NULL as party_id, COALESCE(e.reference_number, 'EXP-' || e.id::text) as reference, NULL as party_name, e.description as notes, 'expense' as module, e.branch_id
+        FROM expenses e
+
+        UNION ALL
+
+        SELECT d.discount_date as transaction_date, d.customer_id as party_id, 'DIS-' || d.id::text as reference, s.name as party_name, d.notes, 'discount' as module, d.branch_id
+        FROM discounts d
+        LEFT JOIN suppliers s ON d.customer_id = s.id
+      )
+      SELECT COUNT(*) as total FROM all_transactions
+      ${whereClause}
+    `;
+
+    const [dataResult, countResult] = await Promise.all([
+      db.execute(sql.raw(unionQuery)),
+      db.execute(sql.raw(countQuery))
+    ]);
+
+    const data: AllTransaction[] = (dataResult.rows as any[]).map((row: any) => ({
+      id: row.id,
+      transactionDate: row.transaction_date,
+      module: row.module,
+      reference: row.reference,
+      partyId: row.party_id,
+      partyName: row.party_name,
+      partyType: row.party_type,
+      branchId: row.branch_id,
+      branchName: row.branch_name,
+      amountKwd: row.amount_kwd,
+      amountFx: row.amount_fx,
+      fxCurrency: row.fx_currency,
+      fxRate: row.fx_rate,
+      notes: row.notes,
+      createdBy: row.created_by,
+      createdAt: row.created_at,
+    }));
+
+    const total = Number((countResult.rows as any[])[0]?.total ?? 0);
+
+    return { data, total };
   }
 }
 

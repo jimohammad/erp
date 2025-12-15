@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BranchProvider, useBranch } from "@/contexts/BranchContext";
 import { BranchSelector } from "@/components/BranchSelector";
-import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown, RotateCcw, FileText, Settings, Percent, LayoutDashboard, ArrowLeftRight, Building2, Smartphone, MessageCircle, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown, RotateCcw, FileText, Settings, Percent, LayoutDashboard, ArrowLeftRight, Building2, Smartphone, MessageCircle, ArrowDownLeft, ArrowUpRight, List } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +69,7 @@ const BackupPage = lazy(() => import("@/pages/backup"));
 const AIChatPage = lazy(() => import("@/pages/ai-chat"));
 const Landing = lazy(() => import("@/pages/landing"));
 const PublicStatementPage = lazy(() => import("@/pages/public-statement"));
+const AllTransactionsPage = lazy(() => import("@/pages/all-transactions"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -414,6 +415,21 @@ function AppSidebar() {
                 </SidebarMenuItem>
               )}
 
+              {/* All Transactions - consolidated view */}
+              {canAccess("payments") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/transactions"}
+                  >
+                    <Link href="/transactions" data-testid="link-all-transactions">
+                      <List className="h-4 w-4" />
+                      <span>All Transactions</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
               {/* Rest of menu items (excluding Dashboard which is handled above) */}
               {mainMenuItems.filter(item => item.title !== "Dashboard").map((item) => (
                 <SidebarMenuItem key={item.title}>
@@ -626,6 +642,8 @@ function AuthenticatedLayout() {
         return "AI Assistant";
       case "/settings/backup":
         return "Database Backup";
+      case "/transactions":
+        return "All Transactions";
       default:
         return "";
     }
@@ -690,6 +708,7 @@ function AuthenticatedLayout() {
                 <Route path="/stock-transfers" component={StockTransfersPage} />
                 <Route path="/stock-lookup" component={StockLookupPage} />
                 <Route path="/imei-history" component={ImeiHistoryPage} />
+                <Route path="/transactions" component={AllTransactionsPage} />
                 <Route component={NotFound} />
               </Switch>
             </Suspense>

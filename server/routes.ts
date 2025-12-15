@@ -2346,6 +2346,39 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== ALL TRANSACTIONS ====================
+  app.get("/api/transactions", isAuthenticated, async (req: any, res) => {
+    try {
+      const {
+        limit = "50",
+        offset = "0",
+        startDate,
+        endDate,
+        modules,
+        branchId,
+        partyId,
+        search
+      } = req.query;
+
+      const options = {
+        limit: parseInt(limit as string) || 50,
+        offset: parseInt(offset as string) || 0,
+        startDate: startDate as string | undefined,
+        endDate: endDate as string | undefined,
+        modules: modules ? (modules as string).split(',') : undefined,
+        branchId: branchId ? parseInt(branchId as string) : undefined,
+        partyId: partyId ? parseInt(partyId as string) : undefined,
+        search: search as string | undefined,
+      };
+
+      const result = await storage.getAllTransactions(options);
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching all transactions:", error);
+      res.status(500).json({ error: "Failed to fetch transactions" });
+    }
+  });
+
   app.post("/api/whatsapp/send-payment-receipt", isAuthenticated, async (req: any, res) => {
     try {
       const { paymentId, phoneNumber } = req.body;
