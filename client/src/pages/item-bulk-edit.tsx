@@ -49,7 +49,7 @@ export default function ItemBulkEdit() {
 
   const bulkUpdateMutation = useMutation({
     mutationFn: (updates: Array<{ id: number; purchasePriceKwd?: string; purchasePriceFx?: string; fxCurrency?: string; sellingPriceKwd?: string }>) =>
-      apiRequest("PATCH", "/api/items/bulk", { updates }),
+      apiRequest("PUT", "/api/items/bulk", { updates }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/items"] });
       toast({ title: "Items updated successfully" });
