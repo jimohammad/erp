@@ -61,7 +61,7 @@ interface SalesOrder {
   saleDate: string;
   invoiceNumber: string | null;
   totalKwd: string | null;
-  customer: { id: number; name: string } | null;
+  customer: { id: number; name: string; balance?: string | null } | null;
   lineItems: SalesOrderLineItem[];
   createdAt: string | null;
 }
@@ -278,11 +278,12 @@ export default function AllSalesPage() {
       <div class="item-row">
         <div class="item-name">${escapeHtml(item.itemName)}</div>
         <div class="item-details">${item.quantity} x ${formatCurrency(item.priceKwd)} = ${formatCurrency(parseFloat(item.priceKwd || "0") * item.quantity)}</div>
-        ${item.imeiNumbers?.length ? `<div class="item-imei">IMEI: ${item.imeiNumbers.map(imei => escapeHtml(imei)).join(", ")}</div>` : ""}
       </div>
     `).join("");
 
     const invoiceAmount = parseFloat(selectedSO.totalKwd || "0");
+    const prevBalance = parseFloat(selectedSO.customer?.balance || "0");
+    const currBalance = prevBalance + invoiceAmount;
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -433,8 +434,19 @@ export default function AllSalesPage() {
             </div>
             
             <div class="total-box">
-              <div class="total-label">Total Amount</div>
+              <div class="total-label">Invoice Total</div>
               <div class="total-value">${invoiceAmount.toFixed(3)} KWD</div>
+            </div>
+            
+            <div class="balance-section" style="font-size: 9pt; margin: 2mm 0; padding: 2mm 0; border-top: 1px dashed #000;">
+              <div class="info-row">
+                <span>Prev. Balance:</span>
+                <span>${prevBalance.toFixed(3)} KWD</span>
+              </div>
+              <div class="info-row" style="font-weight: bold;">
+                <span>Current Balance:</span>
+                <span>${currBalance.toFixed(3)} KWD</span>
+              </div>
             </div>
             
             <div class="footer">
@@ -459,9 +471,14 @@ export default function AllSalesPage() {
         <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(item.itemName)}</td>
         <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
         <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(item.priceKwd)}</td>
-        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; font-size: 11px; color: #6b7280;">${item.imeiNumbers?.length ? item.imeiNumbers.map(imei => escapeHtml(imei)).join(", ") : "-"}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${formatCurrency(parseFloat(item.priceKwd || "0") * item.quantity)}</td>
       </tr>
     `).join("");
+    
+    // Calculate balance information
+    const previousBalance = parseFloat(selectedSO.customer?.balance || "0");
+    const invoiceTotal = parseFloat(selectedSO.totalKwd || "0");
+    const currentBalance = previousBalance + invoiceTotal;
 
     pdfWindow.document.write(`
       <!DOCTYPE html>
@@ -512,12 +529,29 @@ export default function AllSalesPage() {
                 <th>Item</th>
                 <th style="text-align: center;">Qty</th>
                 <th style="text-align: right;">Unit Price</th>
-                <th>IMEI Numbers</th>
+                <th style="text-align: right;">Amount</th>
               </tr>
             </thead>
             <tbody>${lineItemsHtmlPdf}</tbody>
           </table>
-          <div class="total">Total: ${formatCurrency(selectedSO.totalKwd)} KWD</div>
+          <div style="margin-top: 20px; border-top: 2px solid #e5e7eb; padding-top: 16px;">
+            <div style="display: flex; justify-content: flex-end;">
+              <div style="width: 280px;">
+                <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #64748b;">Previous Balance:</span>
+                  <span style="font-weight: 500;">${formatCurrency(previousBalance)} KWD</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #e5e7eb;">
+                  <span style="color: #64748b;">Invoice Total:</span>
+                  <span style="font-weight: 500;">${formatCurrency(invoiceTotal)} KWD</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 8px 0; background: #f1f5f9; margin-top: 4px; padding-left: 8px; padding-right: 8px; border-radius: 4px;">
+                  <span style="font-weight: 600;">Current Balance:</span>
+                  <span style="font-weight: 700; font-size: 16px;">${formatCurrency(currentBalance)} KWD</span>
+                </div>
+              </div>
+            </div>
+          </div>
           <script>window.onload = function() { setTimeout(function() { window.print(); }, 500); }</script>
         </body>
       </html>
