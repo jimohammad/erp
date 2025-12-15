@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Package, DollarSign, TrendingUp, TrendingDown, ShoppingCart, Search, Loader2, ArrowRight, Wallet, Building2, Receipt } from "lucide-react";
+import { Package, DollarSign, TrendingUp, TrendingDown, ShoppingCart, Search, Loader2, ArrowRight, Wallet, Building2, Receipt, AlertTriangle } from "lucide-react";
 import Sparkline from "@/components/Sparkline";
 
 const LazySalesChart = lazy(() => import("@/components/SalesChart"));
@@ -31,6 +31,12 @@ interface SearchResult {
   url: string;
 }
 
+interface LowStockItem {
+  itemName: string;
+  currentStock: number;
+  minStockLevel: number;
+}
+
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -38,6 +44,10 @@ export default function DashboardPage() {
 
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
+  });
+
+  const { data: lowStockItems } = useQuery<LowStockItem[]>({
+    queryKey: ["/api/reports/low-stock"],
   });
 
   const { data: searchResults, isLoading: searchLoading } = useQuery<SearchResult[]>({
@@ -334,6 +344,43 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+
+          {lowStockItems && lowStockItems.length > 0 && (
+            <Card data-testid="card-low-stock-alerts" className="border-amber-200 dark:border-amber-800">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/40">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Low Stock Alerts</CardTitle>
+                    <p className="text-xs text-muted-foreground">Items below minimum level</p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100">
+                  {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''}
+                </Badge>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {lowStockItems.map((item) => (
+                    <div 
+                      key={item.itemName}
+                      className="flex items-center justify-between p-2 rounded-md bg-amber-50 dark:bg-amber-900/20"
+                      data-testid={`low-stock-item-${item.itemName}`}
+                    >
+                      <span className="font-medium text-sm">{item.itemName}</span>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={item.currentStock <= 0 ? "destructive" : "secondary"} className="text-xs">
+                          {item.currentStock} / {item.minStockLevel}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </div>

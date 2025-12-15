@@ -187,6 +187,8 @@ export interface IStorage {
 
   // Reports
   getStockBalance(): Promise<{ itemName: string; purchased: number; sold: number; openingStock: number; balance: number }[]>;
+  getLowStockItems(): Promise<{ itemName: string; currentStock: number; minStockLevel: number }[]>;
+  getCustomerAging(): Promise<{ customerId: number; customerName: string; current: number; days30: number; days60: number; days90Plus: number; totalBalance: number }[]>;
   getDailyCashFlow(startDate?: string, endDate?: string): Promise<{ date: string; inAmount: number; outAmount: number; net: number; runningBalance: number }[]>;
   getCustomerReport(): Promise<{ customerId: number; customerName: string; totalSales: number; totalPayments: number; balance: number }[]>;
   getPartyStatement(partyId: number, startDate?: string, endDate?: string): Promise<{ id: number; date: string; type: string; reference: string; description: string; debit: number; credit: number; balance: number }[]>;
@@ -888,6 +890,100 @@ export class DatabaseStorage implements IStorage {
       ORDER BY ai.item_name
     `);
     return result.rows as { itemName: string; purchased: number; sold: number; openingStock: number; balance: number }[];
+  }
+
+  async getLowStockItems(): Promise<{ itemName: string; currentStock: number; minStockLevel: number }[]> {
+    const result = await db.execute(sql`
+      WITH stock_balance AS (
+        SELECT 
+          i.name as item_name,
+          COALESCE(i.min_stock_level, 0) as min_level,
+          COALESCE((
+            SELECT SUM(quantity) FROM inventory_adjustments ia WHERE ia.item_id = i.id
+          ), 0) +
+          COALESCE((
+            SELECT SUM(pli.quantity) FROM purchase_order_line_items pli WHERE pli.item_name = i.name
+          ), 0) +
+          COALESCE((
+            SELECT SUM(rli.quantity) FROM return_line_items rli 
+            JOIN returns r ON rli.return_id = r.id 
+            WHERE rli.item_name = i.name AND r.return_type = 'sale'
+          ), 0) -
+          COALESCE((
+            SELECT SUM(sli.quantity) FROM sales_order_line_items sli WHERE sli.item_name = i.name
+          ), 0) -
+          COALESCE((
+            SELECT SUM(rli.quantity) FROM return_line_items rli 
+            JOIN returns r ON rli.return_id = r.id 
+            WHERE rli.item_name = i.name AND r.return_type = 'purchase'
+          ), 0) as current_stock
+        FROM items i
+        WHERE i.min_stock_level > 0
+      )
+      SELECT 
+        item_name as "itemName",
+        current_stock::integer as "currentStock",
+        min_level::integer as "minStockLevel"
+      FROM stock_balance
+      WHERE current_stock <= min_level
+      ORDER BY (min_level - current_stock) DESC
+    `);
+    return result.rows as { itemName: string; currentStock: number; minStockLevel: number }[];
+  }
+
+  async getCustomerAging(): Promise<{ customerId: number; customerName: string; current: number; days30: number; days60: number; days90Plus: number; totalBalance: number }[]> {
+    const result = await db.execute(sql`
+      WITH customer_balances AS (
+        SELECT 
+          c.id as customer_id,
+          c.name as customer_name,
+          COALESCE(SUM(CASE WHEN so.sale_date >= CURRENT_DATE - INTERVAL '30 days' THEN CAST(so.total_kwd AS DECIMAL) ELSE 0 END), 0) as sales_current,
+          COALESCE(SUM(CASE WHEN so.sale_date >= CURRENT_DATE - INTERVAL '60 days' AND so.sale_date < CURRENT_DATE - INTERVAL '30 days' THEN CAST(so.total_kwd AS DECIMAL) ELSE 0 END), 0) as sales_30,
+          COALESCE(SUM(CASE WHEN so.sale_date >= CURRENT_DATE - INTERVAL '90 days' AND so.sale_date < CURRENT_DATE - INTERVAL '60 days' THEN CAST(so.total_kwd AS DECIMAL) ELSE 0 END), 0) as sales_60,
+          COALESCE(SUM(CASE WHEN so.sale_date < CURRENT_DATE - INTERVAL '90 days' THEN CAST(so.total_kwd AS DECIMAL) ELSE 0 END), 0) as sales_90_plus
+        FROM customers c
+        LEFT JOIN sales_orders so ON c.id = so.customer_id
+        GROUP BY c.id, c.name
+      ),
+      customer_payments AS (
+        SELECT 
+          customer_id,
+          COALESCE(SUM(CASE WHEN direction = 'IN' THEN CAST(amount AS DECIMAL) ELSE 0 END), 0) as total_paid
+        FROM payments
+        WHERE customer_id IS NOT NULL
+        GROUP BY customer_id
+      ),
+      customer_returns AS (
+        SELECT 
+          customer_id,
+          COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as total_returns
+        FROM returns
+        WHERE customer_id IS NOT NULL AND return_type = 'sale_return'
+        GROUP BY customer_id
+      ),
+      customer_discounts AS (
+        SELECT 
+          customer_id,
+          COALESCE(SUM(CAST(discount_amount AS DECIMAL)), 0) as total_discounts
+        FROM discounts
+        GROUP BY customer_id
+      )
+      SELECT 
+        cb.customer_id as "customerId",
+        cb.customer_name as "customerName",
+        GREATEST(cb.sales_current - COALESCE(cp.total_paid, 0) * (cb.sales_current / NULLIF(cb.sales_current + cb.sales_30 + cb.sales_60 + cb.sales_90_plus, 0)), 0)::float as "current",
+        cb.sales_30::float as "days30",
+        cb.sales_60::float as "days60",
+        cb.sales_90_plus::float as "days90Plus",
+        (cb.sales_current + cb.sales_30 + cb.sales_60 + cb.sales_90_plus - COALESCE(cp.total_paid, 0) - COALESCE(cr.total_returns, 0) - COALESCE(cd.total_discounts, 0))::float as "totalBalance"
+      FROM customer_balances cb
+      LEFT JOIN customer_payments cp ON cb.customer_id = cp.customer_id
+      LEFT JOIN customer_returns cr ON cb.customer_id = cr.customer_id
+      LEFT JOIN customer_discounts cd ON cb.customer_id = cd.customer_id
+      WHERE (cb.sales_current + cb.sales_30 + cb.sales_60 + cb.sales_90_plus - COALESCE(cp.total_paid, 0) - COALESCE(cr.total_returns, 0) - COALESCE(cd.total_discounts, 0)) > 0
+      ORDER BY "totalBalance" DESC
+    `);
+    return result.rows as { customerId: number; customerName: string; current: number; days30: number; days60: number; days90Plus: number; totalBalance: number }[];
   }
 
   async getDailyCashFlow(startDate?: string, endDate?: string): Promise<{ date: string; inAmount: number; outAmount: number; net: number; runningBalance: number }[]> {

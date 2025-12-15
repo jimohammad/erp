@@ -45,6 +45,7 @@ export default function ItemMaster() {
   const [purchasePriceFx, setPurchasePriceFx] = useState("");
   const [fxCurrency, setFxCurrency] = useState("");
   const [sellingPriceKwd, setSellingPriceKwd] = useState("");
+  const [minStockLevel, setMinStockLevel] = useState("");
   const [fetchingPricing, setFetchingPricing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
@@ -79,6 +80,7 @@ export default function ItemMaster() {
     purchasePriceFx: string | null;
     fxCurrency: string | null;
     sellingPriceKwd: string | null;
+    minStockLevel: number | null;
   };
 
   const createMutation = useMutation({
@@ -157,6 +159,7 @@ export default function ItemMaster() {
     setPurchasePriceFx("");
     setFxCurrency("");
     setSellingPriceKwd("");
+    setMinStockLevel("");
     setDialogOpen(true);
   };
 
@@ -168,6 +171,7 @@ export default function ItemMaster() {
     setPurchasePriceFx(item.purchasePriceFx || "");
     setFxCurrency(item.fxCurrency || "");
     setSellingPriceKwd(item.sellingPriceKwd || "");
+    setMinStockLevel(item.minStockLevel?.toString() || "");
     setDialogOpen(true);
   };
 
@@ -180,6 +184,7 @@ export default function ItemMaster() {
     setPurchasePriceFx("");
     setFxCurrency("");
     setSellingPriceKwd("");
+    setMinStockLevel("");
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -193,6 +198,7 @@ export default function ItemMaster() {
       purchasePriceFx: purchasePriceFx.trim() || null,
       fxCurrency: fxCurrency.trim() || null,
       sellingPriceKwd: sellingPriceKwd.trim() || null,
+      minStockLevel: minStockLevel.trim() ? parseInt(minStockLevel.trim()) : 0,
     };
 
     if (editingItem) {
@@ -413,6 +419,21 @@ export default function ItemMaster() {
                   step="0.001"
                   data-testid="input-selling-price"
                 />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="minStockLevel">Min Stock Level</Label>
+                <Input
+                  id="minStockLevel"
+                  value={minStockLevel}
+                  onChange={(e) => setMinStockLevel(e.target.value)}
+                  placeholder="0"
+                  type="number"
+                  step="1"
+                  min="0"
+                  data-testid="input-min-stock-level"
+                />
+                <p className="text-xs text-muted-foreground">Alert when stock falls below this level</p>
               </div>
             </div>
             <DialogFooter>

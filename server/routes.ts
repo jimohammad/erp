@@ -815,6 +815,26 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/reports/low-stock", isAuthenticated, async (req, res) => {
+    try {
+      const lowStock = await storage.getLowStockItems();
+      res.json(lowStock);
+    } catch (error) {
+      console.error("Error fetching low stock items:", error);
+      res.status(500).json({ error: "Failed to fetch low stock items" });
+    }
+  });
+
+  app.get("/api/reports/customer-aging", isAuthenticated, async (req, res) => {
+    try {
+      const aging = await storage.getCustomerAging();
+      res.json(aging);
+    } catch (error) {
+      console.error("Error fetching customer aging:", error);
+      res.status(500).json({ error: "Failed to fetch customer aging report" });
+    }
+  });
+
   app.get("/api/reports/daily-cash-flow", isAuthenticated, async (req, res) => {
     try {
       const { startDate, endDate } = req.query;

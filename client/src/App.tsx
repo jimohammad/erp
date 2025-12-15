@@ -70,6 +70,7 @@ const AIChatPage = lazy(() => import("@/pages/ai-chat"));
 const Landing = lazy(() => import("@/pages/landing"));
 const PublicStatementPage = lazy(() => import("@/pages/public-statement"));
 const AllTransactionsPage = lazy(() => import("@/pages/all-transactions"));
+const CustomerAgingPage = lazy(() => import("@/pages/customer-aging"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -179,6 +180,7 @@ function AppSidebar() {
   const reportsSubItems = [
     { title: "General Reports", url: "/reports" },
     { title: "All Transactions", url: "/reports/all-transactions" },
+    { title: "Customer Aging", url: "/reports/customer-aging" },
     { title: "Party Statement", url: "/reports/party-statement" },
     { title: "Account Statement", url: "/reports/account-statement" },
     { title: "Customer Statement", url: "/reports/customer-statement" },
@@ -685,6 +687,7 @@ function AuthenticatedLayout() {
                 <Route path="/reports/export-imei" component={ExportImeiPage} />
                 <Route path="/reports/customer-statement" component={CustomerStatementPage} />
                 <Route path="/reports/all-transactions" component={AllTransactionsPage} />
+                <Route path="/reports/customer-aging" component={CustomerAgingPage} />
                 <Route path="/settings/user-roles" component={UserRolesPage} />
                 <Route path="/settings/branches" component={BranchesPage} />
                 <Route path="/settings/opening-balances" component={OpeningBalancesPage} />

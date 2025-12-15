@@ -76,6 +76,7 @@ export const items = pgTable("items", {
   purchasePriceFx: numeric("purchase_price_fx", { precision: 12, scale: 3 }),
   fxCurrency: text("fx_currency"),
   sellingPriceKwd: numeric("selling_price_kwd", { precision: 12, scale: 3 }),
+  minStockLevel: integer("min_stock_level").default(0),
 }, (table) => [
   index("idx_item_code").on(table.code),
 ]);
