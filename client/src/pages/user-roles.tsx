@@ -45,6 +45,7 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 const MODULE_LABELS: Record<string, string> = {
+  dashboard: "Dashboard",
   purchases: "Purchases",
   sales: "Sales",
   payments: "Payments",
@@ -54,6 +55,12 @@ const MODULE_LABELS: Record<string, string> = {
   items: "Item Master",
   parties: "Party Master",
   reports: "Reports",
+  discount: "Discount",
+  stock: "Stock Lookup",
+  imei_history: "IMEI History",
+  stock_transfers: "Stock Transfers",
+  ai_assistant: "AI Assistant",
+  backup: "Database Backup",
   settings: "Settings",
 };
 

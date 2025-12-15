@@ -574,6 +574,11 @@ export const MODULE_NAMES = [
   "parties",
   "reports",
   "discount",
+  "stock",
+  "imei_history",
+  "stock_transfers",
+  "ai_assistant",
+  "backup",
   "settings"
 ] as const;
 export type ModuleName = typeof MODULE_NAMES[number];
