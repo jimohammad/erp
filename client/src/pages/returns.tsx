@@ -91,6 +91,21 @@ interface ReturnLineItemForm {
 
 export default function ReturnsPage() {
   const { toast } = useToast();
+  const [logoBase64, setLogoBase64] = useState<string>("");
+
+  useEffect(() => {
+    fetch(companyLogoUrl)
+      .then(res => res.blob())
+      .then(blob => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setLogoBase64(reader.result as string);
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(console.error);
+  }, []);
+
   const [returnType, setReturnType] = useState<"sale_return" | "purchase_return">("sale_return");
   const [lineItems, setLineItems] = useState<ReturnLineItemForm[]>([
     { itemName: "", quantity: 0, priceKwd: "", totalKwd: "", imeiNumbers: [] },
@@ -456,8 +471,7 @@ export default function ReturnsPage() {
         <body>
           <div class="receipt">
             <div class="header">
-              <div class="company-name">Iqbal Electronics</div>
-              <div class="company-sub">Co. WLL - Kuwait</div>
+              ${logoBase64 ? `<img src="${logoBase64}" style="height: 40px; width: auto; margin-bottom: 2mm;" alt="IEC" />` : `<div class="company-name">Iqbal Electronics</div><div class="company-sub">Co. WLL - Kuwait</div>`}
               <div class="badge">${returnTypeLabel}</div>
             </div>
             
@@ -552,7 +566,7 @@ export default function ReturnsPage() {
           </div>
           <div class="header">
             <div>
-              <div class="company">Iqbal Electronics</div>
+              ${logoBase64 ? `<img src="${logoBase64}" style="height: 50px; width: auto;" alt="IEC" />` : `<div class="company">Iqbal Electronics</div>`}
               <div style="color: #64748b; font-size: 12px;">Kuwait</div>
             </div>
             <div style="text-align: right;">
