@@ -265,8 +265,6 @@ export default function AllTransactionsPage() {
                     <TableHead className="sticky top-0 bg-background z-10">Party</TableHead>
                     <TableHead className="sticky top-0 bg-background z-10">Branch</TableHead>
                     <TableHead className="sticky top-0 bg-background z-10 text-right">Amount (KWD)</TableHead>
-                    <TableHead className="sticky top-0 bg-background z-10 text-right">FX Amount</TableHead>
-                    <TableHead className="sticky top-0 bg-background z-10">Notes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -298,21 +296,6 @@ export default function AllTransactionsPage() {
                       </TableCell>
                       <TableCell className="text-right font-mono">
                         {formatCurrency(tx.amountKwd)}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {tx.amountFx && tx.fxCurrency ? (
-                          <div className="flex flex-col items-end">
-                            <span>{formatCurrency(tx.amountFx, tx.fxCurrency)}</span>
-                            {tx.fxRate && (
-                              <span className="text-xs text-muted-foreground">@ {tx.fxRate}</span>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-48 truncate" title={tx.notes || ""}>
-                        {tx.notes || <span className="text-muted-foreground">-</span>}
                       </TableCell>
                     </TableRow>
                   ))}
