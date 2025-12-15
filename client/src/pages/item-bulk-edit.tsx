@@ -29,6 +29,7 @@ type EditedItem = {
   code: string;
   name: string;
   purchasePriceKwd: string;
+  purchasePriceFx: string;
   fxCurrency: string;
   sellingPriceKwd: string;
   hasChanges: boolean;
@@ -47,7 +48,7 @@ export default function ItemBulkEdit() {
   });
 
   const bulkUpdateMutation = useMutation({
-    mutationFn: (updates: Array<{ id: number; purchasePriceKwd?: string; fxCurrency?: string; sellingPriceKwd?: string }>) =>
+    mutationFn: (updates: Array<{ id: number; purchasePriceKwd?: string; purchasePriceFx?: string; fxCurrency?: string; sellingPriceKwd?: string }>) =>
       apiRequest("PATCH", "/api/items/bulk", { updates }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/items"] });
@@ -68,6 +69,7 @@ export default function ItemBulkEdit() {
       case "code": return item.code || "";
       case "name": return item.name;
       case "purchasePriceKwd": return item.purchasePriceKwd || "";
+      case "purchasePriceFx": return item.purchasePriceFx || "";
       case "fxCurrency": return item.fxCurrency || "";
       case "sellingPriceKwd": return item.sellingPriceKwd || "";
       default: return "";
@@ -81,6 +83,7 @@ export default function ItemBulkEdit() {
         code: item.code || "",
         name: item.name,
         purchasePriceKwd: item.purchasePriceKwd || "",
+        purchasePriceFx: item.purchasePriceFx || "",
         fxCurrency: item.fxCurrency || "",
         sellingPriceKwd: item.sellingPriceKwd || "",
         hasChanges: false,
@@ -106,6 +109,7 @@ export default function ItemBulkEdit() {
             code: item.code || "",
             name: item.name,
             purchasePriceKwd: item.purchasePriceKwd || "",
+            purchasePriceFx: item.purchasePriceFx || "",
             fxCurrency: item.fxCurrency || "",
             sellingPriceKwd: item.sellingPriceKwd || "",
             hasChanges: false,
@@ -114,6 +118,7 @@ export default function ItemBulkEdit() {
           const updated = {
             ...existing,
             purchasePriceKwd: pricing.priceKwd || existing.purchasePriceKwd,
+            purchasePriceFx: pricing.priceFx || existing.purchasePriceFx,
             fxCurrency: pricing.fxCurrency || existing.fxCurrency,
             hasChanges: true,
           };
@@ -137,6 +142,7 @@ export default function ItemBulkEdit() {
       .map(item => ({
         id: item.id,
         purchasePriceKwd: item.purchasePriceKwd || undefined,
+        purchasePriceFx: item.purchasePriceFx || undefined,
         fxCurrency: item.fxCurrency || undefined,
         sellingPriceKwd: item.sellingPriceKwd || undefined,
       }));
@@ -211,6 +217,7 @@ export default function ItemBulkEdit() {
                     <TableHead className="w-32">Code</TableHead>
                     <TableHead className="min-w-[150px]">Name</TableHead>
                     <TableHead className="w-36">Purchase KWD</TableHead>
+                    <TableHead className="w-36">Purchase FX</TableHead>
                     <TableHead className="w-28">FX</TableHead>
                     <TableHead className="w-36">Selling KWD</TableHead>
                     <TableHead className="w-24">Fetch</TableHead>
@@ -241,6 +248,17 @@ export default function ItemBulkEdit() {
                           step="0.001"
                           className="h-8"
                           data-testid={`input-bulk-purchase-${item.id}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          value={getEditedValue(item, "purchasePriceFx")}
+                          onChange={(e) => handleFieldChange(item, "purchasePriceFx", e.target.value)}
+                          placeholder="0.000"
+                          type="number"
+                          step="0.001"
+                          className="h-8"
+                          data-testid={`input-bulk-purchase-fx-${item.id}`}
                         />
                       </TableCell>
                       <TableCell>
