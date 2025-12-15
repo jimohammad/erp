@@ -230,13 +230,29 @@ export default function PartyMaster() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="partyPhone">Phone Number</Label>
-                  <Input
-                    id="partyPhone"
-                    value={partyPhone}
-                    onChange={(e) => setPartyPhone(e.target.value)}
-                    placeholder="Enter phone number (optional)"
-                    data-testid="input-party-phone"
-                  />
+                  {partyType === "customer" ? (
+                    <div className="flex">
+                      <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm">
+                        +965
+                      </span>
+                      <Input
+                        id="partyPhone"
+                        value={partyPhone.replace(/^\+965\s*/, "")}
+                        onChange={(e) => setPartyPhone("+965 " + e.target.value.replace(/^\+965\s*/, ""))}
+                        placeholder="Enter phone number"
+                        className="rounded-l-none"
+                        data-testid="input-party-phone"
+                      />
+                    </div>
+                  ) : (
+                    <Input
+                      id="partyPhone"
+                      value={partyPhone}
+                      onChange={(e) => setPartyPhone(e.target.value)}
+                      placeholder="Enter phone number (optional)"
+                      data-testid="input-party-phone"
+                    />
+                  )}
                 </div>
               </div>
 
