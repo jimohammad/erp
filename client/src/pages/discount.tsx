@@ -26,6 +26,7 @@ export default function DiscountPage() {
   const [discountAmount, setDiscountAmount] = useState<string>("");
   const [notes, setNotes] = useState<string>("");
   const [savedDiscount, setSavedDiscount] = useState<DiscountWithDetails | null>(null);
+  const [shouldPrintAfterSave, setShouldPrintAfterSave] = useState(false);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
@@ -54,6 +55,10 @@ export default function DiscountPage() {
         title: "Discount Saved",
         description: "Discount has been saved successfully.",
       });
+      if (shouldPrintAfterSave) {
+        printDiscountReceipt(discount);
+        setShouldPrintAfterSave(false);
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -90,24 +95,6 @@ export default function DiscountPage() {
     setSavedDiscount(null);
   };
 
-  const handleSave = () => {
-    if (!customerId || !salesOrderId || !discountAmount) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    createDiscountMutation.mutate({
-      customerId: parseInt(customerId),
-      salesOrderId: parseInt(salesOrderId),
-      discountAmount,
-      notes: notes || undefined,
-    });
-  };
-
   const handleWhatsApp = () => {
     if (!savedDiscount) {
       toast({
@@ -133,21 +120,12 @@ export default function DiscountPage() {
     window.open(`https://wa.me/?text=${message}`, "_blank");
   };
 
-  const handlePrint = () => {
-    if (!savedDiscount) {
-      toast({
-        title: "Save First",
-        description: "Please save the discount before printing",
-        variant: "destructive",
-      });
-      return;
-    }
-
+  const printDiscountReceipt = (discount: DiscountWithDetails) => {
     const printWindow = window.open("", "_blank");
     if (printWindow) {
-      const customerName = savedDiscount.customer?.name || "Customer";
-      const invoiceNum = savedDiscount.salesOrder?.invoiceNumber || `INV-${savedDiscount.salesOrderId}`;
-      const amount = savedDiscount.discountAmount;
+      const customerName = discount.customer?.name || "Customer";
+      const invoiceNum = discount.salesOrder?.invoiceNumber || `INV-${discount.salesOrderId}`;
+      const amount = discount.discountAmount;
 
       printWindow.document.write(`
         <!DOCTYPE html>
@@ -193,6 +171,56 @@ export default function DiscountPage() {
       printWindow.document.close();
       printWindow.print();
     }
+  };
+
+  const handlePrint = () => {
+    if (!savedDiscount) {
+      toast({
+        title: "Save First",
+        description: "Please save the discount before printing",
+        variant: "destructive",
+      });
+      return;
+    }
+    printDiscountReceipt(savedDiscount);
+  };
+
+  const handleSaveAndPrint = () => {
+    if (!customerId || !salesOrderId || !discountAmount) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setShouldPrintAfterSave(true);
+    createDiscountMutation.mutate({
+      customerId: parseInt(customerId),
+      salesOrderId: parseInt(salesOrderId),
+      discountAmount,
+      notes: notes || undefined,
+    });
+  };
+
+  const handleSave = () => {
+    if (!customerId || !salesOrderId || !discountAmount) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setShouldPrintAfterSave(false);
+    createDiscountMutation.mutate({
+      customerId: parseInt(customerId),
+      salesOrderId: parseInt(salesOrderId),
+      discountAmount,
+      notes: notes || undefined,
+    });
   };
 
   const handleClear = () => {
@@ -293,12 +321,21 @@ export default function DiscountPage() {
 
             <div className="flex flex-wrap gap-2 pt-4">
               <Button 
+                variant="outline"
                 onClick={handleSave} 
                 disabled={createDiscountMutation.isPending}
                 data-testid="button-save"
               >
                 <Save className="h-4 w-4 mr-2" />
                 Save
+              </Button>
+              <Button 
+                onClick={handleSaveAndPrint} 
+                disabled={createDiscountMutation.isPending}
+                data-testid="button-save-print"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Save & Print
               </Button>
               <Button 
                 variant="outline" 
@@ -311,6 +348,7 @@ export default function DiscountPage() {
               <Button 
                 variant="outline" 
                 onClick={handlePrint}
+                disabled={!savedDiscount}
                 data-testid="button-print"
               >
                 <Printer className="h-4 w-4 mr-2" />
