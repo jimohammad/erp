@@ -262,7 +262,15 @@ export default function PaymentsPage() {
 
   const handleFxAmountChange = (value: string) => {
     setFxAmount(value);
-    if (value && fxRate) {
+    // If both FX amount and KWD amount exist, calculate the exchange rate
+    if (value && amount) {
+      const fxAmt = parseFloat(value);
+      const kwdAmt = parseFloat(amount);
+      if (!isNaN(fxAmt) && !isNaN(kwdAmt) && kwdAmt > 0) {
+        setFxRate((fxAmt / kwdAmt).toFixed(4));
+      }
+    } else if (value && fxRate) {
+      // Fallback: if rate exists, calculate KWD
       const rate = parseFloat(fxRate);
       const fxAmt = parseFloat(value);
       if (!isNaN(rate) && !isNaN(fxAmt) && rate > 0) {
@@ -278,6 +286,18 @@ export default function PaymentsPage() {
       const fxAmt = parseFloat(fxAmount);
       if (!isNaN(rate) && !isNaN(fxAmt) && rate > 0) {
         setAmount((fxAmt / rate).toFixed(3));
+      }
+    }
+  };
+
+  const handleAmountChange = (value: string) => {
+    setAmount(value);
+    // For Payment OUT: if both KWD amount and FX amount exist, calculate exchange rate
+    if (direction === "OUT" && value && fxAmount) {
+      const kwdAmt = parseFloat(value);
+      const fxAmt = parseFloat(fxAmount);
+      if (!isNaN(kwdAmt) && !isNaN(fxAmt) && kwdAmt > 0) {
+        setFxRate((fxAmt / kwdAmt).toFixed(4));
       }
     }
   };
@@ -786,7 +806,7 @@ export default function PaymentsPage() {
                 step="0.001"
                 min="0"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => handleAmountChange(e.target.value)}
                 placeholder="0.000"
                 required
                 className="!text-3xl h-14 font-semibold placeholder:text-muted-foreground/30 placeholder:font-normal"
