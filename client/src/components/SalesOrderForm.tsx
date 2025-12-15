@@ -392,67 +392,207 @@ export function SalesOrderForm({
               onClick={() => {
                 const printWindow = window.open("", "_blank");
                 if (printWindow) {
-                  const customerName = selectedCustomer?.name || "Customer";
-                  const itemRows = lineItems.filter(li => li.itemName).map(li => 
-                    `<div class="item-row"><div class="item-name">${li.itemName}</div><div class="item-details">${li.quantity} x ${li.priceKwd} = ${li.totalKwd}</div></div>`
-                  ).join("");
+                  const customerName = selectedCustomer?.name || "Walk-in Customer";
+                  const customerPhone = selectedCustomer?.phone || "—";
                   const prevBal = customerBalance?.balance || 0;
                   const invAmt = parseFloat(totalKwd) || 0;
                   const currBal = prevBal + invAmt;
+                  const validItems = lineItems.filter(li => li.itemName);
+                  const totalQty = validItems.reduce((sum, li) => sum + (parseInt(li.quantity) || 0), 0);
+                  
+                  const numberToWords = (num: number): string => {
+                    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+                    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+                    const scales = ['', 'Thousand', 'Million', 'Billion'];
+                    if (num === 0) return 'Zero';
+                    const intPart = Math.floor(num);
+                    const decPart = Math.round((num - intPart) * 1000);
+                    const convertHundreds = (n: number): string => {
+                      let result = '';
+                      if (n >= 100) { result += ones[Math.floor(n / 100)] + ' Hundred '; n %= 100; }
+                      if (n >= 20) { result += tens[Math.floor(n / 10)] + ' '; n %= 10; }
+                      if (n > 0) { result += ones[n] + ' '; }
+                      return result;
+                    };
+                    const convertNumber = (n: number): string => {
+                      if (n === 0) return '';
+                      let result = '';
+                      let scaleIndex = 0;
+                      while (n > 0) {
+                        const chunk = n % 1000;
+                        if (chunk > 0) { result = convertHundreds(chunk) + scales[scaleIndex] + ' ' + result; }
+                        n = Math.floor(n / 1000);
+                        scaleIndex++;
+                      }
+                      return result.trim();
+                    };
+                    let words = convertNumber(intPart) + ' Dinars';
+                    if (decPart > 0) { words += ' and ' + convertNumber(decPart) + ' Fils'; }
+                    words += ' only';
+                    return words;
+                  };
+                  
+                  const amountInWords = numberToWords(invAmt);
+                  const formatDate = (d: string) => {
+                    const date = new Date(d);
+                    return date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+                  };
+                  const formatTime = () => new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hour12: true });
+                  
                   printWindow.document.write(`
                     <!DOCTYPE html>
                     <html>
                     <head>
-                      <title>Sales Invoice</title>
+                      <title>Credit Invoice ${invoiceNumber || "N/A"} - Iqbal Electronics</title>
                       <style>
-                        @page { size: 80mm auto; margin: 0; }
+                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
                         * { margin: 0; padding: 0; box-sizing: border-box; }
-                        html, body { height: auto; min-height: 0; }
-                        body { font-family: 'Courier New', monospace; font-size: 10pt; width: 80mm; line-height: 1.3; }
-                        .receipt { width: 80mm; padding: 2mm 3mm; }
-                        .header { text-align: center; padding-bottom: 2mm; border-bottom: 1px dashed #000; margin-bottom: 2mm; }
-                        .company-name { font-size: 12pt; font-weight: bold; }
-                        .company-sub { font-size: 8pt; }
-                        .doc-type { font-size: 10pt; font-weight: bold; margin-top: 1mm; }
-                        .info { margin-bottom: 2mm; font-size: 9pt; }
-                        .info-row { display: flex; justify-content: space-between; padding: 1mm 0; }
-                        .items { border-top: 1px dashed #000; border-bottom: 1px dashed #000; padding: 2mm 0; margin: 2mm 0; }
-                        .item-row { margin-bottom: 2mm; font-size: 9pt; }
-                        .item-name { font-weight: bold; }
-                        .item-details { text-align: right; }
-                        .balance-section { font-size: 8pt; margin: 2mm 0; padding: 2mm 0; border-bottom: 1px dashed #000; }
-                        .balance-row { display: flex; justify-content: space-between; padding: 0.5mm 0; }
-                        .total-box { text-align: center; padding: 2mm; margin: 2mm 0; background: #000; color: #fff; }
-                        .total-label { font-size: 8pt; }
-                        .total-value { font-size: 14pt; font-weight: bold; }
-                        .footer { text-align: center; padding-top: 2mm; font-size: 8pt; }
-                        @media print { html, body { height: auto; } body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+                        body { font-family: 'Inter', Arial, sans-serif; background: #fff; color: #000; line-height: 1.4; font-size: 12px; }
+                        .invoice-container { max-width: 850px; margin: 0 auto; padding: 20px 30px; }
+                        .top-title { text-align: center; margin-bottom: 15px; }
+                        .top-title h1 { font-size: 16px; font-weight: 600; text-decoration: underline; display: inline-block; }
+                        .header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+                        .logo-section { text-align: left; }
+                        .logo-section .iec-text { font-size: 48px; font-weight: 700; color: #1a1a2e; letter-spacing: 2px; margin-bottom: 2px; }
+                        .logo-section .arabic-text { font-size: 12px; color: #333; direction: rtl; }
+                        .company-section { text-align: right; }
+                        .company-section .company-name { font-size: 18px; font-weight: 600; color: #1a1a2e; font-style: italic; }
+                        .company-section .phone { font-size: 12px; color: #333; margin-top: 4px; }
+                        .second-title { text-align: center; margin: 20px 0; font-size: 16px; font-weight: 600; }
+                        .info-row { display: flex; justify-content: space-between; margin-bottom: 20px; }
+                        .bill-to-section { flex: 1; }
+                        .bill-to-section .label { font-weight: 600; margin-bottom: 5px; }
+                        .bill-to-section .value { font-size: 12px; margin-bottom: 3px; }
+                        .invoice-details-section { text-align: right; }
+                        .invoice-details-section .title { font-weight: 600; margin-bottom: 5px; }
+                        .invoice-details-section .detail-row { font-size: 12px; margin-bottom: 3px; }
+                        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+                        .items-table thead tr { background: #8B7CB3; color: #fff; }
+                        .items-table th { padding: 8px 10px; text-align: left; font-size: 11px; font-weight: 600; border: 1px solid #8B7CB3; }
+                        .items-table th.text-center { text-align: center; }
+                        .items-table th.text-right { text-align: right; }
+                        .items-table td { padding: 8px 10px; border: 1px solid #ddd; font-size: 11px; vertical-align: middle; }
+                        .items-table td.text-center { text-align: center; }
+                        .items-table td.text-right { text-align: right; }
+                        .items-table .total-row { font-weight: 600; background: #f9f9f9; }
+                        .bottom-section { display: flex; margin-top: 0; }
+                        .left-column { flex: 1; }
+                        .right-column { width: 300px; }
+                        .section-header { background: #8B7CB3; color: #fff; padding: 6px 10px; font-size: 11px; font-weight: 600; }
+                        .section-content { padding: 8px 10px; border: 1px solid #ddd; border-top: none; font-size: 11px; min-height: 30px; }
+                        .amounts-table { width: 100%; border-collapse: collapse; }
+                        .amounts-table td { padding: 6px 10px; border: 1px solid #ddd; font-size: 11px; }
+                        .amounts-table td:first-child { background: #f9f9f9; }
+                        .amounts-table td:last-child { text-align: right; }
+                        .amounts-header { background: #8B7CB3; color: #fff; padding: 6px 10px; font-size: 11px; font-weight: 600; }
+                        .balance-row td { padding: 6px 10px; border: 1px solid #ddd; font-size: 11px; }
+                        .balance-row td:first-child { background: #f9f9f9; }
+                        .balance-row td:last-child { text-align: right; }
+                        @media print {
+                          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                          .invoice-container { padding: 15px; }
+                          .items-table thead tr { background: #8B7CB3 !important; }
+                          .section-header { background: #8B7CB3 !important; }
+                          .amounts-header { background: #8B7CB3 !important; }
+                        }
+                        @page { margin: 0.5cm; }
                       </style>
                     </head>
                     <body>
-                      <div class="receipt">
-                        <div class="header">
-                          ${logoBase64 ? `<img src="${logoBase64}" style="height: 40px; width: auto; margin-bottom: 2mm;" alt="IEC" />` : `<div class="company-name">Iqbal Electronics Co.</div><div class="company-sub">WLL</div>`}
-                          <div class="doc-type">Sales Invoice</div>
+                      <div class="invoice-container">
+                        <div class="top-title"><h1>Credit Invoice</h1></div>
+                        <div class="header-row">
+                          <div class="logo-section">
+                            ${logoBase64 ? `<img src="${logoBase64}" style="height: 60px; width: auto;" alt="IEC" />` : `<div class="iec-text">IEC</div>`}
+                            <div class="arabic-text">شركة إقبال للأجهزة إلكترونية ذ.م.م</div>
+                          </div>
+                          <div class="company-section">
+                            <div class="company-name">Iqbal Electronics Co. WLL</div>
+                            <div class="phone">Phone no.: +965 55584488</div>
+                          </div>
                         </div>
-                        <div class="info">
-                          <div class="info-row"><span>Date:</span><span>${saleDate}</span></div>
-                          <div class="info-row"><span>Invoice:</span><span style="font-weight:bold">${invoiceNumber || "N/A"}</span></div>
-                          <div class="info-row"><span>Customer:</span><span>${customerName}</span></div>
+                        <div class="second-title">Credit Invoice</div>
+                        <div class="info-row">
+                          <div class="bill-to-section">
+                            <div class="label">Bill To</div>
+                            <div class="value"><strong>${customerName}</strong></div>
+                            <div class="value">Kuwait</div>
+                            <div class="value">Contact No. : ${customerPhone}</div>
+                          </div>
+                          <div class="invoice-details-section">
+                            <div class="title">Invoice Details</div>
+                            <div class="detail-row">Invoice No. : ${invoiceNumber || "N/A"}</div>
+                            <div class="detail-row">Date : ${formatDate(saleDate)}</div>
+                            <div class="detail-row">Time : ${formatTime()}</div>
+                          </div>
                         </div>
-                        <div class="items">${itemRows}</div>
-                        ${customerId ? `<div class="balance-section"><div class="balance-row"><span>Previous Balance:</span><span>${prevBal.toFixed(3)} KWD</span></div><div class="balance-row"><span>Invoice Amount:</span><span>${invAmt.toFixed(3)} KWD</span></div></div>` : ''}
-                        <div class="total-box">
-                          <div class="total-label">${customerId ? 'Current Balance' : 'Total Amount'}</div>
-                          <div class="total-value">${customerId ? currBal.toFixed(3) : totalKwd} KWD</div>
+                        <table class="items-table">
+                          <thead>
+                            <tr>
+                              <th style="width: 30px;" class="text-center">#</th>
+                              <th>Item name</th>
+                              <th style="width: 120px;">Item Code</th>
+                              <th style="width: 60px;" class="text-center">Quantity</th>
+                              <th style="width: 80px;" class="text-right">Price/ Unit</th>
+                              <th style="width: 50px;" class="text-center">VAT %</th>
+                              <th style="width: 80px;" class="text-right">Final Rate</th>
+                              <th style="width: 90px;" class="text-right">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            ${validItems.map((li, idx) => {
+                              const item = items.find(i => i.name === li.itemName);
+                              return `<tr>
+                                <td class="text-center">${idx + 1}</td>
+                                <td>${li.itemName}${li.imeiNumbers && li.imeiNumbers.length > 0 ? `<br><small style="color:#666;">IMEI: ${li.imeiNumbers.join(", ")}</small>` : ""}</td>
+                                <td>${item?.itemCode || "—"}</td>
+                                <td class="text-center">${li.quantity}</td>
+                                <td class="text-right">KWD ${parseFloat(li.priceKwd || "0").toFixed(1)}</td>
+                                <td class="text-center">0%</td>
+                                <td class="text-right">KWD ${parseFloat(li.priceKwd || "0").toFixed(1)}</td>
+                                <td class="text-right">KWD ${parseFloat(li.totalKwd || "0").toFixed(1)}</td>
+                              </tr>`;
+                            }).join("")}
+                            <tr class="total-row">
+                              <td></td>
+                              <td><strong>Total</strong></td>
+                              <td></td>
+                              <td class="text-center">${totalQty}</td>
+                              <td></td>
+                              <td></td>
+                              <td></td>
+                              <td class="text-right"><strong>KWD ${invAmt.toFixed(1)}</strong></td>
+                            </tr>
+                          </tbody>
+                        </table>
+                        <div class="bottom-section">
+                          <div class="left-column">
+                            <div class="section-header">Invoice Amount in Words</div>
+                            <div class="section-content">${amountInWords}</div>
+                            <div class="section-header">Payment mode</div>
+                            <div class="section-content">Credit</div>
+                            <div class="section-header">Terms and Conditions</div>
+                            <div class="section-content">Thanks for Shopping<br>Signature</div>
+                          </div>
+                          <div class="right-column">
+                            <div class="amounts-header">Amounts</div>
+                            <table class="amounts-table">
+                              <tr><td>Sub Total</td><td>KWD ${invAmt.toFixed(1)}</td></tr>
+                              <tr><td>Total</td><td>KWD ${invAmt.toFixed(1)}</td></tr>
+                              <tr><td>Balance</td><td>KWD ${invAmt.toFixed(1)}</td></tr>
+                            </table>
+                            <table class="amounts-table" style="margin-top: 10px;">
+                              <tr class="balance-row"><td>Previous Balance</td><td>KWD ${prevBal.toFixed(2)}</td></tr>
+                              <tr class="balance-row"><td>Current Balance</td><td>KWD ${customerId ? currBal.toFixed(2) : invAmt.toFixed(2)}</td></tr>
+                            </table>
+                          </div>
                         </div>
-                        <div class="footer">Thank You!</div>
                       </div>
+                      <script>window.onload = function() { setTimeout(function() { window.print(); }, 300); }</script>
                     </body>
                     </html>
                   `);
                   printWindow.document.close();
-                  printWindow.print();
                 }
               }}
               data-testid="button-print-sales"
