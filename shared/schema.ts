@@ -51,8 +51,10 @@ export const suppliers = pgTable("suppliers", {
   phone: text("phone"),
   partyType: text("party_type").default("supplier").notNull(),
   creditLimit: numeric("credit_limit", { precision: 12, scale: 3 }),
+  area: text("area"),
 }, (table) => [
   index("idx_supplier_party_type").on(table.partyType),
+  index("idx_supplier_area").on(table.area),
 ]);
 
 export const suppliersRelations = relations(suppliers, ({ many }) => ({

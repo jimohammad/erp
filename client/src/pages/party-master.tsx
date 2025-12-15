@@ -36,7 +36,8 @@ export default function PartyMaster() {
   const [partyName, setPartyName] = useState("");
   const [partyAddress, setPartyAddress] = useState("");
   const [partyPhone, setPartyPhone] = useState("");
-  const [partyType, setPartyType] = useState<PartyType>("supplier");
+  const [partyType, setPartyType] = useState<PartyType>("customer");
+  const [partyArea, setPartyArea] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [partyToDelete, setPartyToDelete] = useState<Supplier | null>(null);
@@ -56,8 +57,9 @@ export default function PartyMaster() {
     setPartyName("");
     setPartyAddress("");
     setPartyPhone("");
-    setPartyType("supplier");
+    setPartyType("customer");
     setCreditLimit("");
+    setPartyArea("");
   };
 
   useEffect(() => {
@@ -67,11 +69,12 @@ export default function PartyMaster() {
       setPartyPhone(editingParty.phone || "");
       setPartyType((editingParty.partyType as PartyType) || "supplier");
       setCreditLimit(editingParty.creditLimit || "");
+      setPartyArea(editingParty.area || "");
     }
   }, [editingParty]);
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; address: string | null; phone: string | null; partyType: PartyType; creditLimit: string | null }) => 
+    mutationFn: (data: { name: string; address: string | null; phone: string | null; partyType: PartyType; creditLimit: string | null; area: string | null }) => 
       apiRequest("POST", "/api/suppliers", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
@@ -85,7 +88,7 @@ export default function PartyMaster() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name: string; address: string | null; phone: string | null; partyType: PartyType; creditLimit: string | null } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { name: string; address: string | null; phone: string | null; partyType: PartyType; creditLimit: string | null; area: string | null } }) =>
       apiRequest("PUT", `/api/suppliers/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
@@ -133,6 +136,7 @@ export default function PartyMaster() {
       phone: partyPhone.trim() || null,
       partyType,
       creditLimit: partyType === "customer" && creditLimit.trim() ? creditLimit.trim() : null,
+      area: partyType === "customer" && partyArea.trim() ? partyArea.trim() : null,
     };
 
     if (editingParty) {
@@ -242,6 +246,21 @@ export default function PartyMaster() {
                 </div>
                 {partyType === "customer" && (
                   <div className="space-y-2">
+                    <Label htmlFor="partyArea">Area</Label>
+                    <Input
+                      id="partyArea"
+                      value={partyArea}
+                      onChange={(e) => setPartyArea(e.target.value)}
+                      placeholder="Enter area (e.g., Salmiya, Hawalli)"
+                      data-testid="input-party-area"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {partyType === "customer" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
                     <Label htmlFor="creditLimit">Credit Limit (KWD)</Label>
                     <Input
                       id="creditLimit"
@@ -254,8 +273,8 @@ export default function PartyMaster() {
                       data-testid="input-credit-limit"
                     />
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-end">
                 <Button
@@ -323,6 +342,7 @@ export default function PartyMaster() {
                     <TableHead>Party Name</TableHead>
                     <TableHead className="w-28">Type</TableHead>
                     <TableHead>Address</TableHead>
+                    <TableHead className="w-28">Area</TableHead>
                     <TableHead className="w-36">Phone</TableHead>
                     <TableHead className="w-32 text-right">Credit Limit</TableHead>
                     {isAdmin && <TableHead className="w-24 text-right">Actions</TableHead>}
@@ -347,6 +367,9 @@ export default function PartyMaster() {
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground" data-testid={`text-party-address-${party.id}`}>
                         {party.address || "-"}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground" data-testid={`text-party-area-${party.id}`}>
+                        {party.area || "-"}
                       </TableCell>
                       <TableCell className="text-sm" data-testid={`text-party-phone-${party.id}`}>
                         {party.phone || "-"}
