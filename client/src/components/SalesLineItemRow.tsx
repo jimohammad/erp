@@ -40,6 +40,23 @@ export function SalesLineItemRow({
   const [imeiDialogOpen, setImeiDialogOpen] = useState(false);
   const [newImei, setNewImei] = useState("");
   const [imeiError, setImeiError] = useState("");
+  const [priceError, setPriceError] = useState("");
+
+  // Get the minimum selling price for the selected item
+  const selectedItemData = items.find((itm) => itm.name === item.itemName);
+  const minPrice = selectedItemData?.sellingPriceKwd ? parseFloat(selectedItemData.sellingPriceKwd) : 0;
+
+  const handlePriceChange = (value: string) => {
+    const price = parseFloat(value) || 0;
+    
+    if (item.itemName && minPrice > 0 && price < minPrice) {
+      setPriceError(`Min price: ${minPrice.toFixed(3)} KWD`);
+    } else {
+      setPriceError("");
+    }
+    
+    onChange(item.id, "priceKwd", value);
+  };
 
   const handleQuantityChange = (value: string) => {
     const qty = parseInt(value) || 0;
@@ -48,6 +65,7 @@ export function SalesLineItemRow({
 
   const handleItemChange = (itemName: string) => {
     onChange(item.id, "itemName", itemName === "none" ? "" : itemName);
+    setPriceError(""); // Clear price error when item changes
     
     if (itemName && itemName !== "none") {
       const selectedItem = items.find((itm) => itm.name === itemName);
@@ -155,15 +173,23 @@ export function SalesLineItemRow({
           })()}
         </div>
         
-        <div className="w-20">
+        <div className="w-24">
           <Input
-            type="text"
-            readOnly
-            value={item.priceKwd ? `${item.priceKwd}` : ""}
-            className="text-center text-sm bg-muted/50"
+            type="number"
+            step="0.001"
+            min="0"
+            value={item.priceKwd || ""}
+            onChange={(e) => handlePriceChange(e.target.value)}
+            className={`text-center text-sm ${priceError ? "border-destructive bg-destructive/10" : ""}`}
             placeholder="KWD"
+            title={priceError || ""}
             data-testid={`input-sales-price-${index}`}
           />
+          {priceError && (
+            <p className="text-xs text-destructive mt-0.5" data-testid={`text-price-error-${index}`}>
+              {priceError}
+            </p>
+          )}
         </div>
         
         <div className="w-24">

@@ -120,6 +120,17 @@ export function SalesOrderForm({
     });
   }, [lineItems, stockMap]);
 
+  // Check if any line item has a price below the minimum selling price
+  const pricesBelowMinimum = useMemo(() => {
+    return lineItems.some((li) => {
+      if (!li.itemName) return false;
+      const itemData = items.find((itm) => itm.name === li.itemName);
+      const minPrice = itemData?.sellingPriceKwd ? parseFloat(itemData.sellingPriceKwd) : 0;
+      const currentPrice = parseFloat(li.priceKwd) || 0;
+      return minPrice > 0 && currentPrice < minPrice;
+    });
+  }, [lineItems, items]);
+
   const canSubmit = useMemo(() => {
     if (creditLimitInfo.exceeded && !isAdmin) {
       return false;
@@ -127,8 +138,11 @@ export function SalesOrderForm({
     if (stockExceeded) {
       return false;
     }
+    if (pricesBelowMinimum) {
+      return false;
+    }
     return true;
-  }, [creditLimitInfo.exceeded, isAdmin, stockExceeded]);
+  }, [creditLimitInfo.exceeded, isAdmin, stockExceeded, pricesBelowMinimum]);
 
   const handleLineItemChange = (id: string, field: keyof SalesLineItemData, value: string | number | string[]) => {
     setLineItems(prev => prev.map(item => {
@@ -301,6 +315,15 @@ export function SalesOrderForm({
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
                 Quantity exceeds available stock. Please reduce the quantity or select a different item.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {pricesBelowMinimum && (
+            <Alert variant="destructive" data-testid="alert-price-below-minimum">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                One or more items have a price below the minimum selling price. Please adjust the prices to continue.
               </AlertDescription>
             </Alert>
           )}
