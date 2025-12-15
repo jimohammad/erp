@@ -3,6 +3,25 @@ import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
 
+// Environment variable validation for production
+function validateEnvironment(): void {
+  const requiredVars = ["DATABASE_URL"];
+  const missing = requiredVars.filter(v => !process.env[v]);
+  
+  if (missing.length > 0) {
+    console.error(`[FATAL] Missing required environment variables: ${missing.join(", ")}`);
+    process.exit(1);
+  }
+  
+  // Warn about optional but recommended vars
+  if (!process.env.SESSION_SECRET) {
+    console.warn("[WARN] SESSION_SECRET not set - using default (not recommended for production)");
+  }
+}
+
+// Run validation on startup
+validateEnvironment();
+
 const app = express();
 const httpServer = createServer(app);
 
@@ -60,14 +79,20 @@ app.use((req, res, next) => {
 });
 
 (async () => {
-  await registerRoutes(httpServer, app);
+  try {
+    log("Initializing routes...", "startup");
+    await registerRoutes(httpServer, app);
+    log("Routes initialized successfully", "startup");
+  } catch (error) {
+    console.error("[FATAL] Failed to initialize routes:", error);
+    process.exit(1);
+  }
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
+    console.error(`[ERROR] ${err.message}`, err.stack);
     res.status(status).json({ message });
-    throw err;
   });
 
   // importantly only setup vite in development and after
@@ -93,6 +118,17 @@ app.use((req, res, next) => {
     },
     () => {
       log(`serving on port ${port}`);
+      
+      // Start backup scheduler AFTER server is accepting requests (non-blocking)
+      setImmediate(async () => {
+        try {
+          const { startBackupScheduler } = await import("./backupScheduler");
+          startBackupScheduler();
+        } catch (error) {
+          console.error("[WARN] Failed to start backup scheduler:", error);
+          // Don't crash the server - backup is optional functionality
+        }
+      });
     },
   );
 })();
