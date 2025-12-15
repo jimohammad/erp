@@ -29,6 +29,21 @@ export async function registerRoutes(
     }
   });
 
+  app.put("/api/auth/user/printer-type", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { printerType } = req.body;
+      if (!printerType || !["thermal", "a4laser"].includes(printerType)) {
+        return res.status(400).json({ error: "Invalid printer type. Must be 'thermal' or 'a4laser'" });
+      }
+      const user = await storage.updateUserPrinterType(userId, printerType);
+      res.json(user);
+    } catch (error) {
+      console.error("Error updating printer type:", error);
+      res.status(500).json({ message: "Failed to update printer type" });
+    }
+  });
+
   app.get("/api/suppliers", isAuthenticated, async (req, res) => {
     try {
       const suppliers = await storage.getSuppliers();

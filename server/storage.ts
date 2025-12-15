@@ -107,6 +107,7 @@ import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  updateUserPrinterType(id: string, printerType: string): Promise<User | undefined>;
   getSuppliers(): Promise<Supplier[]>;
   getSupplier(id: number): Promise<Supplier | undefined>;
   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
@@ -340,6 +341,15 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async updateUserPrinterType(id: string, printerType: string): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({ printerType, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return updated || undefined;
   }
 
   async getSuppliers(): Promise<Supplier[]> {

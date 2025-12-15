@@ -1,17 +1,18 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import companyLogoUrl from "@/assets/company-logo.jpg";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Printer, Smartphone, FileDown, Send, Loader2 } from "lucide-react";
+import { Printer, Smartphone, FileDown, Send, Loader2, ChevronDown, FileText } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { SalesOrderWithDetails } from "@shared/schema";
+import type { SalesOrderWithDetails, User } from "@shared/schema";
 
 interface SalesOrderDetailProps {
   open: boolean;
@@ -45,6 +46,23 @@ export function SalesOrderDetail({
   const { data: balanceData } = useQuery<{ previousBalance: number; currentBalance: number }>({
     queryKey: ["/api/customer-balance-for-sale", order?.id],
     enabled: open && !!order?.id && !!order?.customerId,
+  });
+
+  // Get user's printer preference
+  const { data: userData } = useQuery<User>({
+    queryKey: ["/api/auth/user"],
+  });
+  
+  const userPrinterType = userData?.printerType || "thermal";
+
+  // Mutation to update printer preference
+  const updatePrinterMutation = useMutation({
+    mutationFn: async (printerType: string) => {
+      return apiRequest("PUT", "/api/auth/user/printer-type", { printerType });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
   });
 
   const sendWhatsAppMutation = useMutation({
@@ -152,12 +170,95 @@ export function SalesOrderDetail({
     });
   };
 
+  // Thermal printer print function (80mm receipt)
+  const printThermal = () => {
+    const customerName = order.customer?.name || "Walk-in Customer";
+    const previousBalance = balanceData?.previousBalance || 0;
+    const invoiceAmount = parseFloat(order.totalKwd || "0");
+    const currentBalance = balanceData?.currentBalance || (previousBalance + invoiceAmount);
+    
+    const printWindow = window.open("", "_blank", "width=350,height=600");
+    if (!printWindow) return;
+    
+    const itemsHtml = order.lineItems.map(li => `
+      <tr>
+        <td style="text-align:left;padding:2px 0;">${li.itemName}</td>
+        <td style="text-align:center;padding:2px 0;">${li.quantity}</td>
+        <td style="text-align:right;padding:2px 0;">${parseFloat(li.priceKwd || "0").toFixed(3)}</td>
+        <td style="text-align:right;padding:2px 0;">${li.totalKwd}</td>
+      </tr>
+    `).join("");
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice ${order.invoiceNumber || order.id}</title>
+        <style>
+          @page { size: 80mm auto; margin: 0; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            font-family: 'Courier New', monospace; 
+            font-size: 12px; 
+            width: 80mm; 
+            padding: 5mm;
+            color: #000;
+          }
+          .header { text-align: center; margin-bottom: 10px; }
+          .company { font-size: 14px; font-weight: bold; }
+          .divider { border-top: 1px dashed #000; margin: 8px 0; }
+          .info-row { display: flex; justify-content: space-between; margin: 3px 0; }
+          table { width: 100%; border-collapse: collapse; }
+          th { text-align: left; border-bottom: 1px solid #000; padding: 3px 0; font-size: 11px; }
+          .totals { margin-top: 10px; }
+          .totals .row { display: flex; justify-content: space-between; padding: 2px 0; }
+          .totals .total-row { font-weight: bold; font-size: 14px; border-top: 1px solid #000; padding-top: 5px; }
+          .footer { text-align: center; margin-top: 15px; font-size: 14px; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company">Iqbal Electronics Co. WLL</div>
+        </div>
+        <div class="divider"></div>
+        <div class="info-row"><span>Date:</span><span>${formatDateForInvoice(order.saleDate)}</span></div>
+        <div class="info-row"><span>Invoice:</span><span>${order.invoiceNumber || order.id}</span></div>
+        <div class="info-row"><span>Customer:</span><span>${customerName}</span></div>
+        <div class="divider"></div>
+        <table>
+          <thead>
+            <tr>
+              <th style="text-align:left;">Item</th>
+              <th style="text-align:center;">Qty</th>
+              <th style="text-align:right;">Price</th>
+              <th style="text-align:right;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+        </table>
+        <div class="divider"></div>
+        <div class="totals">
+          <div class="row"><span>Previous Balance:</span><span>${previousBalance.toFixed(3)} KWD</span></div>
+          <div class="row"><span>Invoice Amount:</span><span>${invoiceAmount.toFixed(3)} KWD</span></div>
+          <div class="row total-row"><span>Current Balance:</span><span>${currentBalance.toFixed(3)} KWD</span></div>
+        </div>
+        <div class="divider"></div>
+        <div class="footer">Thank You!</div>
+        <script>window.onload = function() { window.print(); }</script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   const handlePrint = () => {
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
     const subtotal = order.lineItems.reduce((sum, item) => sum + (parseFloat(item.totalKwd || "0")), 0);
-    const totalQuantity = order.lineItems.reduce((sum, item) => sum + item.quantity, 0);
+    const totalQuantity = order.lineItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
     const amountInWords = numberToWords(subtotal);
 
     printWindow.document.write(`
@@ -454,7 +555,7 @@ export function SalesOrderDetail({
                   <tr>
                     <td class="text-center">${index + 1}</td>
                     <td>${item.itemName}${item.imeiNumbers && item.imeiNumbers.length > 0 ? `<br><small style="color:#666;">IMEI: ${item.imeiNumbers.join(", ")}</small>` : ""}</td>
-                    <td>${item.itemCode || "—"}</td>
+                    <td>—</td>
                     <td class="text-center">${item.quantity}</td>
                     <td class="text-right">KWD ${formatNumber(item.priceKwd, 1)}</td>
                     <td class="text-center">0%</td>
@@ -869,7 +970,7 @@ export function SalesOrderDetail({
                   <tr>
                     <td class="text-center">${index + 1}</td>
                     <td>${item.itemName}${item.imeiNumbers && item.imeiNumbers.length > 0 ? `<br><small style="color:#666;">IMEI: ${item.imeiNumbers.join(", ")}</small>` : ""}</td>
-                    <td>${item.itemCode || "—"}</td>
+                    <td>—</td>
                     <td class="text-center">${item.quantity}</td>
                     <td class="text-right">KWD ${formatNumber(item.priceKwd, 1)}</td>
                     <td class="text-center">0%</td>
@@ -974,15 +1075,39 @@ export function SalesOrderDetail({
         <DialogHeader className="flex flex-row items-center justify-between gap-4">
           <DialogTitle data-testid="dialog-title-so-detail">Sales Invoice Details</DialogTitle>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handlePrint}
-              data-testid="button-print-invoice"
-            >
-              <Printer className="h-4 w-4 mr-1" />
-              Print
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" data-testid="button-print-invoice">
+                  <Printer className="h-4 w-4 mr-1" />
+                  Print ({userPrinterType === "thermal" ? "Thermal" : "A4"})
+                  <ChevronDown className="h-4 w-4 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (userPrinterType !== "thermal") updatePrinterMutation.mutate("thermal");
+                    printThermal();
+                  }}
+                  data-testid="menu-print-thermal"
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Thermal (80mm)
+                  {userPrinterType === "thermal" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (userPrinterType !== "a4laser") updatePrinterMutation.mutate("a4laser");
+                    handlePrint();
+                  }}
+                  data-testid="menu-print-a4"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  A4 Laser
+                  {userPrinterType === "a4laser" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               variant="outline"
               size="sm"
