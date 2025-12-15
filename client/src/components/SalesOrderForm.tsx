@@ -281,7 +281,7 @@ export function SalesOrderForm({
   const printA4Laser = () => {
     const customerName = selectedCustomer?.name || "Walk-in Customer";
     const customerPhone = selectedCustomer?.phone || "";
-    const customerAddress = selectedCustomer?.address || "";
+    const customerAddress = "";
     const previousBalance = customerBalance?.balance || 0;
     const invoiceAmount = parseFloat(totalKwd) || 0;
     const currentBalance = previousBalance + invoiceAmount;
