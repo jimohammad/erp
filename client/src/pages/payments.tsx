@@ -302,125 +302,197 @@ export default function PaymentsPage() {
     }
   };
 
-  const handlePrintPayment = (payment: PaymentWithDetails) => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
+  const handlePrintPayment = async (payment: PaymentWithDetails) => {
     const partyName = payment.direction === "IN" 
       ? payment.customer?.name || "Not specified"
       : payment.supplier?.name || "Not specified";
+    const partyPhone = payment.direction === "IN"
+      ? payment.customer?.phone || ""
+      : "";
     const partyLabel = payment.direction === "IN" ? "Received From" : "Paid To";
+
+    let currentBalance = 0;
+    let previousBalance = 0;
+    const paymentAmount = parseFloat(payment.amount);
+
+    if (payment.direction === "IN" && payment.customerId) {
+      try {
+        const res = await fetch(`/api/customers/${payment.customerId}/balance`, {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          currentBalance = data.balance || 0;
+          previousBalance = currentBalance + paymentAmount;
+        }
+      } catch (e) {
+        console.error("Failed to fetch customer balance:", e);
+      }
+    }
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const now = new Date();
+    const receiptTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
 
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>Payment Receipt</title>
+          <title>Payment Receipt Voucher</title>
           <style>
             @page {
-              size: 80mm auto;
-              margin: 0;
+              size: A4;
+              margin: 10mm;
             }
             
             * { margin: 0; padding: 0; box-sizing: border-box; }
             
             body { 
-              font-family: 'Courier New', monospace;
+              font-family: 'Segoe UI', Arial, sans-serif;
               background: #fff;
               color: #000;
-              line-height: 1.3;
-              font-size: 10pt;
-              width: 80mm;
-              margin: 0;
-              padding: 0;
+              line-height: 1.4;
+              font-size: 11pt;
             }
             
             .receipt {
-              max-width: 68mm;
+              max-width: 210mm;
               margin: 0 auto;
-              padding: 3mm 2mm;
-              overflow-wrap: anywhere;
-              word-break: break-word;
+              padding: 5mm;
+            }
+            
+            .voucher-title {
+              text-align: center;
+              font-size: 14pt;
+              font-weight: bold;
+              margin-bottom: 5mm;
+              color: #333;
             }
             
             .header {
-              text-align: center;
-              padding-bottom: 2mm;
-              border-bottom: 1px dashed #000;
-              margin-bottom: 2mm;
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              padding-bottom: 4mm;
+              border-bottom: 2px solid #666;
+              margin-bottom: 5mm;
             }
             
-            .company-name {
+            .company-info {
+              text-align: left;
+            }
+            
+            .company-logo {
+              font-size: 24pt;
+              font-weight: bold;
+              color: #333;
+            }
+            
+            .company-arabic {
+              font-size: 9pt;
+              color: #666;
+            }
+            
+            .company-contact {
+              text-align: right;
+            }
+            
+            .company-name-right {
               font-size: 12pt;
               font-weight: bold;
             }
             
-            .company-sub {
-              font-size: 8pt;
-            }
-            
-            .badge {
-              display: inline-block;
-              margin-top: 2mm;
-              padding: 1mm 3mm;
-              font-size: 9pt;
-              font-weight: bold;
-              border: 1px solid #000;
-            }
-            
-            .details {
-              margin-bottom: 2mm;
-            }
-            
-            .row {
-              display: flex;
-              justify-content: space-between;
-              gap: 2mm;
-              padding: 1mm 0;
-              font-size: 9pt;
-            }
-            
-            .row-label {
+            .phone-no {
+              font-size: 10pt;
               color: #333;
-              flex-shrink: 0;
             }
             
-            .row-value {
-              font-weight: bold;
-              text-align: right;
-              overflow-wrap: anywhere;
-            }
-            
-            .amount-box {
+            .main-title {
               text-align: center;
-              padding: 3mm 0;
-              margin: 2mm 0;
-              border-top: 1px dashed #000;
-              border-bottom: 1px dashed #000;
-            }
-            
-            .amount-label {
-              font-size: 8pt;
-              text-transform: uppercase;
-            }
-            
-            .amount-value {
               font-size: 16pt;
               font-weight: bold;
+              margin: 5mm 0;
+              color: #333;
             }
             
-            .notes {
-              font-size: 8pt;
-              padding: 2mm;
-              background: #f0f0f0;
+            .content-section {
+              display: flex;
+              justify-content: space-between;
+              margin-bottom: 5mm;
+            }
+            
+            .left-section {
+              width: 55%;
+            }
+            
+            .right-section {
+              width: 40%;
+              text-align: right;
+            }
+            
+            .section-title {
+              font-weight: bold;
+              font-size: 10pt;
+              color: #333;
+              margin-bottom: 1mm;
+            }
+            
+            .party-name {
+              font-size: 12pt;
+              font-weight: bold;
               margin-bottom: 2mm;
+            }
+            
+            .party-details {
+              font-size: 10pt;
+              color: #333;
+            }
+            
+            .receipt-details {
+              font-size: 10pt;
+            }
+            
+            .receipt-details div {
+              margin-bottom: 1mm;
+            }
+            
+            .amounts-table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 5mm;
+            }
+            
+            .amounts-table th,
+            .amounts-table td {
+              padding: 3mm 4mm;
+              text-align: left;
+              font-size: 10pt;
+            }
+            
+            .amounts-table .header-row th {
+              background: #6b5b95;
+              color: white;
+              font-weight: bold;
+            }
+            
+            .amounts-table .data-row td {
+              border-bottom: 1px solid #ddd;
+            }
+            
+            .amounts-table .amount-col {
+              text-align: right;
+              width: 30%;
             }
             
             .footer {
               text-align: center;
-              padding-top: 2mm;
-              border-top: 1px dashed #000;
-              font-size: 8pt;
+              padding-top: 5mm;
+              margin-top: 5mm;
+              border-top: 1px solid #ddd;
+              font-size: 9pt;
+              color: #666;
             }
             
             @media print {
@@ -430,42 +502,88 @@ export default function PaymentsPage() {
         </head>
         <body>
           <div class="receipt">
+            <div class="voucher-title">Payment Receipt Voucher</div>
+            
             <div class="header">
-              <div class="company-name">Iqbal Electronics</div>
-              <div class="company-sub">Co. WLL - Kuwait</div>
-              <div class="badge">${payment.direction === "IN" ? "PAYMENT IN" : "PAYMENT OUT"}</div>
+              <div class="company-info">
+                <div class="company-logo">IEC</div>
+                <div class="company-arabic">شركة إقبال للأجهزة الإلكترونية ذ.م.م</div>
+              </div>
+              <div class="company-contact">
+                <div class="company-name-right">Iqbal Electronics Co. WLL</div>
+                <div class="phone-no">Phone no.: +965 55584488</div>
+              </div>
             </div>
             
-            <div class="details">
-              <div class="row">
-                <span class="row-label">Date:</span>
-                <span class="row-value">${formatDate(payment.paymentDate)}</span>
+            <div class="main-title">Payment Receipt Voucher</div>
+            
+            <div class="content-section">
+              <div class="left-section">
+                <div class="section-title">${partyLabel}</div>
+                <div class="party-name">${partyName}</div>
+                <div class="party-details">Kuwait</div>
+                ${partyPhone ? `<div class="party-details">Contact No.: ${partyPhone}</div>` : ""}
               </div>
-              <div class="row">
-                <span class="row-label">${partyLabel}:</span>
-                <span class="row-value">${partyName}</span>
+              <div class="right-section">
+                <div class="section-title">Receipt Details</div>
+                <div class="receipt-details">
+                  <div>Receipt No.: ${payment.id}</div>
+                  <div>Date: ${formatDate(payment.paymentDate)}</div>
+                  <div>Time: ${receiptTime}</div>
+                </div>
               </div>
-              <div class="row">
-                <span class="row-label">Method:</span>
-                <span class="row-value">${payment.paymentType}</span>
-              </div>
-              ${payment.reference ? `
-              <div class="row">
-                <span class="row-label">Ref:</span>
-                <span class="row-value">${payment.reference}</span>
-              </div>
-              ` : ""}
             </div>
             
-            <div class="amount-box">
-              <div class="amount-label">Amount ${payment.direction === "IN" ? "Received" : "Paid"}</div>
-              <div class="amount-value">${payment.direction === "OUT" ? "-" : ""}${parseFloat(payment.amount).toFixed(3)} KWD</div>
-            </div>
+            <table class="amounts-table">
+              <tr class="header-row">
+                <th>Amount in words</th>
+                <th class="amount-col">Amounts</th>
+              </tr>
+              <tr class="data-row">
+                <td>${numberToWords(paymentAmount)} Dinars only</td>
+                <td class="amount-col">${payment.direction === "IN" ? "Received" : "Paid"}</td>
+              </tr>
+              <tr class="data-row">
+                <td></td>
+                <td class="amount-col" style="font-weight: bold;">KWD ${paymentAmount.toFixed(3)}</td>
+              </tr>
+              ${payment.direction === "IN" ? `
+              <tr class="header-row">
+                <th>Payment mode</th>
+                <th class="amount-col"></th>
+              </tr>
+              <tr class="data-row">
+                <td>${payment.paymentType.toUpperCase()}</td>
+                <td class="amount-col">Previous Balance</td>
+              </tr>
+              <tr class="data-row">
+                <td></td>
+                <td class="amount-col" style="font-weight: bold;">KWD ${previousBalance.toFixed(3)}</td>
+              </tr>
+              <tr class="data-row">
+                <td></td>
+                <td class="amount-col">Current Balance</td>
+              </tr>
+              <tr class="data-row">
+                <td></td>
+                <td class="amount-col" style="font-weight: bold;">KWD ${currentBalance.toFixed(3)}</td>
+              </tr>
+              ` : `
+              <tr class="header-row">
+                <th>Payment mode</th>
+                <th class="amount-col"></th>
+              </tr>
+              <tr class="data-row">
+                <td>${payment.paymentType.toUpperCase()}</td>
+                <td class="amount-col"></td>
+              </tr>
+              `}
+            </table>
             
-            ${payment.notes ? `<div class="notes">Notes: ${payment.notes}</div>` : ""}
+            ${payment.notes ? `<div style="margin-top: 5mm; font-size: 10pt;"><strong>Notes:</strong> ${payment.notes}</div>` : ""}
             
             <div class="footer">
-              Thank You!<br/>
+              Thank You for your payment!<br/>
               Computer Generated Receipt
             </div>
           </div>
@@ -476,6 +594,46 @@ export default function PaymentsPage() {
     `);
 
     printWindow.document.close();
+  };
+
+  const numberToWords = (num: number): string => {
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const scales = ['', 'Thousand', 'Million'];
+    
+    if (num === 0) return 'Zero';
+    
+    const wholeNum = Math.floor(num);
+    if (wholeNum === 0) return 'Zero';
+    
+    let words = '';
+    let scaleIndex = 0;
+    let n = wholeNum;
+    
+    while (n > 0) {
+      const chunk = n % 1000;
+      if (chunk !== 0) {
+        let chunkWords = '';
+        const hundreds = Math.floor(chunk / 100);
+        const remainder = chunk % 100;
+        
+        if (hundreds > 0) {
+          chunkWords += ones[hundreds] + ' Hundred ';
+        }
+        
+        if (remainder < 20) {
+          chunkWords += ones[remainder];
+        } else {
+          chunkWords += tens[Math.floor(remainder / 10)] + ' ' + ones[remainder % 10];
+        }
+        
+        words = chunkWords.trim() + ' ' + scales[scaleIndex] + ' ' + words;
+      }
+      n = Math.floor(n / 1000);
+      scaleIndex++;
+    }
+    
+    return words.trim();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
