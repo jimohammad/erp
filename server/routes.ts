@@ -835,6 +835,34 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/reports/customer-trends/:customerId", isAuthenticated, async (req, res) => {
+    try {
+      const customerId = parseInt(req.params.customerId);
+      if (isNaN(customerId)) {
+        return res.status(400).json({ error: "Invalid customer ID" });
+      }
+      const trends = await storage.getCustomerMonthlyTrends(customerId);
+      res.json(trends);
+    } catch (error) {
+      console.error("Error fetching customer trends:", error);
+      res.status(500).json({ error: "Failed to fetch customer trends" });
+    }
+  });
+
+  app.get("/api/reports/customer-metrics/:customerId", isAuthenticated, async (req, res) => {
+    try {
+      const customerId = parseInt(req.params.customerId);
+      if (isNaN(customerId)) {
+        return res.status(400).json({ error: "Invalid customer ID" });
+      }
+      const metrics = await storage.getCustomerPaymentMetrics(customerId);
+      res.json(metrics);
+    } catch (error) {
+      console.error("Error fetching customer metrics:", error);
+      res.status(500).json({ error: "Failed to fetch customer metrics" });
+    }
+  });
+
   app.get("/api/reports/daily-cash-flow", isAuthenticated, async (req, res) => {
     try {
       const { startDate, endDate } = req.query;

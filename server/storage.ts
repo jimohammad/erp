@@ -986,6 +986,122 @@ export class DatabaseStorage implements IStorage {
     return result.rows as { customerId: number; customerName: string; current: number; days30: number; days60: number; days90Plus: number; totalBalance: number }[];
   }
 
+  // Get monthly sales and payments trend for a specific customer (last 12 months)
+  async getCustomerMonthlyTrends(customerId: number): Promise<{ month: string; sales: number; payments: number; balance: number }[]> {
+    const result = await db.execute(sql`
+      WITH months AS (
+        SELECT generate_series(
+          date_trunc('month', CURRENT_DATE - INTERVAL '11 months'),
+          date_trunc('month', CURRENT_DATE),
+          '1 month'::interval
+        )::date as month_start
+      ),
+      monthly_sales AS (
+        SELECT 
+          date_trunc('month', sale_date)::date as month_start,
+          COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as total_sales
+        FROM sales_orders
+        WHERE customer_id = ${customerId}
+          AND sale_date >= CURRENT_DATE - INTERVAL '12 months'
+        GROUP BY date_trunc('month', sale_date)
+      ),
+      monthly_payments AS (
+        SELECT 
+          date_trunc('month', payment_date)::date as month_start,
+          COALESCE(SUM(CAST(amount AS DECIMAL)), 0) as total_payments
+        FROM payments
+        WHERE customer_id = ${customerId}
+          AND direction = 'IN'
+          AND payment_date >= CURRENT_DATE - INTERVAL '12 months'
+        GROUP BY date_trunc('month', payment_date)
+      )
+      SELECT 
+        to_char(m.month_start, 'YYYY-MM') as month,
+        COALESCE(ms.total_sales, 0)::float as sales,
+        COALESCE(mp.total_payments, 0)::float as payments,
+        (COALESCE(ms.total_sales, 0) - COALESCE(mp.total_payments, 0))::float as balance
+      FROM months m
+      LEFT JOIN monthly_sales ms ON m.month_start = ms.month_start
+      LEFT JOIN monthly_payments mp ON m.month_start = mp.month_start
+      ORDER BY m.month_start
+    `);
+    return result.rows as { month: string; sales: number; payments: number; balance: number }[];
+  }
+
+  // Get payment behavior metrics for a specific customer
+  async getCustomerPaymentMetrics(customerId: number): Promise<{
+    avgDaysToPay: number;
+    paymentFrequency: number;
+    totalTransactions: number;
+    onTimePayments: number;
+    latePayments: number;
+    totalSalesAmount: number;
+    totalPaymentsAmount: number;
+    currentBalance: number;
+  }> {
+    const result = await db.execute(sql`
+      WITH customer_sales AS (
+        SELECT 
+          COUNT(*)::int as total_sales_count,
+          COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total_sales_amount,
+          MIN(sale_date::date) as first_sale_date
+        FROM sales_orders
+        WHERE customer_id = ${customerId}
+      ),
+      customer_payments AS (
+        SELECT 
+          COUNT(*)::int as total_payments_count,
+          COALESCE(SUM(CAST(amount AS DECIMAL)), 0)::float as total_payments_amount,
+          MIN(payment_date::date) as first_payment_date
+        FROM payments
+        WHERE customer_id = ${customerId} AND direction = 'IN'
+      ),
+      payment_timing AS (
+        SELECT 
+          AVG(
+            CASE 
+              WHEN p.payment_date IS NOT NULL AND so.sale_date IS NOT NULL 
+              THEN (p.payment_date::date - so.sale_date::date)
+              ELSE NULL 
+            END
+          )::float as avg_days_to_pay,
+          COUNT(CASE WHEN p.payment_date::date <= so.sale_date::date + 30 THEN 1 END)::int as on_time_count,
+          COUNT(CASE WHEN p.payment_date::date > so.sale_date::date + 30 THEN 1 END)::int as late_count
+        FROM sales_orders so
+        LEFT JOIN payments p ON p.customer_id = so.customer_id 
+          AND p.direction = 'IN'
+          AND p.payment_date::date >= so.sale_date::date
+        WHERE so.customer_id = ${customerId}
+      )
+      SELECT 
+        COALESCE(pt.avg_days_to_pay, 0)::float as "avgDaysToPay",
+        CASE 
+          WHEN cs.first_sale_date IS NOT NULL THEN 
+            (cp.total_payments_count::float / GREATEST((CURRENT_DATE - cs.first_sale_date) / 30.0, 1))
+          ELSE 0 
+        END as "paymentFrequency",
+        (cs.total_sales_count + cp.total_payments_count)::int as "totalTransactions",
+        COALESCE(pt.on_time_count, 0)::int as "onTimePayments",
+        COALESCE(pt.late_count, 0)::int as "latePayments",
+        cs.total_sales_amount as "totalSalesAmount",
+        cp.total_payments_amount as "totalPaymentsAmount",
+        (cs.total_sales_amount - cp.total_payments_amount)::float as "currentBalance"
+      FROM customer_sales cs, customer_payments cp, payment_timing pt
+    `);
+    
+    const row = result.rows[0] as any;
+    return {
+      avgDaysToPay: row?.avgDaysToPay || 0,
+      paymentFrequency: row?.paymentFrequency || 0,
+      totalTransactions: row?.totalTransactions || 0,
+      onTimePayments: row?.onTimePayments || 0,
+      latePayments: row?.latePayments || 0,
+      totalSalesAmount: row?.totalSalesAmount || 0,
+      totalPaymentsAmount: row?.totalPaymentsAmount || 0,
+      currentBalance: row?.currentBalance || 0,
+    };
+  }
+
   async getDailyCashFlow(startDate?: string, endDate?: string): Promise<{ date: string; inAmount: number; outAmount: number; net: number; runningBalance: number }[]> {
     let whereClause = sql``;
     if (startDate && endDate) {
