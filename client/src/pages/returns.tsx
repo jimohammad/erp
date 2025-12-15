@@ -703,7 +703,7 @@ export default function ReturnsPage() {
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="w-[300px]">Item</TableHead>
+                          <TableHead className="w-[450px]">Item</TableHead>
                           <TableHead className="w-[80px]">Qty</TableHead>
                           <TableHead className="w-[100px]">Price (KWD)</TableHead>
                           <TableHead className="w-[100px]">Total (KWD)</TableHead>
