@@ -173,7 +173,17 @@ export async function registerRoutes(
       if (!Array.isArray(updates) || updates.length === 0) {
         return res.status(400).json({ error: "Updates array is required" });
       }
-      const updatedItems = await storage.bulkUpdateItems(updates);
+      // Transform frontend format to storage format
+      const transformedUpdates = updates.map((update: any) => ({
+        id: update.id,
+        item: {
+          purchasePriceKwd: update.purchasePriceKwd,
+          purchasePriceFx: update.purchasePriceFx,
+          fxCurrency: update.fxCurrency,
+          sellingPriceKwd: update.sellingPriceKwd,
+        }
+      }));
+      const updatedItems = await storage.bulkUpdateItems(transformedUpdates);
       res.json(updatedItems);
     } catch (error) {
       console.error("Error bulk updating items:", error);
