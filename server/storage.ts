@@ -3073,53 +3073,53 @@ export class DatabaseStorage implements IStorage {
 
         UNION ALL
 
-        -- Payment IN
+        -- Payment IN (from customers)
         SELECT 
           'payment_in-' || p.id::text as id,
           p.payment_date::text as transaction_date,
           'payment_in' as module,
-          COALESCE(p.reference_number, 'PAY-' || p.id::text) as reference,
-          p.party_id,
-          s.name as party_name,
-          p.party_type,
+          COALESCE(p.reference, 'PAY-' || p.id::text) as reference,
+          p.customer_id as party_id,
+          c.name as party_name,
+          'customer' as party_type,
           p.branch_id,
           b.name as branch_name,
-          COALESCE(p.amount_kwd, '0') as amount_kwd,
-          p.amount_fx as amount_fx,
+          COALESCE(p.amount, '0') as amount_kwd,
+          p.fx_amount::text as amount_fx,
           p.fx_currency,
           p.fx_rate::text as fx_rate,
           p.notes,
           p.created_by,
           p.created_at::text
         FROM payments p
-        LEFT JOIN suppliers s ON p.party_id = s.id
+        LEFT JOIN customers c ON p.customer_id = c.id
         LEFT JOIN branches b ON p.branch_id = b.id
-        WHERE p.direction = 'in'
+        WHERE p.direction = 'IN'
 
         UNION ALL
 
-        -- Payment OUT
+        -- Payment OUT (to suppliers)
         SELECT 
           'payment_out-' || p.id::text as id,
           p.payment_date::text as transaction_date,
           'payment_out' as module,
-          COALESCE(p.reference_number, 'PAY-' || p.id::text) as reference,
-          p.party_id,
+          COALESCE(p.reference, 'PAY-' || p.id::text) as reference,
+          p.supplier_id as party_id,
           s.name as party_name,
-          p.party_type,
+          'supplier' as party_type,
           p.branch_id,
           b.name as branch_name,
-          COALESCE(p.amount_kwd, '0') as amount_kwd,
-          p.amount_fx as amount_fx,
+          COALESCE(p.amount, '0') as amount_kwd,
+          p.fx_amount::text as amount_fx,
           p.fx_currency,
           p.fx_rate::text as fx_rate,
           p.notes,
           p.created_by,
           p.created_at::text
         FROM payments p
-        LEFT JOIN suppliers s ON p.party_id = s.id
+        LEFT JOIN suppliers s ON p.supplier_id = s.id
         LEFT JOIN branches b ON p.branch_id = b.id
-        WHERE p.direction = 'out'
+        WHERE p.direction = 'OUT'
 
         UNION ALL
 
@@ -3128,13 +3128,13 @@ export class DatabaseStorage implements IStorage {
           'sale_return-' || r.id::text as id,
           r.return_date::text as transaction_date,
           'sale_return' as module,
-          COALESCE(r.reference_number, 'RET-' || r.id::text) as reference,
+          COALESCE(r.return_number, 'RET-' || r.id::text) as reference,
           r.customer_id as party_id,
           c.name as party_name,
           'customer' as party_type,
           r.branch_id,
           b.name as branch_name,
-          COALESCE(r.total_amount, '0') as amount_kwd,
+          COALESCE(r.total_kwd, '0') as amount_kwd,
           NULL as amount_fx,
           NULL as fx_currency,
           NULL as fx_rate,
@@ -3144,7 +3144,7 @@ export class DatabaseStorage implements IStorage {
         FROM returns r
         LEFT JOIN customers c ON r.customer_id = c.id
         LEFT JOIN branches b ON r.branch_id = b.id
-        WHERE r.return_type = 'sale'
+        WHERE r.return_type = 'sale_return'
 
         UNION ALL
 
@@ -3153,13 +3153,13 @@ export class DatabaseStorage implements IStorage {
           'purchase_return-' || r.id::text as id,
           r.return_date::text as transaction_date,
           'purchase_return' as module,
-          COALESCE(r.reference_number, 'RET-' || r.id::text) as reference,
+          COALESCE(r.return_number, 'RET-' || r.id::text) as reference,
           r.supplier_id as party_id,
           s.name as party_name,
           'supplier' as party_type,
           r.branch_id,
           b.name as branch_name,
-          COALESCE(r.total_amount, '0') as amount_kwd,
+          COALESCE(r.total_kwd, '0') as amount_kwd,
           NULL as amount_fx,
           NULL as fx_currency,
           NULL as fx_rate,
@@ -3169,7 +3169,7 @@ export class DatabaseStorage implements IStorage {
         FROM returns r
         LEFT JOIN suppliers s ON r.supplier_id = s.id
         LEFT JOIN branches b ON r.branch_id = b.id
-        WHERE r.return_type = 'purchase'
+        WHERE r.return_type = 'purchase_return'
 
         UNION ALL
 
@@ -3178,8 +3178,8 @@ export class DatabaseStorage implements IStorage {
           'expense-' || e.id::text as id,
           e.expense_date::text as transaction_date,
           'expense' as module,
-          COALESCE(e.reference_number, 'EXP-' || e.id::text) as reference,
-          NULL as party_id,
+          COALESCE(e.reference, 'EXP-' || e.id::text) as reference,
+          NULL::integer as party_id,
           NULL as party_name,
           NULL as party_type,
           e.branch_id,
@@ -3199,15 +3199,15 @@ export class DatabaseStorage implements IStorage {
         -- Discounts
         SELECT 
           'discount-' || d.id::text as id,
-          d.discount_date::text as transaction_date,
+          d.created_at::date::text as transaction_date,
           'discount' as module,
           'DIS-' || d.id::text as reference,
           d.customer_id as party_id,
-          s.name as party_name,
+          c.name as party_name,
           'customer' as party_type,
-          d.branch_id,
-          b.name as branch_name,
-          COALESCE(d.amount, '0') as amount_kwd,
+          NULL::integer as branch_id,
+          NULL as branch_name,
+          COALESCE(d.discount_amount, '0') as amount_kwd,
           NULL as amount_fx,
           NULL as fx_currency,
           NULL as fx_rate,
@@ -3215,8 +3215,7 @@ export class DatabaseStorage implements IStorage {
           d.created_by,
           d.created_at::text
         FROM discounts d
-        LEFT JOIN suppliers s ON d.customer_id = s.id
-        LEFT JOIN branches b ON d.branch_id = b.id
+        LEFT JOIN customers c ON d.customer_id = c.id
       )
       SELECT * FROM all_transactions
       ${whereClause}
@@ -3226,9 +3225,9 @@ export class DatabaseStorage implements IStorage {
 
     const countQuery = `
       WITH all_transactions AS (
-        SELECT so.sale_date as transaction_date, so.customer_id as party_id, COALESCE(so.invoice_number, 'SO-' || so.id::text) as reference, c.name as party_name, so.notes, 'sales' as module, so.branch_id
+        SELECT so.sale_date as transaction_date, so.customer_id as party_id, COALESCE(so.invoice_number, 'SO-' || so.id::text) as reference, c.name as party_name, NULL as notes, 'sales' as module, so.branch_id
         FROM sales_orders so
-        LEFT JOIN suppliers c ON so.customer_id = c.id
+        LEFT JOIN customers c ON so.customer_id = c.id
 
         UNION ALL
 
@@ -3238,42 +3237,42 @@ export class DatabaseStorage implements IStorage {
 
         UNION ALL
 
-        SELECT p.payment_date as transaction_date, p.party_id, COALESCE(p.reference_number, 'PAY-' || p.id::text) as reference, s.name as party_name, p.notes, 'payment_in' as module, p.branch_id
+        SELECT p.payment_date as transaction_date, p.customer_id as party_id, COALESCE(p.reference, 'PAY-' || p.id::text) as reference, c.name as party_name, p.notes, 'payment_in' as module, p.branch_id
         FROM payments p
-        LEFT JOIN suppliers s ON p.party_id = s.id
-        WHERE p.direction = 'in'
+        LEFT JOIN customers c ON p.customer_id = c.id
+        WHERE p.direction = 'IN'
 
         UNION ALL
 
-        SELECT p.payment_date as transaction_date, p.party_id, COALESCE(p.reference_number, 'PAY-' || p.id::text) as reference, s.name as party_name, p.notes, 'payment_out' as module, p.branch_id
+        SELECT p.payment_date as transaction_date, p.supplier_id as party_id, COALESCE(p.reference, 'PAY-' || p.id::text) as reference, s.name as party_name, p.notes, 'payment_out' as module, p.branch_id
         FROM payments p
-        LEFT JOIN suppliers s ON p.party_id = s.id
-        WHERE p.direction = 'out'
+        LEFT JOIN suppliers s ON p.supplier_id = s.id
+        WHERE p.direction = 'OUT'
 
         UNION ALL
 
-        SELECT r.return_date as transaction_date, r.customer_id as party_id, COALESCE(r.reference_number, 'RET-' || r.id::text) as reference, c.name as party_name, r.notes, 'sale_return' as module, r.branch_id
+        SELECT r.return_date as transaction_date, r.customer_id as party_id, COALESCE(r.return_number, 'RET-' || r.id::text) as reference, c.name as party_name, r.notes, 'sale_return' as module, r.branch_id
         FROM returns r
-        LEFT JOIN suppliers c ON r.customer_id = c.id
-        WHERE r.return_type = 'sale'
+        LEFT JOIN customers c ON r.customer_id = c.id
+        WHERE r.return_type = 'sale_return'
 
         UNION ALL
 
-        SELECT r.return_date as transaction_date, r.supplier_id as party_id, COALESCE(r.reference_number, 'RET-' || r.id::text) as reference, s.name as party_name, r.notes, 'purchase_return' as module, r.branch_id
+        SELECT r.return_date as transaction_date, r.supplier_id as party_id, COALESCE(r.return_number, 'RET-' || r.id::text) as reference, s.name as party_name, r.notes, 'purchase_return' as module, r.branch_id
         FROM returns r
         LEFT JOIN suppliers s ON r.supplier_id = s.id
-        WHERE r.return_type = 'purchase'
+        WHERE r.return_type = 'purchase_return'
 
         UNION ALL
 
-        SELECT e.expense_date as transaction_date, NULL as party_id, COALESCE(e.reference_number, 'EXP-' || e.id::text) as reference, NULL as party_name, e.description as notes, 'expense' as module, e.branch_id
+        SELECT e.expense_date as transaction_date, NULL::integer as party_id, COALESCE(e.reference, 'EXP-' || e.id::text) as reference, NULL as party_name, e.description as notes, 'expense' as module, e.branch_id
         FROM expenses e
 
         UNION ALL
 
-        SELECT d.discount_date as transaction_date, d.customer_id as party_id, 'DIS-' || d.id::text as reference, s.name as party_name, d.notes, 'discount' as module, d.branch_id
+        SELECT d.created_at::date as transaction_date, d.customer_id as party_id, 'DIS-' || d.id::text as reference, c.name as party_name, d.notes, 'discount' as module, NULL::integer as branch_id
         FROM discounts d
-        LEFT JOIN suppliers s ON d.customer_id = s.id
+        LEFT JOIN customers c ON d.customer_id = c.id
       )
       SELECT COUNT(*) as total FROM all_transactions
       ${whereClause}
