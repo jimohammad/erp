@@ -128,13 +128,17 @@ export function SalesOrderForm({
   }, [selectedCustomer, totalKwd]);
 
   // Check if any line item exceeds available stock
+  // Only block if we have stock data AND the item exists in stock map
   const stockExceeded = useMemo(() => {
+    if (stockBalance.length === 0) return false; // Don't block if stock data not loaded yet
     return lineItems.some((li) => {
       if (!li.itemName || li.quantity <= 0) return false;
+      // Only check if the item exists in our stock data
+      if (!stockMap.has(li.itemName)) return false;
       const available = stockMap.get(li.itemName) ?? 0;
       return li.quantity > available;
     });
-  }, [lineItems, stockMap]);
+  }, [lineItems, stockMap, stockBalance.length]);
 
   // Check if any line item has a price below the minimum selling price
   const pricesBelowMinimum = useMemo(() => {
