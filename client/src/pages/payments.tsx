@@ -105,6 +105,7 @@ export default function PaymentsPage() {
   
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
   const [direction, setDirection] = useState<PaymentDirection>("IN");
+  const [shouldPrintAfterSave, setShouldPrintAfterSave] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [purchaseOrderId, setPurchaseOrderId] = useState("");
@@ -180,8 +181,11 @@ export default function PaymentsPage() {
       await queryClient.refetchQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
       setPage(1);
       toast({ title: "Payment recorded successfully" });
+      if (shouldPrintAfterSave) {
+        handlePrintPayment(savedPayment);
+      }
       resetForm();
-      handlePrintPayment(savedPayment);
+      setShouldPrintAfterSave(false);
     },
     onError: (error: Error) => {
       toast({ title: "Failed to record payment", description: error.message, variant: "destructive" });
@@ -1000,9 +1004,33 @@ export default function PaymentsPage() {
               />
             </div>
 
-            <div className="flex justify-end">
-              <Button type="submit" disabled={createPaymentMutation.isPending} data-testid="button-save-payment">
-                {createPaymentMutation.isPending ? (
+            <div className="flex justify-end gap-2">
+              <Button 
+                type="submit" 
+                variant="outline"
+                disabled={createPaymentMutation.isPending} 
+                onClick={() => setShouldPrintAfterSave(false)}
+                data-testid="button-save-payment"
+              >
+                {createPaymentMutation.isPending && !shouldPrintAfterSave ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save
+                  </>
+                )}
+              </Button>
+              <Button 
+                type="submit" 
+                disabled={createPaymentMutation.isPending} 
+                onClick={() => setShouldPrintAfterSave(true)}
+                data-testid="button-save-print-payment"
+              >
+                {createPaymentMutation.isPending && shouldPrintAfterSave ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Saving...
