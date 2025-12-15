@@ -161,11 +161,6 @@ function AppSidebar() {
     },
   ].filter(item => canAccess(item.module));
 
-  const paymentsSubItems = [
-    { title: "Payment IN", url: "/payments/in", icon: ArrowDownLeft },
-    { title: "Payment OUT", url: "/payments/out", icon: ArrowUpRight },
-  ];
-
   const purchasesSubItems = [
     { title: "Purchase Orders", url: "/purchases/orders" },
     { title: "All Purchases", url: "/purchases/all" },
@@ -201,7 +196,6 @@ function AppSidebar() {
   const getInitialExpandedMenu = () => {
     if (location.startsWith("/purchases")) return "purchases";
     if (location.startsWith("/sales")) return "sales";
-    if (location.startsWith("/payments")) return "payments";
     if (location.startsWith("/items")) return "items";
     if (location.startsWith("/reports")) return "reports";
     if (location.startsWith("/settings")) return "settings";
@@ -390,36 +384,34 @@ function AppSidebar() {
                 </Collapsible>
               )}
 
-              {/* Payments - collapsible with IN/OUT submenu */}
+              {/* Payment IN - separate menu item */}
               {canAccess("payments") && (
-                <Collapsible open={expandedMenu === "payments"} onOpenChange={() => handleMenuToggle("payments")} className="group/collapsible">
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton isActive={location.startsWith("/payments")}>
-                        <CreditCard className="h-4 w-4" />
-                        <span>Payments</span>
-                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {paymentsSubItems.map((subItem) => (
-                          <SidebarMenuSubItem key={subItem.url}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={location === subItem.url}
-                            >
-                              <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(/\s+/g, "-")}`}>
-                                <subItem.icon className="h-4 w-4" />
-                                <span>{subItem.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/payments/in"}
+                  >
+                    <Link href="/payments/in" data-testid="link-payment-in">
+                      <ArrowDownLeft className="h-4 w-4" />
+                      <span>Payment IN</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
+              {/* Payment OUT - separate menu item */}
+              {canAccess("payments") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/payments/out"}
+                  >
+                    <Link href="/payments/out" data-testid="link-payment-out">
+                      <ArrowUpRight className="h-4 w-4" />
+                      <span>Payment OUT</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               )}
 
               {/* Rest of menu items (excluding Dashboard which is handled above) */}
