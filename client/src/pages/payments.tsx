@@ -1009,8 +1009,8 @@ export default function PaymentsPage() {
                   </>
                 ) : (
                   <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Payment
+                    <Printer className="h-4 w-4 mr-2" />
+                    Save & Print
                   </>
                 )}
               </Button>
