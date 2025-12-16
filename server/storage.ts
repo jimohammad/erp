@@ -40,6 +40,7 @@ import {
   salesOrders,
   salesOrderLineItems,
   payments,
+  paymentSplits,
   users,
   accounts,
   accountTransfers,
@@ -75,6 +76,8 @@ import {
   type Payment,
   type InsertPayment,
   type PaymentWithDetails,
+  type PaymentSplit,
+  type InsertPaymentSplit,
   type User,
   type UpsertUser,
   type Account,
@@ -184,8 +187,9 @@ export interface IStorage {
   // Payment Module
   getPayments(options?: { limit?: number; offset?: number }): Promise<{ data: PaymentWithDetails[]; total: number }>;
   getPayment(id: number): Promise<PaymentWithDetails | undefined>;
-  createPayment(payment: InsertPayment): Promise<PaymentWithDetails>;
+  createPayment(payment: InsertPayment, splits?: Omit<InsertPaymentSplit, 'paymentId'>[]): Promise<PaymentWithDetails>;
   deletePayment(id: number): Promise<boolean>;
+  getPaymentSplits(paymentId: number): Promise<PaymentSplit[]>;
 
   // Reports
   getStockBalance(): Promise<{ itemName: string; purchased: number; sold: number; openingStock: number; balance: number }[]>;
@@ -871,11 +875,27 @@ export class DatabaseStorage implements IStorage {
         purchaseOrder: true,
       },
     });
-    return (payment as PaymentWithDetails) || undefined;
+    if (!payment) return undefined;
+    
+    const splits = await this.getPaymentSplits(id);
+    return { ...(payment as PaymentWithDetails), splits };
   }
 
-  async createPayment(payment: InsertPayment): Promise<PaymentWithDetails> {
+  async getPaymentSplits(paymentId: number): Promise<PaymentSplit[]> {
+    return db.select().from(paymentSplits).where(eq(paymentSplits.paymentId, paymentId));
+  }
+
+  async createPayment(payment: InsertPayment, splits?: Omit<InsertPaymentSplit, 'paymentId'>[]): Promise<PaymentWithDetails> {
     const [newPayment] = await db.insert(payments).values(payment).returning();
+    
+    if (splits && splits.length > 0) {
+      const splitValues = splits.map(split => ({
+        ...split,
+        paymentId: newPayment.id,
+      }));
+      await db.insert(paymentSplits).values(splitValues);
+    }
+    
     return this.getPayment(newPayment.id) as Promise<PaymentWithDetails>;
   }
 
