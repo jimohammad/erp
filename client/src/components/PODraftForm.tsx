@@ -180,10 +180,22 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
         if (item.id !== id) return item;
 
         const updated = { ...item, [field]: value };
+        const rate = parseFloat(fxRate) || 0;
 
-        if (field === "quantity" || field === "priceKwd") {
+        // When FX price changes, auto-calculate KWD price if rate is set
+        if (field === "fxPrice" && rate > 0) {
+          const fxPriceVal = parseFloat(value as string) || 0;
+          updated.priceKwd = (fxPriceVal / rate).toFixed(3);
+        }
+
+        // Recalculate total KWD based on quantity and priceKwd
+        if (field === "quantity" || field === "priceKwd" || field === "fxPrice") {
           const qty = field === "quantity" ? (value as number) : item.quantity;
-          const price = field === "priceKwd" ? parseFloat(value as string) || 0 : parseFloat(item.priceKwd) || 0;
+          const price = field === "priceKwd" 
+            ? (parseFloat(value as string) || 0)
+            : (field === "fxPrice" && rate > 0)
+              ? (parseFloat(value as string) || 0) / rate
+              : parseFloat(item.priceKwd) || 0;
           updated.totalKwd = (qty * price).toFixed(3);
         }
 
@@ -299,6 +311,23 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
+              <Label htmlFor="supplier">Supplier</Label>
+              <Select value={supplierId || "none"} onValueChange={(val) => setSupplierId(val === "none" ? "" : val)}>
+                <SelectTrigger data-testid="select-supplier">
+                  <SelectValue placeholder="-- Select supplier --" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">-- Select supplier --</SelectItem>
+                  {suppliers.map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id.toString()}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="po-number">PO Number</Label>
               <Input
                 id="po-number"
@@ -319,23 +348,6 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
                 onChange={(e) => setPoDate(e.target.value)}
                 data-testid="input-po-date"
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="supplier">Supplier</Label>
-              <Select value={supplierId || "none"} onValueChange={(val) => setSupplierId(val === "none" ? "" : val)}>
-                <SelectTrigger data-testid="select-supplier">
-                  <SelectValue placeholder="-- Select supplier --" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">-- Select supplier --</SelectItem>
-                  {suppliers.map((supplier) => (
-                    <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                      {supplier.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
 
@@ -374,7 +386,8 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
                   <tr>
                     <th className="text-left p-2 font-medium text-sm">Item Name</th>
                     <th className="text-right p-2 font-medium text-sm w-24">Qty</th>
-                    <th className="text-right p-2 font-medium text-sm w-32">Price KWD</th>
+                    <th className="text-right p-2 font-medium text-sm w-28">Price {fxCurrency}</th>
+                    <th className="text-right p-2 font-medium text-sm w-28">Price KWD</th>
                     <th className="text-right p-2 font-medium text-sm w-32">Total KWD</th>
                     <th className="w-12"></th>
                   </tr>
@@ -412,6 +425,17 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
                       <td className="p-2">
                         <Input
                           type="number"
+                          step="0.01"
+                          value={item.fxPrice}
+                          onChange={(e) => handleLineItemChange(item.id, "fxPrice", e.target.value)}
+                          className="text-right"
+                          placeholder="0.00"
+                          data-testid={`input-fx-price-${index}`}
+                        />
+                      </td>
+                      <td className="p-2">
+                        <Input
+                          type="number"
                           step="0.001"
                           value={item.priceKwd}
                           onChange={(e) => handleLineItemChange(item.id, "priceKwd", e.target.value)}
@@ -438,7 +462,7 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
                 </tbody>
                 <tfoot className="bg-muted/30">
                   <tr className="border-t">
-                    <td colSpan={3} className="p-2 text-right font-medium">
+                    <td colSpan={4} className="p-2 text-right font-medium">
                       Total KWD:
                     </td>
                     <td className="p-2 text-right font-bold" data-testid="text-total-kwd">
@@ -448,7 +472,7 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
                   </tr>
                   {totals.totalFx && (
                     <tr>
-                      <td colSpan={3} className="p-2 text-right font-medium">
+                      <td colSpan={4} className="p-2 text-right font-medium">
                         Total {fxCurrency}:
                       </td>
                       <td className="p-2 text-right font-bold" data-testid="text-total-fx">
