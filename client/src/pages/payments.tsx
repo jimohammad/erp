@@ -30,6 +30,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Plus, 
   Trash2, 
@@ -46,6 +52,7 @@ import {
   ArrowUpRight,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Printer,
   Send,
   RotateCcw,
@@ -106,6 +113,7 @@ export default function PaymentsPage() {
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
   const [direction, setDirection] = useState<PaymentDirection>("IN");
   const [shouldPrintAfterSave, setShouldPrintAfterSave] = useState(false);
+  const [printTypeAfterSave, setPrintTypeAfterSave] = useState<"thermal" | "a4">("thermal");
   const [customerId, setCustomerId] = useState("");
   const [supplierId, setSupplierId] = useState("");
   const [purchaseOrderId, setPurchaseOrderId] = useState("");
@@ -182,7 +190,11 @@ export default function PaymentsPage() {
       setPage(1);
       toast({ title: "Payment recorded successfully" });
       if (shouldPrintAfterSave) {
-        handlePrintPayment(savedPayment);
+        if (printTypeAfterSave === "thermal") {
+          handlePrintPaymentThermal(savedPayment);
+        } else {
+          handlePrintPaymentA4(savedPayment);
+        }
       }
       resetForm();
       setShouldPrintAfterSave(false);
@@ -226,6 +238,17 @@ export default function PaymentsPage() {
         description: error.message || "Could not send receipt via WhatsApp",
         variant: "destructive",
       });
+    },
+  });
+
+  const { data: userData } = useQuery<{ printerType?: string }>({
+    queryKey: ["/api/auth/user"],
+  });
+  const userPrinterType = userData?.printerType || "thermal";
+
+  const updatePrinterMutation = useMutation({
+    mutationFn: async (printerType: string) => {
+      return apiRequest("PUT", "/api/auth/user/printer-type", { printerType });
     },
   });
 
@@ -322,7 +345,163 @@ export default function PaymentsPage() {
     }
   };
 
-  const handlePrintPayment = async (payment: PaymentWithDetails) => {
+  const handlePrintPaymentThermal = async (payment: PaymentWithDetails) => {
+    const partyName = payment.direction === "IN" 
+      ? payment.customer?.name || "Not specified"
+      : payment.supplier?.name || "Not specified";
+    const partyPhone = payment.direction === "IN"
+      ? payment.customer?.phone || ""
+      : "";
+    const partyLabel = payment.direction === "IN" ? "Received From" : "Paid To";
+
+    let currentBalance = 0;
+    let previousBalance = 0;
+    const paymentAmount = parseFloat(payment.amount);
+
+    if (payment.direction === "IN" && payment.customerId) {
+      try {
+        const res = await fetch(`/api/customers/${payment.customerId}/balance`, {
+          credentials: "include",
+        });
+        if (res.ok) {
+          const data = await res.json();
+          currentBalance = data.balance || 0;
+          previousBalance = currentBalance + paymentAmount;
+        }
+      } catch (e) {
+        console.error("Failed to fetch customer balance:", e);
+      }
+    }
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const receiptDate = new Date(payment.paymentDate).toLocaleDateString("en-GB", {
+      day: "2-digit", month: "short", year: "numeric"
+    });
+    const now = new Date();
+    const receiptTime = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+    const fxSection = payment.fxCurrency && payment.fxAmount ? `
+      <div class="row">
+        <span class="label">FX Amount:</span>
+        <span class="value">${parseFloat(payment.fxAmount).toFixed(2)} ${payment.fxCurrency}</span>
+      </div>
+      <div class="row">
+        <span class="label">Rate:</span>
+        <span class="value">${payment.fxRate || "-"}</span>
+      </div>
+    ` : "";
+
+    const balanceSection = payment.direction === "IN" && payment.customerId ? `
+      <div class="balance-section">
+        <div class="row">
+          <span class="label">Previous Bal:</span>
+          <span class="value">${previousBalance.toFixed(3)} KWD</span>
+        </div>
+        <div class="row">
+          <span class="label">Current Bal:</span>
+          <span class="value">${currentBalance.toFixed(3)} KWD</span>
+        </div>
+      </div>
+    ` : "";
+
+    const notesSection = payment.notes ? `<div style="margin: 2mm 0; font-size: 9pt;"><strong>Notes:</strong> ${payment.notes}</div>` : "";
+    const phoneRow = partyPhone ? `<div class="row"><span class="label">Phone:</span><span class="value">${partyPhone}</span></div>` : "";
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Payment Receipt</title>
+          <style>
+            @page { size: 80mm auto; margin: 0; }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { 
+              font-family: 'Courier New', monospace;
+              width: 80mm; 
+              padding: 3mm;
+              font-size: 10pt;
+              line-height: 1.3;
+            }
+            .header { text-align: center; margin-bottom: 3mm; border-bottom: 1px dashed #000; padding-bottom: 2mm; }
+            .company-name { font-size: 12pt; font-weight: bold; }
+            .arabic { font-size: 9pt; }
+            .receipt-title { font-size: 11pt; font-weight: bold; margin: 2mm 0; text-align: center; }
+            .row { display: flex; justify-content: space-between; margin: 1mm 0; }
+            .label { color: #333; }
+            .value { font-weight: bold; text-align: right; }
+            .divider { border-top: 1px dashed #000; margin: 2mm 0; }
+            .total-row { font-size: 12pt; font-weight: bold; }
+            .balance-section { background: #f0f0f0; padding: 2mm; margin: 2mm 0; }
+            .footer { text-align: center; margin-top: 3mm; font-size: 8pt; border-top: 1px dashed #000; padding-top: 2mm; }
+            @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="company-name">IQBAL ELECTRONICS CO. WLL</div>
+            <div class="arabic">شركة إقبال للأجهزة الإلكترونية ذ.م.م</div>
+            <div style="font-size: 8pt;">Tel: 22622445 / 22622445</div>
+          </div>
+          
+          <div class="receipt-title">${payment.direction === "IN" ? "PAYMENT RECEIVED" : "PAYMENT VOUCHER"}</div>
+          
+          <div class="row">
+            <span class="label">Date:</span>
+            <span class="value">${receiptDate}</span>
+          </div>
+          <div class="row">
+            <span class="label">Time:</span>
+            <span class="value">${receiptTime}</span>
+          </div>
+          <div class="row">
+            <span class="label">Receipt #:</span>
+            <span class="value">PAY-${payment.id}</span>
+          </div>
+          
+          <div class="divider"></div>
+          
+          <div class="row">
+            <span class="label">${partyLabel}:</span>
+            <span class="value">${partyName}</span>
+          </div>
+          ${phoneRow}
+          
+          <div class="divider"></div>
+          
+          <div class="row">
+            <span class="label">Payment Type:</span>
+            <span class="value">${payment.paymentType}</span>
+          </div>
+          
+          ${fxSection}
+          
+          <div class="divider"></div>
+          
+          <div class="total-row row">
+            <span>AMOUNT (KWD):</span>
+            <span>${parseFloat(payment.amount).toFixed(3)}</span>
+          </div>
+          
+          ${balanceSection}
+          
+          ${notesSection}
+          
+          <div class="footer">
+            Thank You!<br/>
+            Computer Generated Receipt
+          </div>
+          
+          <script>window.onload = function() { setTimeout(function() { window.print(); }, 300); }</script>
+        </body>
+      </html>
+    `);
+
+    printWindow.document.close();
+  };
+
+  const handlePrintPaymentA4 = async (payment: PaymentWithDetails) => {
     const partyName = payment.direction === "IN" 
       ? payment.customer?.name || "Not specified"
       : payment.supplier?.name || "Not specified";
@@ -614,6 +793,14 @@ export default function PaymentsPage() {
     `);
 
     printWindow.document.close();
+  };
+
+  const handlePrintPayment = (payment: PaymentWithDetails) => {
+    if (userPrinterType === "thermal") {
+      handlePrintPaymentThermal(payment);
+    } else {
+      handlePrintPaymentA4(payment);
+    }
   };
 
   const numberToWords = (num: number): string => {
@@ -1024,24 +1211,58 @@ export default function PaymentsPage() {
                   </>
                 )}
               </Button>
-              <Button 
-                type="submit" 
-                disabled={createPaymentMutation.isPending} 
-                onClick={() => setShouldPrintAfterSave(true)}
-                data-testid="button-save-print-payment"
-              >
-                {createPaymentMutation.isPending && shouldPrintAfterSave ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    type="button"
+                    disabled={createPaymentMutation.isPending && shouldPrintAfterSave}
+                    data-testid="button-save-print-payment"
+                  >
+                    {createPaymentMutation.isPending && shouldPrintAfterSave ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Printer className="h-4 w-4 mr-2" />
+                        Save & Print ({userPrinterType === "thermal" ? "Thermal" : "A4"})
+                        <ChevronDown className="h-4 w-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      if (userPrinterType !== "thermal") updatePrinterMutation.mutate("thermal");
+                      setPrintTypeAfterSave("thermal");
+                      setShouldPrintAfterSave(true);
+                      const form = document.querySelector("form");
+                      form?.requestSubmit();
+                    }}
+                    data-testid="menu-save-print-thermal"
+                  >
                     <Printer className="h-4 w-4 mr-2" />
-                    Save & Print
-                  </>
-                )}
-              </Button>
+                    Thermal (80mm)
+                    {userPrinterType === "thermal" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      if (userPrinterType !== "a4laser") updatePrinterMutation.mutate("a4laser");
+                      setPrintTypeAfterSave("a4");
+                      setShouldPrintAfterSave(true);
+                      const form = document.querySelector("form");
+                      form?.requestSubmit();
+                    }}
+                    data-testid="menu-save-print-a4"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    A4 Laser
+                    {userPrinterType === "a4laser" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </form>
         </CardContent>
@@ -1318,14 +1539,39 @@ export default function PaymentsPage() {
             </div>
           )}
           <DialogFooter className="flex gap-2">
-            <Button 
-              variant="outline" 
-              onClick={() => selectedPayment && handlePrintPayment(selectedPayment)}
-              data-testid="button-print-payment"
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              Print
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" data-testid="button-print-payment">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print ({userPrinterType === "thermal" ? "Thermal" : "A4"})
+                  <ChevronDown className="h-4 w-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem 
+                  onClick={() => {
+                    if (userPrinterType !== "thermal") updatePrinterMutation.mutate("thermal");
+                    selectedPayment && handlePrintPaymentThermal(selectedPayment);
+                  }}
+                  data-testid="menu-print-thermal"
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  Thermal (80mm)
+                  {userPrinterType === "thermal" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => {
+                    if (userPrinterType !== "a4laser") updatePrinterMutation.mutate("a4laser");
+                    selectedPayment && handlePrintPaymentA4(selectedPayment);
+                  }}
+                  data-testid="menu-print-a4"
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  A4 Laser
+                  {userPrinterType === "a4laser" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {selectedPayment?.direction === "IN" && (
               <Button 
                 variant="outline" 
