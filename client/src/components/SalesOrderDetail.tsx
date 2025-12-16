@@ -43,9 +43,10 @@ export function SalesOrderDetail({
       .catch(console.error);
   }, []);
   
-  const { data: balanceData } = useQuery<{ previousBalance: number; currentBalance: number }>({
+  const { data: balanceData, isLoading: isBalanceLoading } = useQuery<{ previousBalance: number; currentBalance: number }>({
     queryKey: ["/api/customer-balance-for-sale", order?.id],
     enabled: open && !!order?.id && !!order?.customerId,
+    staleTime: 0, // Always fetch fresh balance data
   });
 
   // Get user's printer preference
@@ -1079,9 +1080,14 @@ export function SalesOrderDetail({
                   }
                 }}
                 className="rounded-r-none border-r-0"
+                disabled={!!order?.customerId && isBalanceLoading}
                 data-testid="button-print-invoice"
               >
-                <Printer className="h-4 w-4 mr-1" />
+                {order?.customerId && isBalanceLoading ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Printer className="h-4 w-4 mr-1" />
+                )}
                 Print ({userPrinterType === "a4laser" ? "A4" : "Thermal"})
               </Button>
               <DropdownMenu>
