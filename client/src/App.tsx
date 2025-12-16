@@ -165,7 +165,7 @@ function AppSidebar() {
       title: "All Transactions",
       url: "/all-transactions",
       icon: List,
-      module: "reports",
+      module: "all_transactions",
     },
   ].filter(item => canAccess(item.module));
 

@@ -55,6 +55,7 @@ const MODULE_LABELS: Record<string, string> = {
   items: "Item Master",
   parties: "Party Master",
   reports: "Reports",
+  all_transactions: "All Transactions",
   discount: "Discount",
   stock: "Stock Lookup",
   imei_history: "IMEI History",
