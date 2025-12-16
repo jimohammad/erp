@@ -5,7 +5,8 @@
 This is a **Purchase Order Register** system built for Iqbal Electronics Co. WLL to track and manage supplier invoices, purchase orders, and multi-currency transactions. The application enables users to:
 
 - Dashboard with real-time KPIs (Stock Available, Total Cash, Monthly Sales, Monthly Purchases), global search across all entities, and low stock alerts
-- Create and manage parties (suppliers and customers) and inventory items via Party Master with toggle switch for type selection
+- Create and manage parties (suppliers, customers, and salesmen) and inventory items via Party Master with dropdown for type selection
+- Salesman tracking with commission rate percentage field for sales performance management
 - Record purchase orders with line items
 - Track invoice numbers, delivery notes, and TT (Telegraphic Transfer) copies
 - Upload supporting documents (invoices, delivery notes, payment proofs)
