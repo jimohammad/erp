@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, RotateCcw, Save, Loader2, Trash2, FileText } from "lucide-react";
 import { CurrencyToggle } from "./CurrencyToggle";
+import { FileUploadField } from "./FileUploadField";
 import type { Supplier, Item } from "@shared/schema";
 
 interface PODraftLineItem {
@@ -34,6 +35,9 @@ interface PurchaseOrderDraft {
   fxRate: string | null;
   totalFx: string | null;
   notes: string | null;
+  invoiceFilePath: string | null;
+  deliveryNoteFilePath: string | null;
+  ttCopyFilePath: string | null;
   lineItems: PODraftLineItem[];
 }
 
@@ -69,6 +73,9 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
     { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", fxPrice: "", totalKwd: "0.000" },
   ]);
   const [totals, setTotals] = useState({ totalKwd: "0.000", totalFx: "" });
+  const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
+  const [deliveryNoteFile, setDeliveryNoteFile] = useState<File | null>(null);
+  const [ttCopyFile, setTtCopyFile] = useState<File | null>(null);
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
@@ -93,6 +100,9 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
       { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", fxPrice: "", totalKwd: "0.000" },
     ]);
     setTotals({ totalKwd: "0.000", totalFx: "" });
+    setInvoiceFile(null);
+    setDeliveryNoteFile(null);
+    setTtCopyFile(null);
     refetchNextNumber();
   };
 
@@ -195,8 +205,42 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
     }
   };
 
+  const uploadFile = async (file: File): Promise<string | null> => {
+    if (!file) return null;
+    try {
+      const response = await apiRequest("POST", "/api/objects/upload");
+      const { uploadURL } = response as { uploadURL: string };
+
+      await fetch(uploadURL, {
+        method: "PUT",
+        body: file,
+        headers: { "Content-Type": file.type },
+      });
+
+      const updateResponse = await apiRequest("PUT", "/api/files/uploaded", { uploadURL });
+      return (updateResponse as { objectPath: string }).objectPath;
+    } catch (error) {
+      console.error("Upload failed:", error);
+      return null;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    let invoiceFilePath = editingPO?.invoiceFilePath || null;
+    let deliveryNoteFilePath = editingPO?.deliveryNoteFilePath || null;
+    let ttCopyFilePath = editingPO?.ttCopyFilePath || null;
+
+    if (invoiceFile) {
+      invoiceFilePath = await uploadFile(invoiceFile);
+    }
+    if (deliveryNoteFile) {
+      deliveryNoteFilePath = await uploadFile(deliveryNoteFile);
+    }
+    if (ttCopyFile) {
+      ttCopyFilePath = await uploadFile(ttCopyFile);
+    }
 
     const payload = {
       poNumber,
@@ -208,6 +252,9 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
       fxRate: fxRate || null,
       totalFx: totals.totalFx || null,
       notes: notes || null,
+      invoiceFilePath,
+      deliveryNoteFilePath,
+      ttCopyFilePath,
       status: editingPO?.status || "draft",
       lineItems: lineItems
         .filter((item) => item.itemName)
@@ -425,6 +472,33 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
               rows={3}
               data-testid="textarea-notes"
             />
+          </div>
+
+          <div className="space-y-4">
+            <Label className="text-base font-medium">Supporting Documents</Label>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <FileUploadField
+                label="Invoice"
+                value={invoiceFile}
+                onChange={setInvoiceFile}
+                existingPath={editingPO?.invoiceFilePath}
+                testId="invoice-upload"
+              />
+              <FileUploadField
+                label="Delivery Note"
+                value={deliveryNoteFile}
+                onChange={setDeliveryNoteFile}
+                existingPath={editingPO?.deliveryNoteFilePath}
+                testId="delivery-note-upload"
+              />
+              <FileUploadField
+                label="TT Copy"
+                value={ttCopyFile}
+                onChange={setTtCopyFile}
+                existingPath={editingPO?.ttCopyFilePath}
+                testId="tt-copy-upload"
+              />
+            </div>
           </div>
 
           <div className="flex items-center justify-end">
