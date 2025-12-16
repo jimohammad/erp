@@ -398,6 +398,33 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/customers/:id/stock-check", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid customer ID" });
+      }
+      const customer = await storage.markCustomerStockChecked(id);
+      if (!customer) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+      res.json(customer);
+    } catch (error) {
+      console.error("Error marking stock checked:", error);
+      res.status(500).json({ error: "Failed to mark stock checked" });
+    }
+  });
+
+  app.get("/api/customers/due-for-stock-check", isAuthenticated, async (req, res) => {
+    try {
+      const customers = await storage.getCustomersDueForStockCheck();
+      res.json(customers);
+    } catch (error) {
+      console.error("Error fetching customers due for stock check:", error);
+      res.status(500).json({ error: "Failed to fetch customers" });
+    }
+  });
+
   app.get("/api/sales-orders/next-invoice-number", isAuthenticated, async (req, res) => {
     try {
       const result = await storage.getSalesOrders();

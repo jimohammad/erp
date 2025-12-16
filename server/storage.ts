@@ -135,7 +135,7 @@ import {
   type AllTransaction,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, or, isNull, asc } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -170,6 +170,8 @@ export interface IStorage {
   updateCustomer(id: number, customer: InsertCustomer): Promise<Customer | undefined>;
   deleteCustomer(id: number): Promise<{ deleted: boolean; error?: string }>;
   syncPartyToCustomer(partyId: number): Promise<Customer | undefined>;
+  markCustomerStockChecked(id: number): Promise<Customer | undefined>;
+  getCustomersDueForStockCheck(): Promise<Customer[]>;
 
   getSalesOrders(options?: { limit?: number; offset?: number }): Promise<{ data: SalesOrderWithDetails[]; total: number }>;
   getSalesOrder(id: number): Promise<SalesOrderWithDetails | undefined>;
@@ -681,6 +683,58 @@ export class DatabaseStorage implements IStorage {
     }).returning();
     
     return newCustomer;
+  }
+
+  async markCustomerStockChecked(id: number): Promise<Customer | undefined> {
+    const today = new Date().toISOString().split('T')[0];
+    // Update in suppliers table (parties with partyType='customer')
+    const [updated] = await db.update(suppliers)
+      .set({ lastStockCheckDate: today })
+      .where(and(eq(suppliers.id, id), eq(suppliers.partyType, 'customer')))
+      .returning();
+    
+    if (!updated) return undefined;
+    
+    // Return as Customer type format
+    return {
+      id: updated.id,
+      name: updated.name,
+      phone: updated.phone,
+      email: null,
+      creditLimit: updated.creditLimit,
+      branchId: null,
+      lastStockCheckDate: updated.lastStockCheckDate,
+    } as Customer;
+  }
+
+  async getCustomersDueForStockCheck(): Promise<Customer[]> {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0];
+    
+    // Get from suppliers table where partyType='customer'
+    const results = await db.select().from(suppliers)
+      .where(
+        and(
+          eq(suppliers.partyType, 'customer'),
+          or(
+            isNull(suppliers.lastStockCheckDate),
+            sql`${suppliers.lastStockCheckDate} <= ${threeMonthsAgoStr}`
+          )
+        )
+      )
+      .orderBy(asc(suppliers.lastStockCheckDate));
+    
+    // Map to Customer type format
+    return results.map(s => ({
+      id: s.id,
+      name: s.name,
+      phone: s.phone,
+      email: null,
+      creditLimit: s.creditLimit,
+      branchId: null,
+      lastStockCheckDate: s.lastStockCheckDate,
+    })) as Customer[];
   }
 
   async deleteCustomer(id: number): Promise<{ deleted: boolean; error?: string }> {

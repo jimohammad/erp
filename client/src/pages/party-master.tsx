@@ -31,7 +31,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Pencil, Trash2, Loader2, Users, RotateCcw, Save } from "lucide-react";
+import { Pencil, Trash2, Loader2, Users, RotateCcw, Save, ClipboardCheck } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Supplier, PartyType } from "@shared/schema";
 
 export default function PartyMaster() {
@@ -126,6 +127,21 @@ export default function PartyMaster() {
     },
     onError: (error: Error) => {
       toast({ title: error.message, variant: "destructive" });
+    },
+  });
+
+  const stockCheckMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const response = await apiRequest("POST", `/api/customers/${id}/stock-check`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/due-for-stock-check"] });
+      toast({ title: "Stock check recorded", description: "Customer marked as checked today" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to record stock check", description: error.message, variant: "destructive" });
     },
   });
 
@@ -416,6 +432,29 @@ export default function PartyMaster() {
                       {isAdmin && (
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
+                            {party.partyType === "customer" && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => stockCheckMutation.mutate(party.id)}
+                                    disabled={stockCheckMutation.isPending}
+                                    data-testid={`button-stock-check-${party.id}`}
+                                  >
+                                    <ClipboardCheck className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Mark stock checked</p>
+                                  {party.lastStockCheckDate && (
+                                    <p className="text-xs text-muted-foreground">
+                                      Last: {new Date(party.lastStockCheckDate).toLocaleDateString()}
+                                    </p>
+                                  )}
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"

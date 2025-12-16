@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Package, DollarSign, TrendingUp, TrendingDown, ShoppingCart, Search, Loader2, ArrowRight, Wallet, Building2, Receipt, AlertTriangle } from "lucide-react";
+import { Package, DollarSign, TrendingUp, TrendingDown, ShoppingCart, Search, Loader2, ArrowRight, Wallet, Building2, Receipt, AlertTriangle, Users, ClipboardCheck } from "lucide-react";
 import Sparkline from "@/components/Sparkline";
 
 const LazySalesChart = lazy(() => import("@/components/SalesChart"));
@@ -37,6 +37,13 @@ interface LowStockItem {
   minStockLevel: number;
 }
 
+interface CustomerDueForStockCheck {
+  id: number;
+  name: string;
+  phone: string | null;
+  lastStockCheckDate: string | null;
+}
+
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,6 +55,10 @@ export default function DashboardPage() {
 
   const { data: lowStockItems } = useQuery<LowStockItem[]>({
     queryKey: ["/api/reports/low-stock"],
+  });
+
+  const { data: customersDueForStockCheck } = useQuery<CustomerDueForStockCheck[]>({
+    queryKey: ["/api/customers/due-for-stock-check"],
   });
 
   const { data: searchResults, isLoading: searchLoading } = useQuery<SearchResult[]>({
@@ -377,6 +388,56 @@ export default function DashboardPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {customersDueForStockCheck && customersDueForStockCheck.length > 0 && (
+            <Card data-testid="card-stock-check-reminders" className="border-blue-200 dark:border-blue-800">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
+                    <ClipboardCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Stock Check Reminders</CardTitle>
+                    <p className="text-xs text-muted-foreground">Customers due for field visit (3+ months)</p>
+                  </div>
+                </div>
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+                  {customersDueForStockCheck.length} customer{customersDueForStockCheck.length !== 1 ? 's' : ''}
+                </Badge>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                  {customersDueForStockCheck.slice(0, 10).map((customer) => (
+                    <div 
+                      key={customer.id}
+                      className="flex items-center justify-between p-2 rounded-md bg-blue-50 dark:bg-blue-900/20 cursor-pointer hover-elevate"
+                      data-testid={`stock-check-customer-${customer.id}`}
+                      onClick={() => setLocation("/party-master")}
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-medium text-sm">{customer.name}</span>
+                        {customer.phone && (
+                          <span className="text-xs text-muted-foreground">{customer.phone}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs">
+                          {customer.lastStockCheckDate 
+                            ? `Last: ${new Date(customer.lastStockCheckDate).toLocaleDateString()}`
+                            : 'Never checked'}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                  {customersDueForStockCheck.length > 10 && (
+                    <p className="text-xs text-muted-foreground text-center pt-2">
+                      +{customersDueForStockCheck.length - 10} more customers
+                    </p>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -53,6 +53,7 @@ export const suppliers = pgTable("suppliers", {
   partyType: text("party_type").default("supplier").notNull(),
   creditLimit: numeric("credit_limit", { precision: 12, scale: 3 }),
   area: text("area"),
+  lastStockCheckDate: text("last_stock_check_date"),
 }, (table) => [
   index("idx_supplier_party_type").on(table.partyType),
   index("idx_supplier_area").on(table.area),
@@ -241,6 +242,7 @@ export const customers = pgTable("customers", {
   email: text("email"),
   creditLimit: numeric("credit_limit", { precision: 12, scale: 3 }),
   branchId: integer("branch_id").references(() => branches.id),
+  lastStockCheckDate: text("last_stock_check_date"),
 }, (table) => [
   index("idx_customer_branch").on(table.branchId),
 ]);
