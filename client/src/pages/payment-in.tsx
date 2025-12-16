@@ -864,17 +864,6 @@ export default function PaymentInPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="paymentDate">Date</Label>
-                <Input
-                  id="paymentDate"
-                  type="date"
-                  value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                  data-testid="input-payment-date"
-                />
-              </div>
-              
-              <div className="space-y-2">
                 <Label htmlFor="customer">Customer</Label>
                 <Select value={customerId} onValueChange={setCustomerId}>
                   <SelectTrigger data-testid="select-customer">
@@ -888,6 +877,17 @@ export default function PaymentInPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="paymentDate">Date</Label>
+                <Input
+                  id="paymentDate"
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  data-testid="input-payment-date"
+                />
               </div>
 
               {!splitEnabled && (

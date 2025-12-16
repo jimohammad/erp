@@ -410,17 +410,6 @@ export default function PaymentOutPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="paymentDate">Date</Label>
-                <Input
-                  id="paymentDate"
-                  type="date"
-                  value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
-                  data-testid="input-payment-date"
-                />
-              </div>
-              
-              <div className="space-y-2">
                 <Label htmlFor="supplier">Supplier</Label>
                 <Select value={supplierId} onValueChange={(v) => { setSupplierId(v); setPurchaseOrderId(""); }}>
                   <SelectTrigger data-testid="select-supplier">
@@ -434,6 +423,17 @@ export default function PaymentOutPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="paymentDate">Date</Label>
+                <Input
+                  id="paymentDate"
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  data-testid="input-payment-date"
+                />
               </div>
 
               <div className="space-y-2">
