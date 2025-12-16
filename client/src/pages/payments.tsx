@@ -170,9 +170,12 @@ export default function PaymentsPage() {
     queryKey: ["/api/customers"],
   });
 
-  const { data: suppliers = [] } = useQuery<Supplier[]>({
+  const { data: allSuppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
+  
+  // Filter to only show suppliers (not customers or salesmen)
+  const suppliers = allSuppliers.filter(s => s.partyType === "supplier" || !s.partyType);
 
   const { data: purchaseOrdersData } = useQuery<{ data: PurchaseOrderWithDetails[]; total: number }>({
     queryKey: ["/api/purchase-orders", "all"],

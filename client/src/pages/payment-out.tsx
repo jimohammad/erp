@@ -110,9 +110,12 @@ export default function PaymentOutPage() {
   const totalPayments = paymentsData?.total ?? 0;
   const totalPages = Math.ceil(totalPayments / PAGE_SIZE);
 
-  const { data: suppliers = [] } = useQuery<Supplier[]>({
+  const { data: allSuppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
+  
+  // Filter to only show suppliers (not customers or salesmen)
+  const suppliers = allSuppliers.filter(s => s.partyType === "supplier" || !s.partyType);
 
   const { data: purchaseOrdersData } = useQuery<{ data: PurchaseOrderWithDetails[]; total: number }>({
     queryKey: ["/api/purchase-orders", "all"],

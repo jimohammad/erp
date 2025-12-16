@@ -47,6 +47,7 @@ export default function PartyMaster() {
   const [partyType, setPartyType] = useState<PartyType>("customer");
   const [partyArea, setPartyArea] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
+  const [commissionRate, setCommissionRate] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [partyToDelete, setPartyToDelete] = useState<Supplier | null>(null);
   
@@ -68,6 +69,7 @@ export default function PartyMaster() {
     setPartyType("customer");
     setCreditLimit("");
     setPartyArea("");
+    setCommissionRate("");
   };
 
   useEffect(() => {
@@ -78,11 +80,12 @@ export default function PartyMaster() {
       setPartyType((editingParty.partyType as PartyType) || "supplier");
       setCreditLimit(editingParty.creditLimit || "");
       setPartyArea(editingParty.area || "");
+      setCommissionRate(editingParty.commissionRate || "");
     }
   }, [editingParty]);
 
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; address: string | null; phone: string | null; partyType: PartyType; creditLimit: string | null; area: string | null }) => 
+    mutationFn: (data: { name: string; address: string | null; phone: string | null; partyType: PartyType; creditLimit: string | null; area: string | null; commissionRate: string | null }) => 
       apiRequest("POST", "/api/suppliers", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
@@ -96,7 +99,7 @@ export default function PartyMaster() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name: string; address: string | null; phone: string | null; partyType: PartyType; creditLimit: string | null; area: string | null } }) =>
+    mutationFn: ({ id, data }: { id: number; data: { name: string; address: string | null; phone: string | null; partyType: PartyType; creditLimit: string | null; area: string | null; commissionRate: string | null } }) =>
       apiRequest("PUT", `/api/suppliers/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
@@ -160,6 +163,7 @@ export default function PartyMaster() {
       partyType,
       creditLimit: partyType === "customer" && creditLimit.trim() ? creditLimit.trim() : null,
       area: partyType === "customer" && partyArea.trim() ? partyArea.trim() : null,
+      commissionRate: partyType === "salesman" && commissionRate.trim() ? commissionRate.trim() : null,
     };
 
     if (editingParty) {
@@ -214,23 +218,22 @@ export default function PartyMaster() {
                 <div className="space-y-0.5">
                   <Label htmlFor="partyType" className="text-base">Party Type</Label>
                   <p className="text-sm text-muted-foreground">
-                    {partyType === "customer" ? "Customer (sales)" : "Supplier (purchases)"}
+                    {partyType === "customer" ? "Customer (sales)" : partyType === "salesman" ? "Salesman (field sales)" : "Supplier (purchases)"}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm ${partyType === "supplier" ? "font-medium" : "text-muted-foreground"}`}>
-                    Supplier
-                  </span>
-                  <Switch
-                    id="partyType"
-                    checked={partyType === "customer"}
-                    onCheckedChange={(checked) => setPartyType(checked ? "customer" : "supplier")}
-                    data-testid="switch-party-type"
-                  />
-                  <span className={`text-sm ${partyType === "customer" ? "font-medium" : "text-muted-foreground"}`}>
-                    Customer
-                  </span>
-                </div>
+                <Select
+                  value={partyType}
+                  onValueChange={(value) => setPartyType(value as PartyType)}
+                >
+                  <SelectTrigger className="w-[180px]" data-testid="select-party-type">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="customer">Customer</SelectItem>
+                    <SelectItem value="supplier">Supplier</SelectItem>
+                    <SelectItem value="salesman">Salesman</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -328,6 +331,25 @@ export default function PartyMaster() {
                 </div>
               )}
 
+              {partyType === "salesman" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="commissionRate">Commission Rate (%)</Label>
+                    <Input
+                      id="commissionRate"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="100"
+                      value={commissionRate}
+                      onChange={(e) => setCommissionRate(e.target.value)}
+                      placeholder="Enter commission percentage (optional)"
+                      data-testid="input-commission-rate"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-end">
                 <Button
                   type="submit"
@@ -378,6 +400,14 @@ export default function PartyMaster() {
             >
               Customers
             </Button>
+            <Button
+              variant={filterType === "salesman" ? "secondary" : "ghost"}
+              size="sm"
+              onClick={() => setFilterType("salesman")}
+              data-testid="filter-salesman"
+            >
+              Salesmen
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -396,7 +426,7 @@ export default function PartyMaster() {
                     <TableHead>Address</TableHead>
                     <TableHead className="w-28">Area</TableHead>
                     <TableHead className="w-36">Phone</TableHead>
-                    <TableHead className="w-32 text-right">Credit Limit</TableHead>
+                    <TableHead className="w-32 text-right">Credit/Commission</TableHead>
                     {isAdmin && <TableHead className="w-24 text-right">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -411,7 +441,7 @@ export default function PartyMaster() {
                       </TableCell>
                       <TableCell data-testid={`text-party-type-${party.id}`}>
                         <Badge 
-                          variant={party.partyType === "customer" ? "default" : "secondary"}
+                          variant={party.partyType === "customer" ? "default" : party.partyType === "salesman" ? "outline" : "secondary"}
                           className="capitalize"
                         >
                           {party.partyType || "supplier"}
@@ -427,7 +457,8 @@ export default function PartyMaster() {
                         {party.phone || "-"}
                       </TableCell>
                       <TableCell className="text-right text-sm font-medium" data-testid={`text-credit-limit-${party.id}`}>
-                        {party.partyType === "customer" ? formatCurrency(party.creditLimit) : "-"}
+                        {party.partyType === "customer" ? formatCurrency(party.creditLimit) : 
+                         party.partyType === "salesman" && party.commissionRate ? `${party.commissionRate}%` : "-"}
                       </TableCell>
                       {isAdmin && (
                         <TableCell className="text-right">

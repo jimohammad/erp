@@ -101,6 +101,7 @@ type StockAgingReport = {
 type Supplier = {
   id: number;
   name: string;
+  partyType?: string | null;
 };
 
 export default function ReportsPage() {
@@ -153,9 +154,12 @@ export default function ReportsPage() {
   });
 
   // Stock Aging queries
-  const { data: suppliers = [] } = useQuery<Supplier[]>({
+  const { data: allSuppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
+  
+  // Filter to only show suppliers (not customers or salesmen)
+  const suppliers = allSuppliers.filter(s => s.partyType === "supplier" || !s.partyType);
 
   const stockAgingQueryParams = new URLSearchParams();
   if (agingItemSearch) stockAgingQueryParams.set("itemName", agingItemSearch);

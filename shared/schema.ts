@@ -54,6 +54,7 @@ export const suppliers = pgTable("suppliers", {
   creditLimit: numeric("credit_limit", { precision: 12, scale: 3 }),
   area: text("area"),
   lastStockCheckDate: text("last_stock_check_date"),
+  commissionRate: numeric("commission_rate", { precision: 5, scale: 2 }),
 }, (table) => [
   index("idx_supplier_party_type").on(table.partyType),
   index("idx_supplier_area").on(table.area),
@@ -67,7 +68,7 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: tru
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type Supplier = typeof suppliers.$inferSelect;
 
-export type PartyType = "supplier" | "customer";
+export type PartyType = "supplier" | "customer" | "salesman";
 
 export const items = pgTable("items", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),

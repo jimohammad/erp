@@ -124,9 +124,12 @@ export default function ReturnsPage() {
     queryKey: ["/api/customers"],
   });
 
-  const { data: suppliers = [] } = useQuery<Supplier[]>({
+  const { data: allSuppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
+  
+  // Filter to only show suppliers (not customers or salesmen)
+  const suppliers = allSuppliers.filter(s => s.partyType === "supplier" || !s.partyType);
 
   const { data: items = [] } = useQuery<Item[]>({
     queryKey: ["/api/items"],
