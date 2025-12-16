@@ -335,7 +335,6 @@ export function SalesOrderForm({
           .totals-row { display: flex; justify-content: space-between; padding: 5px 0; }
           .totals-row.total { font-weight: bold; font-size: 16px; border-top: 2px solid #6B5B95; padding-top: 10px; margin-top: 5px; color: #6B5B95; }
           .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
-          .terms { font-size: 10px; color: #666; }
           .signature-section { display: flex; justify-content: space-between; margin-top: 40px; }
           .signature-box { width: 200px; text-align: center; }
           .signature-line { border-top: 1px solid #333; margin-top: 50px; padding-top: 5px; }
@@ -391,12 +390,6 @@ export function SalesOrderForm({
             </div>
           </div>
           <div class="footer">
-            <div class="terms">
-              <strong>Terms & Conditions:</strong><br/>
-              1. Goods once sold will not be taken back or exchanged.<br/>
-              2. Payment is due within the agreed credit period.<br/>
-              3. All disputes are subject to local jurisdiction.
-            </div>
             <div class="signature-section">
               <div class="signature-box">
                 <div class="signature-line">Customer Signature</div>

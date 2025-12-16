@@ -585,11 +585,7 @@ export function SalesOrderDetail({
                 <div class="section-header">Payment mode</div>
                 <div class="section-content">Credit</div>
                 
-                <div class="section-header">Terms and Conditions</div>
-                <div class="section-content">
-                  Thanks for Shopping<br>
-                  Signature
-                </div>
+
               </div>
               
               <div class="right-column">
@@ -1000,11 +996,7 @@ export function SalesOrderDetail({
                 <div class="section-header">Payment mode</div>
                 <div class="section-content">Credit</div>
                 
-                <div class="section-header">Terms and Conditions</div>
-                <div class="section-content">
-                  Thanks for Shopping<br>
-                  Signature
-                </div>
+
               </div>
               
               <div class="right-column">
