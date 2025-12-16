@@ -109,6 +109,8 @@ export function SalesLineItemRow({
 
     const updatedImeis = [...item.imeiNumbers, trimmedImei];
     onChange(item.id, "imeiNumbers", updatedImeis);
+    // Auto-update quantity to match IMEI count
+    onChange(item.id, "quantity", updatedImeis.length);
     setNewImei("");
     setImeiError("");
   };
@@ -116,6 +118,8 @@ export function SalesLineItemRow({
   const handleRemoveImei = (imeiIndex: number) => {
     const updatedImeis = item.imeiNumbers.filter((_, i) => i !== imeiIndex);
     onChange(item.id, "imeiNumbers", updatedImeis);
+    // Auto-update quantity to match IMEI count (minimum 1 if IMEIs exist, 0 if none)
+    onChange(item.id, "quantity", updatedImeis.length > 0 ? updatedImeis.length : 0);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -157,6 +161,7 @@ export function SalesLineItemRow({
           {(() => {
             const availableQty = item.itemName ? (stockMap?.get(item.itemName) ?? 0) : 0;
             const exceedsStock = item.itemName && item.quantity > availableQty;
+            const hasImeis = item.imeiNumbers.length > 0;
             return (
               <Input
                 type="number"
@@ -164,9 +169,10 @@ export function SalesLineItemRow({
                 step="1"
                 value={item.quantity || ""}
                 onChange={(e) => handleQuantityChange(e.target.value)}
-                className={`text-center text-sm ${exceedsStock ? "border-destructive bg-destructive/10" : ""}`}
+                disabled={hasImeis}
+                className={`text-center text-sm ${exceedsStock ? "border-destructive bg-destructive/10" : ""} ${hasImeis ? "bg-muted/50" : ""}`}
                 placeholder="Qty"
-                title={exceedsStock ? `Only ${availableQty} available` : ""}
+                title={hasImeis ? `Qty controlled by ${item.imeiNumbers.length} IMEI(s)` : exceedsStock ? `Only ${availableQty} available` : ""}
                 data-testid={`input-sales-qty-${index}`}
               />
             );
