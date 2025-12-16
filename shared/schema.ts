@@ -614,6 +614,7 @@ export const MODULE_NAMES = [
   "stock",
   "imei_history",
   "stock_transfers",
+  "all_transactions",
   "ai_assistant",
   "backup",
   "settings"
