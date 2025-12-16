@@ -1075,39 +1075,55 @@ export function SalesOrderDetail({
         <DialogHeader className="flex flex-row items-center justify-between gap-4">
           <DialogTitle data-testid="dialog-title-so-detail">Sales Invoice Details</DialogTitle>
           <div className="flex gap-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" data-testid="button-print-invoice">
-                  <Printer className="h-4 w-4 mr-1" />
-                  Print ({userPrinterType === "thermal" ? "Thermal" : "A4"})
-                  <ChevronDown className="h-4 w-4 ml-1" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => {
-                    if (userPrinterType !== "thermal") updatePrinterMutation.mutate("thermal");
-                    printThermal();
-                  }}
-                  data-testid="menu-print-thermal"
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Thermal (80mm)
-                  {userPrinterType === "thermal" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    if (userPrinterType !== "a4laser") updatePrinterMutation.mutate("a4laser");
+            <div className="flex">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  if (userPrinterType === "a4laser") {
                     handlePrint();
-                  }}
-                  data-testid="menu-print-a4"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  A4 Laser
-                  {userPrinterType === "a4laser" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  } else {
+                    printThermal();
+                  }
+                }}
+                className="rounded-r-none border-r-0"
+                data-testid="button-print-invoice"
+              >
+                <Printer className="h-4 w-4 mr-1" />
+                Print ({userPrinterType === "a4laser" ? "A4" : "Thermal"})
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="rounded-l-none px-2" data-testid="button-print-dropdown">
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (userPrinterType !== "thermal") updatePrinterMutation.mutate("thermal");
+                      printThermal();
+                    }}
+                    data-testid="menu-print-thermal"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Thermal (80mm)
+                    {userPrinterType === "thermal" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (userPrinterType !== "a4laser") updatePrinterMutation.mutate("a4laser");
+                      handlePrint();
+                    }}
+                    data-testid="menu-print-a4"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    A4 Laser
+                    {userPrinterType === "a4laser" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <Button
               variant="outline"
               size="sm"

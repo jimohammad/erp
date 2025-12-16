@@ -702,41 +702,58 @@ export function SalesOrderForm({
               <Share2 className="h-4 w-4 mr-2" />
               WhatsApp
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button type="button" variant="outline" disabled={!canSubmit || isSubmitting} data-testid="button-print-sales">
-                  <Printer className="h-4 w-4 mr-2" />
-                  Save & Print
-                  <ChevronDown className="h-4 w-4 ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => {
-                    if (userPrinterType !== "thermal") updatePrinterMutation.mutate("thermal");
-                    handleSaveAndPrintThermal();
-                  }}
-                  disabled={!canSubmit || isSubmitting}
-                  data-testid="menu-print-thermal"
-                >
-                  <Printer className="h-4 w-4 mr-2" />
-                  Thermal (80mm)
-                  {userPrinterType === "thermal" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    if (userPrinterType !== "a4laser") updatePrinterMutation.mutate("a4laser");
+            <div className="flex">
+              <Button 
+                type="button" 
+                variant="outline" 
+                disabled={!canSubmit || isSubmitting}
+                onClick={() => {
+                  if (userPrinterType === "a4laser") {
                     handleSaveAndPrintA4();
-                  }}
-                  disabled={!canSubmit || isSubmitting}
-                  data-testid="menu-print-a4"
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  A4 Laser
-                  {userPrinterType === "a4laser" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  } else {
+                    handleSaveAndPrintThermal();
+                  }
+                }}
+                className="rounded-r-none border-r-0"
+                data-testid="button-print-sales"
+              >
+                <Printer className="h-4 w-4 mr-2" />
+                Save & Print ({userPrinterType === "a4laser" ? "A4" : "Thermal"})
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" disabled={!canSubmit || isSubmitting} className="rounded-l-none px-2" data-testid="button-print-dropdown">
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (userPrinterType !== "thermal") updatePrinterMutation.mutate("thermal");
+                      handleSaveAndPrintThermal();
+                    }}
+                    disabled={!canSubmit || isSubmitting}
+                    data-testid="menu-print-thermal"
+                  >
+                    <Printer className="h-4 w-4 mr-2" />
+                    Thermal (80mm)
+                    {userPrinterType === "thermal" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => {
+                      if (userPrinterType !== "a4laser") updatePrinterMutation.mutate("a4laser");
+                      handleSaveAndPrintA4();
+                    }}
+                    disabled={!canSubmit || isSubmitting}
+                    data-testid="menu-print-a4"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    A4 Laser
+                    {userPrinterType === "a4laser" && <span className="ml-2 text-xs text-muted-foreground">(Default)</span>}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
             <Button 
               type="submit" 
               disabled={isSubmitting || !canSubmit}
