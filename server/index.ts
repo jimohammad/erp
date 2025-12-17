@@ -83,6 +83,10 @@ app.use((req, res, next) => {
     log("Initializing routes...", "startup");
     await registerRoutes(httpServer, app);
     log("Routes initialized successfully", "startup");
+    
+    // Seed admin user from environment variables if configured
+    const { seedAdminUser } = await import("./localAuth");
+    await seedAdminUser();
   } catch (error) {
     console.error("[FATAL] Failed to initialize routes:", error);
     process.exit(1);

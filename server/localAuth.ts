@@ -112,74 +112,9 @@ export async function setupAuth(app: Express) {
     })(req, res, next);
   });
 
-  app.post("/api/register", async (req, res) => {
-    try {
-      const { username, password, firstName, lastName, email } = req.body;
-
-      if (!username || !password) {
-        return res.status(400).json({ message: "Username and password are required" });
-      }
-
-      if (password.length < 6) {
-        return res.status(400).json({ message: "Password must be at least 6 characters" });
-      }
-
-      const [existingUser] = await db
-        .select()
-        .from(users)
-        .where(eq(users.username, username))
-        .limit(1);
-
-      if (existingUser) {
-        return res.status(400).json({ message: "Username already exists" });
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-      
-      const [adminCount] = await db
-        .select({ count: count() })
-        .from(users)
-        .where(eq(users.role, "admin"));
-      const isFirstAdmin = (adminCount?.count ?? 0) === 0;
-
-      const [newUser] = await db
-        .insert(users)
-        .values({
-          username,
-          password: hashedPassword,
-          firstName: firstName || null,
-          lastName: lastName || null,
-          email: email || null,
-          role: isFirstAdmin ? "admin" : "viewer",
-        })
-        .returning();
-
-      req.logIn({
-        id: newUser.id,
-        username: newUser.username,
-        email: newUser.email,
-        firstName: newUser.firstName,
-        lastName: newUser.lastName,
-        role: newUser.role,
-      }, (err) => {
-        if (err) {
-          return res.status(500).json({ message: "Auto-login failed" });
-        }
-        return res.json({ 
-          user: {
-            id: newUser.id,
-            username: newUser.username,
-            email: newUser.email,
-            firstName: newUser.firstName,
-            lastName: newUser.lastName,
-            role: newUser.role,
-          }
-        });
-      });
-    } catch (error) {
-      console.error("Registration error:", error);
-      res.status(500).json({ message: "Registration failed" });
-    }
+  // Public registration disabled - admins create users via /api/admin/users
+  app.post("/api/register", (req, res) => {
+    return res.status(403).json({ message: "Public registration is disabled. Please contact an administrator." });
   });
 
   app.get("/api/logout", (req, res) => {
@@ -201,6 +136,46 @@ export const isAuthenticated: RequestHandler = (req, res, next) => {
   }
   return res.status(401).json({ message: "Unauthorized" });
 };
+
+// Seed initial admin from environment variables at startup
+export async function seedAdminUser() {
+  const adminUsername = process.env.ADMIN_USERNAME;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  
+  if (!adminUsername || !adminPassword) {
+    console.log("[Auth] No ADMIN_USERNAME/ADMIN_PASSWORD environment variables set. Skipping admin seeding.");
+    return;
+  }
+  
+  try {
+    // Check if admin already exists
+    const [existingAdmin] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, adminUsername))
+      .limit(1);
+    
+    if (existingAdmin) {
+      console.log(`[Auth] Admin user '${adminUsername}' already exists.`);
+      return;
+    }
+    
+    // Create the admin user
+    const hashedPassword = await bcrypt.hash(adminPassword, 10);
+    await db.insert(users).values({
+      username: adminUsername,
+      password: hashedPassword,
+      role: "admin",
+      firstName: "Admin",
+      lastName: null,
+      email: null,
+    });
+    
+    console.log(`[Auth] Admin user '${adminUsername}' created successfully.`);
+  } catch (error) {
+    console.error("[Auth] Failed to seed admin user:", error);
+  }
+}
 
 export const isAdmin: RequestHandler = async (req, res, next) => {
   if (!req.isAuthenticated()) {
