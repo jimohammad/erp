@@ -70,10 +70,24 @@ export type Supplier = typeof suppliers.$inferSelect;
 
 export type PartyType = "supplier" | "customer" | "salesman";
 
+export const ITEM_CATEGORIES = [
+  "Apple",
+  "Honor", 
+  "Meizu",
+  "Redmi",
+  "Realme",
+  "Samsung",
+  "Buds",
+  "Charger",
+] as const;
+
+export type ItemCategory = typeof ITEM_CATEGORIES[number];
+
 export const items = pgTable("items", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   code: text("code"),
   name: text("name").notNull().unique(),
+  category: text("category"),
   purchasePriceKwd: numeric("purchase_price_kwd", { precision: 12, scale: 3 }),
   purchasePriceFx: numeric("purchase_price_fx", { precision: 12, scale: 3 }),
   fxCurrency: text("fx_currency"),
@@ -81,6 +95,7 @@ export const items = pgTable("items", {
   minStockLevel: integer("min_stock_level").default(0),
 }, (table) => [
   index("idx_item_code").on(table.code),
+  index("idx_item_category").on(table.category),
 ]);
 
 export const insertItemSchema = createInsertSchema(items).omit({ id: true });

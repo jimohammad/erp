@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/dialog";
 import { Plus, Pencil, Trash2, Loader2, Package, RefreshCw } from "lucide-react";
 import type { Item } from "@shared/schema";
+import { ITEM_CATEGORIES } from "@shared/schema";
 
 export default function ItemMaster() {
   const { toast } = useToast();
@@ -41,6 +42,7 @@ export default function ItemMaster() {
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [itemCode, setItemCode] = useState("");
   const [itemName, setItemName] = useState("");
+  const [category, setCategory] = useState("");
   const [purchasePriceKwd, setPurchasePriceKwd] = useState("");
   const [purchasePriceFx, setPurchasePriceFx] = useState("");
   const [fxCurrency, setFxCurrency] = useState("");
@@ -76,6 +78,7 @@ export default function ItemMaster() {
   type ItemFormData = {
     code: string | null;
     name: string;
+    category: string | null;
     purchasePriceKwd: string | null;
     purchasePriceFx: string | null;
     fxCurrency: string | null;
@@ -155,6 +158,7 @@ export default function ItemMaster() {
     setEditingItem(null);
     setItemCode("");
     setItemName("");
+    setCategory("");
     setPurchasePriceKwd("");
     setPurchasePriceFx("");
     setFxCurrency("");
@@ -167,6 +171,7 @@ export default function ItemMaster() {
     setEditingItem(item);
     setItemCode(item.code || "");
     setItemName(item.name);
+    setCategory(item.category || "");
     setPurchasePriceKwd(item.purchasePriceKwd || "");
     setPurchasePriceFx(item.purchasePriceFx || "");
     setFxCurrency(item.fxCurrency || "");
@@ -180,6 +185,7 @@ export default function ItemMaster() {
     setEditingItem(null);
     setItemCode("");
     setItemName("");
+    setCategory("");
     setPurchasePriceKwd("");
     setPurchasePriceFx("");
     setFxCurrency("");
@@ -194,6 +200,7 @@ export default function ItemMaster() {
     const data: ItemFormData = {
       code: itemCode.trim() || null,
       name: itemName.trim(),
+      category: category || null,
       purchasePriceKwd: purchasePriceKwd.trim() || null,
       purchasePriceFx: purchasePriceFx.trim() || null,
       fxCurrency: fxCurrency.trim() || null,
@@ -349,6 +356,20 @@ export default function ItemMaster() {
                     data-testid="input-item-name"
                   />
                 </div>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="category">Category</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger data-testid="select-item-category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ITEM_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               
               <div className="space-y-2">
