@@ -128,19 +128,42 @@ export default function SendPriceList() {
     lines.push(`Here is our latest price list:`);
     lines.push(``);
     
+    // Group items by category
+    const itemsByCategory = new Map<string, typeof selectedItemsList>();
     for (const item of selectedItemsList) {
-      const price = item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "N/A";
-      const stock = stockMap.get(item.name) ?? 0;
-      lines.push(`*${item.name}*`);
-      lines.push(`  Price: ${price} KWD`);
-      if (includeQuantity) {
-        const availability = stock > 0 ? `Available (${stock})` : "Out of Stock";
-        lines.push(`  ${availability}`);
-      } else {
-        const availability = stock > 0 ? "Available" : "Out of Stock";
-        lines.push(`  ${availability}`);
+      const cat = item.category || "Other";
+      if (!itemsByCategory.has(cat)) {
+        itemsByCategory.set(cat, []);
       }
-      lines.push(``);
+      itemsByCategory.get(cat)!.push(item);
+    }
+    
+    // Sort categories alphabetically, but put "Other" at the end
+    const sortedCategories = Array.from(itemsByCategory.keys()).sort((a, b) => {
+      if (a === "Other") return 1;
+      if (b === "Other") return -1;
+      return a.localeCompare(b);
+    });
+    
+    for (const category of sortedCategories) {
+      const categoryItems = itemsByCategory.get(category)!;
+      lines.push(`*${category}*`);
+      lines.push(`─────────────`);
+      
+      for (const item of categoryItems) {
+        const price = item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "N/A";
+        const stock = stockMap.get(item.name) ?? 0;
+        lines.push(`${item.name}`);
+        lines.push(`  Price: ${price} KWD`);
+        if (includeQuantity) {
+          const availability = stock > 0 ? `Available (${stock})` : "Out of Stock";
+          lines.push(`  ${availability}`);
+        } else {
+          const availability = stock > 0 ? "Available" : "Out of Stock";
+          lines.push(`  ${availability}`);
+        }
+        lines.push(``);
+      }
     }
     
     lines.push(`━━━━━━━━━━━━━━━━━━━━`);
