@@ -155,11 +155,7 @@ export default function SendPriceList() {
         lines.push(`${item.name}`);
         lines.push(`  Price: ${price} KWD`);
         if (includeQuantity) {
-          const availability = stock > 0 ? `Available (${stock})` : "Out of Stock";
-          lines.push(`  ${availability}`);
-        } else {
-          const availability = stock > 0 ? "Available" : "Out of Stock";
-          lines.push(`  ${availability}`);
+          lines.push(`  Qty: ${stock}`);
         }
         lines.push(``);
       }
