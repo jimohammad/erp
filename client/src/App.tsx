@@ -71,6 +71,7 @@ const Landing = lazy(() => import("@/pages/landing"));
 const PublicStatementPage = lazy(() => import("@/pages/public-statement"));
 const AllTransactionsPage = lazy(() => import("@/pages/all-transactions"));
 const CustomerAgingPage = lazy(() => import("@/pages/customer-aging"));
+const SendPriceListPage = lazy(() => import("@/pages/send-price-list"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -324,6 +325,21 @@ function AppSidebar() {
                     <Link href="/ai-chat" data-testid="link-ai-chat">
                       <MessageCircle className="h-4 w-4" />
                       <span>AI Assistant</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
+              {/* Send Price List via WhatsApp */}
+              {canAccess("sales") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/send-price-list"}
+                  >
+                    <Link href="/send-price-list" data-testid="link-send-price-list">
+                      <List className="h-4 w-4" />
+                      <span>Send Price List</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -711,6 +727,7 @@ function AuthenticatedLayout() {
                 <Route path="/reports/customer-statement" component={CustomerStatementPage} />
                 <Route path="/all-transactions" component={AllTransactionsPage} />
                 <Route path="/reports/customer-aging" component={CustomerAgingPage} />
+                <Route path="/send-price-list" component={SendPriceListPage} />
                 <Route path="/settings/user-roles" component={UserRolesPage} />
                 <Route path="/settings/branches" component={BranchesPage} />
                 <Route path="/settings/opening-balances" component={OpeningBalancesPage} />

@@ -2495,5 +2495,72 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/whatsapp/send-price-list", isAuthenticated, async (req: any, res) => {
+    try {
+      const { customerId, itemIds } = req.body;
+      
+      if (!customerId || !itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
+        return res.status(400).json({ error: "Customer ID and item IDs are required" });
+      }
+
+      const customer = await storage.getSupplier(customerId);
+      if (!customer) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+
+      if (!customer.phone) {
+        return res.status(400).json({ error: "Customer does not have a phone number" });
+      }
+
+      const items = await storage.getItems();
+      const selectedItems = items.filter(item => itemIds.includes(item.id));
+
+      if (selectedItems.length === 0) {
+        return res.status(400).json({ error: "No valid items found" });
+      }
+
+      const stockBalance = await storage.getStockBalance();
+      const stockMap = new Map<string, number>();
+      stockBalance.forEach((item: any) => {
+        stockMap.set(item.itemName, item.balance);
+      });
+
+      const lines: string[] = [];
+      lines.push(`*Iqbal Electronics Co. WLL*`);
+      lines.push(`━━━━━━━━━━━━━━━━━━━━`);
+      lines.push(``);
+      lines.push(`Dear ${customer.name},`);
+      lines.push(`Here is our latest price list:`);
+      lines.push(``);
+      
+      for (const item of selectedItems) {
+        const price = item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "N/A";
+        const stock = stockMap.get(item.name) ?? 0;
+        const availability = stock > 0 ? `Available (${stock})` : "Out of Stock";
+        lines.push(`*${item.name}*`);
+        lines.push(`  Price: ${price} KWD`);
+        lines.push(`  ${availability}`);
+        lines.push(``);
+      }
+      
+      lines.push(`━━━━━━━━━━━━━━━━━━━━`);
+      lines.push(`For orders, please contact us.`);
+      lines.push(`Thank you!`);
+
+      const message = lines.join('\n');
+      const result = await sendWhatsAppMessage(customer.phone, message);
+
+      if (result.success) {
+        console.log(`[WhatsApp] Price list sent to ${customer.name} (${customer.phone})`);
+        res.json({ success: true, messageId: result.messageId });
+      } else {
+        res.status(400).json({ error: result.error });
+      }
+    } catch (error) {
+      console.error("WhatsApp price list send error:", error);
+      res.status(500).json({ error: "Failed to send price list via WhatsApp" });
+    }
+  });
+
   return httpServer;
 }
