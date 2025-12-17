@@ -151,15 +151,25 @@ export function SalesOrderForm({
     });
   }, [lineItems, items]);
 
-  // Check if there's at least one valid line item with quantity > 0
-  const noValidLineItems = useMemo(() => {
-    const validItems = lineItems.filter(li => li.itemName && li.quantity > 0);
-    return validItems.length === 0;
+  // Validation: Check if customer is selected
+  const isCustomerMissing = !customerId;
+
+  // Validation: Check if there's at least one valid line item with item name, quantity > 0, and price > 0
+  const hasValidLineItem = useMemo(() => {
+    return lineItems.some(li => 
+      li.itemName && 
+      li.quantity > 0 && 
+      parseFloat(li.priceKwd) > 0
+    );
   }, [lineItems]);
 
   const canSubmit = useMemo(() => {
+    // Customer is required
+    if (isCustomerMissing) return false;
+    // At least one valid line item with item, qty > 0, and price > 0 is required
+    if (!hasValidLineItem) return false;
     return true;
-  }, []);
+  }, [isCustomerMissing, hasValidLineItem]);
 
   // Get user's printer preference
   const { data: userData } = useQuery<User>({
