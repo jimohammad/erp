@@ -416,17 +416,27 @@ export default function ItemMaster() {
               </div>
               
               <div className="space-y-2">
-                <Label htmlFor="fxCurrency">FX Currency</Label>
-                <Select value={fxCurrency} onValueChange={setFxCurrency}>
-                  <SelectTrigger data-testid="select-fx-currency">
-                    <SelectValue placeholder="Select currency" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AED">AED</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="KWD">KWD</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>FX Currency</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={fxCurrency === "AED" ? "default" : "outline"}
+                    onClick={() => setFxCurrency("AED")}
+                    className="flex-1"
+                    data-testid="button-fx-aed"
+                  >
+                    AED
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={fxCurrency === "USD" ? "default" : "outline"}
+                    onClick={() => setFxCurrency("USD")}
+                    className="flex-1"
+                    data-testid="button-fx-usd"
+                  >
+                    USD
+                  </Button>
+                </div>
               </div>
               
               <div className="space-y-2">
