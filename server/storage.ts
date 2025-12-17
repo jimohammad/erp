@@ -322,6 +322,9 @@ export interface IStorage {
   getAllSalesLineItems(): Promise<SalesLineItem[]>;
   getAllReturnLineItems(): Promise<ReturnLineItem[]>;
   getAllUsers(): Promise<User[]>;
+  createUser(data: { username: string; password: string; firstName?: string | null; lastName?: string | null; email?: string | null; role: string }): Promise<User>;
+  updateUser(id: string, data: Partial<{ firstName: string | null; lastName: string | null; email: string | null; role: string; password: string }>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
   getAllPurchaseOrders(): Promise<PurchaseOrder[]>;
   getAllSalesOrders(): Promise<SalesOrder[]>;
   getAllPayments(): Promise<Payment[]>;
@@ -3299,6 +3302,38 @@ export class DatabaseStorage implements IStorage {
 
   async getAllUsers(): Promise<User[]> {
     return await db.select().from(users);
+  }
+
+  async createUser(data: { username: string; password: string; firstName?: string | null; lastName?: string | null; email?: string | null; role: string }): Promise<User> {
+    const [newUser] = await db
+      .insert(users)
+      .values({
+        username: data.username,
+        password: data.password,
+        firstName: data.firstName || null,
+        lastName: data.lastName || null,
+        email: data.email || null,
+        role: data.role,
+      })
+      .returning();
+    return newUser;
+  }
+
+  async updateUser(id: string, data: Partial<{ firstName: string | null; lastName: string | null; email: string | null; role: string; password: string }>): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({
+        ...data,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    const result = await db.delete(users).where(eq(users.id, id));
+    return (result.rowCount ?? 0) > 0;
   }
 
   async getAllPurchaseOrders(): Promise<PurchaseOrder[]> {

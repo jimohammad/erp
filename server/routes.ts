@@ -2562,5 +2562,151 @@ export async function registerRoutes(
     }
   });
 
+  // ========== Admin User Management ==========
+  
+  // Get all users (admin only)
+  app.get("/api/admin/users", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const allUsers = await storage.getAllUsers();
+      // Exclude password from response
+      const safeUsers = allUsers.map(({ password, ...user }) => user);
+      res.json(safeUsers);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Create a new user (admin only)
+  app.post("/api/admin/users", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { username, password, firstName, lastName, email, role } = req.body;
+
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password are required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      const validRoles = ["admin", "viewer"];
+      if (role && !validRoles.includes(role)) {
+        return res.status(400).json({ error: "Invalid role. Must be 'admin' or 'viewer'" });
+      }
+
+      // Check if username already exists
+      const existingUsers = await storage.getAllUsers();
+      if (existingUsers.some(u => u.username === username)) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+
+      const bcrypt = await import("bcryptjs");
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const newUser = await storage.createUser({
+        username,
+        password: hashedPassword,
+        firstName: firstName || null,
+        lastName: lastName || null,
+        email: email || null,
+        role: role || "viewer",
+      });
+
+      // Return user without password
+      const { password: _, ...safeUser } = newUser;
+      res.status(201).json(safeUser);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ error: "Failed to create user" });
+    }
+  });
+
+  // Update a user (admin only)
+  app.put("/api/admin/users/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { firstName, lastName, email, role } = req.body;
+
+      const validRoles = ["admin", "viewer"];
+      if (role && !validRoles.includes(role)) {
+        return res.status(400).json({ error: "Invalid role. Must be 'admin' or 'viewer'" });
+      }
+
+      const updatedUser = await storage.updateUser(id, {
+        firstName: firstName ?? undefined,
+        lastName: lastName ?? undefined,
+        email: email ?? undefined,
+        role: role ?? undefined,
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Return user without password
+      const { password: _, ...safeUser } = updatedUser;
+      res.json(safeUser);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // Reset user password (admin only)
+  app.put("/api/admin/users/:id/password", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const { password } = req.body;
+
+      if (!password) {
+        return res.status(400).json({ error: "Password is required" });
+      }
+
+      if (password.length < 6) {
+        return res.status(400).json({ error: "Password must be at least 6 characters" });
+      }
+
+      const bcrypt = await import("bcryptjs");
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      const updatedUser = await storage.updateUser(id, {
+        password: hashedPassword,
+      });
+
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json({ success: true, message: "Password updated successfully" });
+    } catch (error) {
+      console.error("Error resetting password:", error);
+      res.status(500).json({ error: "Failed to reset password" });
+    }
+  });
+
+  // Delete a user (admin only)
+  app.delete("/api/admin/users/:id", isAuthenticated, isAdmin, async (req: any, res) => {
+    try {
+      const { id } = req.params;
+      const currentUser = req.user;
+
+      // Prevent self-deletion
+      if (currentUser.id === id) {
+        return res.status(400).json({ error: "Cannot delete your own account" });
+      }
+
+      const success = await storage.deleteUser(id);
+      if (!success) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ error: "Failed to delete user" });
+    }
+  });
+
   return httpServer;
 }
