@@ -154,6 +154,7 @@ export default function PaymentOutPage() {
     },
     onSuccess: async (savedPayment: PaymentWithDetails) => {
       await queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
+      await queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).includes("/api/suppliers") });
       await queryClient.refetchQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
       setPage(1);
       toast({ title: "Payment recorded successfully" });
@@ -174,6 +175,7 @@ export default function PaymentOutPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
+      queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).includes("/api/suppliers") });
       toast({ title: "Payment deleted successfully" });
       setPaymentToDelete(null);
     },

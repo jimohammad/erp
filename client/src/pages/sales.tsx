@@ -92,6 +92,7 @@ export default function SalesPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/sales-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sales-stats/monthly"] });
+      queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).includes("/api/customers") });
       toast({ title: "Sales invoice saved successfully" });
     },
     onError: (error: Error) => {

@@ -203,6 +203,7 @@ export default function PaymentInPage() {
     },
     onSuccess: async (savedPayment: PaymentWithDetails) => {
       await queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
+      await queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).includes("/api/customers") });
       await queryClient.refetchQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
       setPage(1);
       toast({ title: "Payment received successfully" });
@@ -228,6 +229,7 @@ export default function PaymentInPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
+      queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).includes("/api/customers") });
       toast({ title: "Payment deleted successfully" });
       setPaymentToDelete(null);
     },
