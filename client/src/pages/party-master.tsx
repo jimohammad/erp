@@ -38,7 +38,7 @@ import type { Supplier, PartyType } from "@shared/schema";
 export default function PartyMaster() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "super_user";
   
   const [editingParty, setEditingParty] = useState<Supplier | null>(null);
   const [partyName, setPartyName] = useState("");

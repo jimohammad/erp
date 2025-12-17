@@ -38,7 +38,7 @@ type EditedItem = {
 export default function ItemBulkEdit() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "super_user";
   
   const [editedItems, setEditedItems] = useState<Record<number, EditedItem>>({});
   const [fetchingPriceFor, setFetchingPriceFor] = useState<number | null>(null);

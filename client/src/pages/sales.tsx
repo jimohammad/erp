@@ -111,7 +111,7 @@ export default function SalesPage() {
           items={items}
           onSubmit={handleSubmitSO}
           isSubmitting={createSOMutation.isPending}
-          isAdmin={user?.role === "admin"}
+          isAdmin={user?.role === "admin" || user?.role === "super_user"}
         />
       </section>
 
