@@ -163,7 +163,7 @@ export default function PartyMaster() {
       address: partyAddress.trim() || null,
       phone: partyPhone.trim() || null,
       partyType,
-      creditLimit: partyType === "customer" && creditLimit.trim() ? creditLimit.trim() : null,
+      creditLimit: (partyType === "customer" || partyType === "salesman") && creditLimit.trim() ? creditLimit.trim() : null,
       area: partyType === "customer" && partyArea.trim() ? partyArea.trim() : null,
       commissionRate: partyType === "salesman" && commissionRate.trim() ? commissionRate.trim() : null,
     };
@@ -251,7 +251,7 @@ export default function PartyMaster() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="partyPhone">Phone Number</Label>
-                  {partyType === "customer" ? (
+                  {(partyType === "customer" || partyType === "salesman") ? (
                     <div className="flex">
                       <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-input bg-muted text-muted-foreground text-sm">
                         +965
@@ -335,6 +335,19 @@ export default function PartyMaster() {
 
               {partyType === "salesman" && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="creditLimit">Credit Limit (KWD)</Label>
+                    <Input
+                      id="creditLimit"
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      value={creditLimit}
+                      onChange={(e) => setCreditLimit(e.target.value)}
+                      placeholder="Enter credit limit (optional)"
+                      data-testid="input-salesman-credit-limit"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="commissionRate">Commission Rate (%)</Label>
                     <Input
