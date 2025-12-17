@@ -139,7 +139,7 @@ export const isAuthenticated: RequestHandler = (req, res, next) => {
 
 // Seed initial admin from environment variables at startup
 export async function seedAdminUser() {
-  const adminUsername = process.env.ADMIN_USERNAME;
+  const adminUsername = process.env.ADMIN_USERNAME?.trim();
   const adminPassword = process.env.ADMIN_PASSWORD;
   
   if (!adminUsername || !adminPassword) {
