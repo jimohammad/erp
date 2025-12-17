@@ -122,7 +122,6 @@ export default function ExpensesPage() {
         description: data.description || null,
         reference: data.reference || null,
       };
-      console.log("Creating expense with payload:", payload);
       return apiRequest("POST", "/api/expenses", payload);
     },
     onSuccess: () => {
@@ -151,7 +150,6 @@ export default function ExpensesPage() {
 
   const createCategoryMutation = useMutation({
     mutationFn: async (data: CategoryFormValues) => {
-      console.log("Creating category with data:", data);
       return apiRequest("POST", "/api/expense-categories", data);
     },
     onSuccess: () => {
