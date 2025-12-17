@@ -52,14 +52,20 @@ export default function PartyMaster() {
   const [partyToDelete, setPartyToDelete] = useState<Supplier | null>(null);
   
   const [filterType, setFilterType] = useState<"all" | PartyType>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: allParties = [], isLoading } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
 
-  const filteredParties = filterType === "all" 
-    ? allParties 
-    : allParties.filter(p => p.partyType === filterType);
+  const filteredParties = allParties.filter(p => {
+    const matchesType = filterType === "all" || p.partyType === filterType;
+    const matchesSearch = !searchQuery || 
+      p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (p.phone && p.phone.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (p.area && p.area.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesType && matchesSearch;
+  });
 
   const resetForm = () => {
     setEditingParty(null);
@@ -385,12 +391,20 @@ export default function PartyMaster() {
       )}
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4">
+        <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-4 flex-wrap">
           <CardTitle className="flex items-center gap-2 text-lg font-semibold">
             <Users className="h-5 w-5" />
             Party List
           </CardTitle>
-          <div className="flex items-center gap-2 border rounded-md p-1">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Input
+              placeholder="Search by name, phone, area..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-64"
+              data-testid="input-search-party"
+            />
+            <div className="flex items-center gap-2 border rounded-md p-1">
             <Button
               variant={filterType === "all" ? "secondary" : "ghost"}
               size="sm"
@@ -423,6 +437,7 @@ export default function PartyMaster() {
             >
               Salesmen
             </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
