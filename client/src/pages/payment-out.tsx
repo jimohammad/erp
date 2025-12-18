@@ -4,6 +4,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import companyLogoUrl from "@/assets/company-logo.jpg";
+import { generateQRCodeDataURL } from "@/lib/qrcode";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -327,13 +328,22 @@ export default function PaymentOutPage() {
     return result;
   };
 
-  const handlePrintPayment = (payment: PaymentWithDetails) => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
+  const handlePrintPayment = async (payment: PaymentWithDetails) => {
     const supplierName = payment.supplier?.name || "Supplier";
     const amountNum = parseFloat(payment.amount);
     const amountWords = numberToWords(amountNum);
+
+    // Generate QR code
+    const qrDataUrl = await generateQRCodeDataURL({
+      type: 'PAYMENT_OUT',
+      number: `PV-${payment.id}`,
+      amount: amountNum.toFixed(3),
+      date: payment.paymentDate,
+      customer: supplierName,
+    });
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -387,6 +397,12 @@ export default function PaymentOutPage() {
         <div class="footer">
           <p>Printed: ${new Date().toLocaleString()}</p>
         </div>
+        ${qrDataUrl ? `
+        <div style="text-align:center;margin-top:10px;padding-top:8px;border-top:1px dashed #000;">
+          <img src="${qrDataUrl}" alt="QR Code" style="width:60px;height:60px;" />
+          <div style="font-size:8px;margin-top:3px;">Scan to verify</div>
+        </div>
+        ` : ''}
       </body>
       </html>
     `);

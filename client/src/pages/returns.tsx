@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import companyLogoUrl from "@/assets/company-logo.jpg";
+import { generateQRCodeDataURL } from "@/lib/qrcode";
 import {
   Table,
   TableBody,
@@ -389,10 +390,7 @@ export default function ReturnsPage() {
     createReturnMutation.mutate(data);
   };
 
-  const handlePrintReturn = (ret: ReturnWithDetails) => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
+  const handlePrintReturn = async (ret: ReturnWithDetails) => {
     const partyName = ret.returnType === "sale_return" 
       ? ret.customer?.name || "Not specified"
       : ret.supplier?.name || "Not specified";
@@ -400,6 +398,18 @@ export default function ReturnsPage() {
     const returnTypeLabel = ret.returnType === "sale_return" ? "SALE RETURN" : "PURCHASE RETURN";
 
     const grandTotal = ret.lineItems?.reduce((sum, item) => sum + (parseFloat(item.totalKwd || "0")), 0) || 0;
+
+    // Generate QR code
+    const qrDataUrl = await generateQRCodeDataURL({
+      type: 'RETURN',
+      number: ret.returnNumber,
+      amount: grandTotal.toFixed(3),
+      date: ret.returnDate,
+      customer: partyName,
+    });
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
 
     const lineItemsHtml = ret.lineItems?.map(item => `
       <div class="item-row">
@@ -553,6 +563,12 @@ export default function ReturnsPage() {
               Thank You!<br/>
               Computer Generated Receipt
             </div>
+            ${qrDataUrl ? `
+            <div style="text-align:center;margin-top:8px;padding-top:8px;border-top:1px dashed #000;">
+              <img src="${qrDataUrl}" alt="QR Code" style="width:60px;height:60px;" />
+              <div style="font-size:8px;margin-top:3px;">Scan to verify</div>
+            </div>
+            ` : ''}
           </div>
           
           <script>window.onload = function() { window.print(); }</script>
@@ -573,6 +589,15 @@ export default function ReturnsPage() {
     const returnTypeLabel = ret.returnType === "sale_return" ? "SALE RETURN" : "PURCHASE RETURN";
 
     const grandTotal = ret.lineItems?.reduce((sum, item) => sum + (parseFloat(item.totalKwd || "0")), 0) || 0;
+
+    // Generate QR code
+    const qrDataUrl = await generateQRCodeDataURL({
+      type: 'RETURN',
+      number: ret.returnNumber,
+      amount: grandTotal.toFixed(3),
+      date: ret.returnDate,
+      customer: partyName,
+    });
 
     // Fetch balance data for sale returns
     let balanceData = { previousBalance: 0, returnAmount: 0, currentBalance: 0 };
@@ -698,6 +723,12 @@ export default function ReturnsPage() {
                 <div class="signature-box">
                   <div class="signature-line">${partyLabel} Signature</div>
                 </div>
+                ${qrDataUrl ? `
+                <div style="text-align:center;">
+                  <img src="${qrDataUrl}" alt="QR Code" style="width:50px;height:50px;" />
+                  <div style="font-size:7px;margin-top:2px;">Scan to verify</div>
+                </div>
+                ` : ''}
                 <div class="signature-box">
                   <div class="signature-line">Authorized Signature</div>
                 </div>

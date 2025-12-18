@@ -12,6 +12,7 @@ import { Plus, RotateCcw, Save, Loader2, AlertTriangle, Share2, Printer, Chevron
 import { SalesLineItemRow, type SalesLineItemData } from "./SalesLineItemRow";
 import type { Customer, Item, User } from "@shared/schema";
 import companyLogoUrl from "@/assets/company-logo.jpg";
+import { generateQRCodeDataURL } from "@/lib/qrcode";
 
 interface StockBalance {
   itemName: string;
@@ -203,13 +204,22 @@ export function SalesOrderForm({
   });
 
   // Thermal printer print function (80mm receipt)
-  const printThermal = () => {
+  const printThermal = async () => {
     const customerName = selectedCustomer?.name || "Walk-in Customer";
     const previousBalance = customerBalance?.balance || 0;
     const invoiceAmount = parseFloat(totalKwd) || 0;
     const currentBalance = previousBalance + invoiceAmount;
     
     const validItems = lineItems.filter(li => li.itemName && li.quantity > 0);
+    
+    // Generate QR code
+    const qrDataUrl = await generateQRCodeDataURL({
+      type: 'SALE',
+      number: invoiceNumber || 'N/A',
+      amount: invoiceAmount.toFixed(3),
+      date: saleDate,
+      customer: customerName,
+    });
     
     const printWindow = window.open("", "_blank", "width=350,height=600");
     if (!printWindow) return;
@@ -280,6 +290,12 @@ export function SalesOrderForm({
         </div>
         <div class="divider"></div>
         <div class="footer">Thank You!</div>
+        ${qrDataUrl ? `
+        <div style="text-align:center;margin-top:15px;padding-top:10px;border-top:1px dashed #000;">
+          <img src="${qrDataUrl}" alt="QR Code" style="width:60px;height:60px;" />
+          <div style="font-size:8px;margin-top:3px;">Scan to verify</div>
+        </div>
+        ` : ''}
         <script>window.onload = function() { window.print(); }</script>
       </body>
       </html>
@@ -288,12 +304,21 @@ export function SalesOrderForm({
   };
 
   // A5 printer print function
-  const printA5 = () => {
+  const printA5 = async () => {
     const customerName = selectedCustomer?.name || "Walk-in Customer";
     const customerPhone = selectedCustomer?.phone || "";
     const customerAddress = "";
     const previousBalance = customerBalance?.balance || 0;
     const invoiceAmount = parseFloat(totalKwd) || 0;
+    
+    // Generate QR code
+    const qrDataUrl = await generateQRCodeDataURL({
+      type: 'SALE',
+      number: invoiceNumber || 'N/A',
+      amount: invoiceAmount.toFixed(3),
+      date: saleDate,
+      customer: customerName,
+    });
     const currentBalance = previousBalance + invoiceAmount;
     
     const validItems = lineItems.filter(li => li.itemName && li.quantity > 0);
@@ -402,6 +427,12 @@ export function SalesOrderForm({
               <div class="signature-box">
                 <div class="signature-line">Customer Signature</div>
               </div>
+              ${qrDataUrl ? `
+              <div style="text-align:center;">
+                <img src="${qrDataUrl}" alt="QR Code" style="width:50px;height:50px;" />
+                <div style="font-size:7px;margin-top:2px;">Scan to verify</div>
+              </div>
+              ` : ''}
               <div class="signature-box">
                 <div class="signature-line">Authorized Signature</div>
               </div>

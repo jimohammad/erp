@@ -4,6 +4,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import companyLogoUrl from "@/assets/company-logo.jpg";
+import { generateQRCodeDataURL } from "@/lib/qrcode";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -443,6 +444,15 @@ export default function PaymentInPage() {
     const amountNum = parseFloat(payment.amount);
     const amountWords = numberToWords(amountNum);
 
+    // Generate QR code
+    const qrDataUrl = await generateQRCodeDataURL({
+      type: 'PAYMENT_IN',
+      number: `PAY-${payment.id}`,
+      amount: amountNum.toFixed(3),
+      date: payment.paymentDate,
+      customer: customerName,
+    });
+
     let currentBalance = 0;
     let previousBalance = 0;
 
@@ -579,6 +589,12 @@ export default function PaymentInPage() {
           <p>Thank you for your payment!</p>
           <p>Printed: ${new Date().toLocaleString()}</p>
         </div>
+        ${qrDataUrl ? `
+        <div style="text-align:center;margin-top:10px;padding-top:8px;border-top:1px dashed #000;">
+          <img src="${qrDataUrl}" alt="QR Code" style="width:60px;height:60px;" />
+          <div style="font-size:8px;margin-top:3px;">Scan to verify</div>
+        </div>
+        ` : ''}
       </body>
       </html>
     `);
@@ -591,6 +607,15 @@ export default function PaymentInPage() {
     const customerPhone = payment.customer?.phone || "";
     const amountNum = parseFloat(payment.amount);
     const amountWords = numberToWords(amountNum);
+
+    // Generate QR code
+    const qrDataUrl = await generateQRCodeDataURL({
+      type: 'PAYMENT_IN',
+      number: `PAY-${payment.id}`,
+      amount: amountNum.toFixed(3),
+      date: payment.paymentDate,
+      customer: customerName,
+    });
 
     let currentBalance = 0;
     let previousBalance = 0;
@@ -718,6 +743,12 @@ export default function PaymentInPage() {
               <div class="signature-box">
                 <div class="signature-line">Customer Signature</div>
               </div>
+              ${qrDataUrl ? `
+              <div style="text-align:center;">
+                <img src="${qrDataUrl}" alt="QR Code" style="width:50px;height:50px;" />
+                <div style="font-size:7px;margin-top:2px;">Scan to verify</div>
+              </div>
+              ` : ''}
               <div class="signature-box">
                 <div class="signature-line">Authorized Signature</div>
               </div>
