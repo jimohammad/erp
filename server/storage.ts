@@ -1883,10 +1883,10 @@ export class DatabaseStorage implements IStorage {
           return_number as reference,
           'Sales Return' as description,
           0::float as debit,
-          COALESCE(CAST(total_amount AS DECIMAL), 0)::float as credit,
+          COALESCE(CAST(total_kwd AS DECIMAL), 0)::float as credit,
           created_at
         FROM returns
-        WHERE customer_id = ${customerId} AND return_type = 'sale'
+        WHERE customer_id = ${customerId} AND return_type = 'sale_return'
         ${dateFilter}
       )
       SELECT 
