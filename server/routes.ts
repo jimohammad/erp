@@ -498,6 +498,26 @@ export async function registerRoutes(
       // Default to Head Office (id: 1) if no branchId provided
       const branchId = orderData.branchId || 1;
       
+      // Validate stock availability before creating order
+      if (lineItems && lineItems.length > 0) {
+        const stockBalance = await storage.getStockBalance();
+        const stockMap = new Map<string, number>();
+        for (const item of stockBalance) {
+          stockMap.set(item.itemName, item.balance);
+        }
+        
+        for (const lineItem of lineItems) {
+          if (lineItem.itemName && lineItem.quantity > 0) {
+            const available = stockMap.get(lineItem.itemName) ?? 0;
+            if (lineItem.quantity > available) {
+              return res.status(400).json({ 
+                error: `Insufficient stock for "${lineItem.itemName}". Available: ${available}, Requested: ${lineItem.quantity}` 
+              });
+            }
+          }
+        }
+      }
+      
       // Handle customerId - Party Master customers have IDs offset by 100000
       // If ID >= 100000, it's from Party Master (suppliers table)
       // We need to sync this to the customers table first

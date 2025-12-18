@@ -178,10 +178,12 @@ export function SalesOrderForm({
     if (isCustomerMissing) return false;
     // At least one valid line item with item, qty > 0, and price > 0 is required
     if (!hasValidLineItem) return false;
+    // Cannot sell items that exceed available stock
+    if (stockExceeded) return false;
     // Credit limit exceeded blocks non-admin users
     if (creditLimitBlocked) return false;
     return true;
-  }, [isCustomerMissing, hasValidLineItem, creditLimitBlocked]);
+  }, [isCustomerMissing, hasValidLineItem, stockExceeded, creditLimitBlocked]);
 
   // Get user's printer preference
   const { data: userData } = useQuery<User>({
