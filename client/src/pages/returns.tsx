@@ -825,24 +825,35 @@ export default function ReturnsPage() {
                     <FormField
                       control={form.control}
                       name="customerId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Customer</FormLabel>
-                          <Select value={field.value} onValueChange={field.onChange}>
-                            <SelectTrigger data-testid="select-customer">
-                              <SelectValue placeholder="Select customer" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {customers.map((customer) => (
-                                <SelectItem key={customer.id} value={customer.id.toString()}>
-                                  {customer.name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const selectedCustomer = customers.find(c => c.id.toString() === field.value);
+                        const customerBalance = selectedCustomer ? parseFloat(selectedCustomer.balance || "0") : 0;
+                        return (
+                          <FormItem>
+                            <FormLabel>Customer</FormLabel>
+                            <Select value={field.value} onValueChange={field.onChange}>
+                              <SelectTrigger data-testid="select-customer">
+                                <SelectValue placeholder="Select customer" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {customers.map((customer) => (
+                                  <SelectItem key={customer.id} value={customer.id.toString()}>
+                                    {customer.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {selectedCustomer && (
+                              <p className="text-sm text-muted-foreground" data-testid="text-customer-balance">
+                                Due: <span className={customerBalance > 0 ? "text-red-600 font-medium" : "text-green-600 font-medium"}>
+                                  {customerBalance.toFixed(3)} KWD
+                                </span>
+                              </p>
+                            )}
+                            <FormMessage />
+                          </FormItem>
+                        );
+                      }}
                     />
                   ) : (
                     <FormField
