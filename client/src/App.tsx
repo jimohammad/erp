@@ -534,7 +534,7 @@ function AppSidebar() {
                   >
                     <Link href="/parties" data-testid="link-party-master">
                       <Users className="h-4 w-4" />
-                      <span>Party Master</span>
+                      <span>Parties</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -666,7 +666,7 @@ function AuthenticatedLayout() {
       case "/items/bulk-edit":
         return "Items - Bulk Edit";
       case "/parties":
-        return "Party Master";
+        return "Parties";
       case "/reports":
         return "Reports";
       case "/reports/party-statement":
