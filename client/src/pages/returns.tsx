@@ -130,6 +130,11 @@ export default function ReturnsPage() {
     queryKey: ["/api/customers"],
   });
 
+  // Fetch calculated customer balances (includes sales, payments, returns)
+  const { data: customerBalances = [] } = useQuery<{ customerId: number; balance: number }[]>({
+    queryKey: ["/api/customers/balances/all"],
+  });
+
   const { data: allSuppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
@@ -826,7 +831,9 @@ export default function ReturnsPage() {
                       name="customerId"
                       render={({ field }) => {
                         const selectedCustomer = customers.find(c => c.id.toString() === field.value);
-                        const customerBalance = selectedCustomer ? parseFloat(selectedCustomer.balance || "0") : 0;
+                        // Use calculated balance from customerBalances API
+                        const balanceData = customerBalances.find(b => b.customerId === selectedCustomer?.id);
+                        const customerBalance = balanceData?.balance || 0;
                         return (
                           <FormItem>
                             <FormLabel>Customer</FormLabel>
