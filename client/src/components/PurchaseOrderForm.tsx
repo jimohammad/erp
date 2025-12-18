@@ -369,8 +369,8 @@ export function PurchaseOrderForm({
                           .details { margin: 20px 0; }
                           .row { display: flex; justify-content: space-between; padding: 4px 0; }
                           table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                          th { background: #f5f5f5; }
+                          th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+                          th { font-weight: bold; }
                           .total { font-size: 18px; font-weight: bold; margin-top: 20px; text-align: right; }
                         </style>
                       </head>

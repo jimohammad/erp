@@ -390,8 +390,7 @@ export function SalesOrderDetail({
             }
             
             .items-table thead tr {
-              background: #8B7CB3;
-              color: #fff;
+              background: #fff;
             }
             
             .items-table th {
@@ -399,7 +398,7 @@ export function SalesOrderDetail({
               text-align: left;
               font-size: 7px;
               font-weight: 600;
-              border: 1px solid #8B7CB3;
+              border: 1px solid #000;
             }
             
             .items-table th.text-center { text-align: center; }
@@ -407,7 +406,7 @@ export function SalesOrderDetail({
             
             .items-table td {
               padding: 3px 4px;
-              border: 1px solid #ddd;
+              border: 1px solid #000;
               font-size: 8px;
               vertical-align: middle;
             }
@@ -417,7 +416,6 @@ export function SalesOrderDetail({
             
             .items-table .total-row {
               font-weight: 600;
-              background: #f9f9f9;
             }
             
             .bottom-section {
@@ -434,17 +432,18 @@ export function SalesOrderDetail({
             }
             
             .section-header {
-              background: #8B7CB3;
-              color: #fff;
+              background: #fff;
+              color: #000;
               padding: 3px 5px;
               font-size: 7px;
               font-weight: 600;
+              border: 1px solid #000;
+              border-bottom: none;
             }
             
             .section-content {
               padding: 4px 5px;
-              border: 1px solid #ddd;
-              border-top: none;
+              border: 1px solid #000;
               font-size: 8px;
               min-height: 18px;
             }
@@ -456,12 +455,12 @@ export function SalesOrderDetail({
             
             .amounts-table td {
               padding: 3px 5px;
-              border: 1px solid #ddd;
+              border: 1px solid #000;
               font-size: 8px;
             }
             
             .amounts-table td:first-child {
-              background: #f9f9f9;
+              font-weight: 600;
             }
             
             .amounts-table td:last-child {
@@ -469,21 +468,23 @@ export function SalesOrderDetail({
             }
             
             .amounts-header {
-              background: #8B7CB3;
-              color: #fff;
+              background: #fff;
+              color: #000;
               padding: 3px 5px;
               font-size: 7px;
               font-weight: 600;
+              border: 1px solid #000;
+              border-bottom: none;
             }
             
             .balance-row td {
               padding: 3px 5px;
-              border: 1px solid #ddd;
+              border: 1px solid #000;
               font-size: 8px;
             }
             
             .balance-row td:first-child {
-              background: #f9f9f9;
+              font-weight: 600;
             }
             
             .balance-row td:last-child {
@@ -493,9 +494,6 @@ export function SalesOrderDetail({
             @media print {
               body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               .invoice-container { padding: 8px; }
-              .items-table thead tr { background: #8B7CB3 !important; }
-              .section-header { background: #8B7CB3 !important; }
-              .amounts-header { background: #8B7CB3 !important; }
             }
             
             @page { size: A5; margin: 5mm; }
@@ -797,8 +795,7 @@ export function SalesOrderDetail({
             }
             
             .items-table thead tr {
-              background: #8B7CB3;
-              color: #fff;
+              background: #fff;
             }
             
             .items-table th {
@@ -806,7 +803,7 @@ export function SalesOrderDetail({
               text-align: left;
               font-size: 7px;
               font-weight: 600;
-              border: 1px solid #8B7CB3;
+              border: 1px solid #000;
             }
             
             .items-table th.text-center { text-align: center; }
@@ -814,7 +811,7 @@ export function SalesOrderDetail({
             
             .items-table td {
               padding: 3px 4px;
-              border: 1px solid #ddd;
+              border: 1px solid #000;
               font-size: 8px;
               vertical-align: middle;
             }
@@ -824,7 +821,6 @@ export function SalesOrderDetail({
             
             .items-table .total-row {
               font-weight: 600;
-              background: #f9f9f9;
             }
             
             .bottom-section {
@@ -841,17 +837,18 @@ export function SalesOrderDetail({
             }
             
             .section-header {
-              background: #8B7CB3;
-              color: #fff;
+              background: #fff;
+              color: #000;
               padding: 3px 5px;
               font-size: 7px;
               font-weight: 600;
+              border: 1px solid #000;
+              border-bottom: none;
             }
             
             .section-content {
               padding: 4px 5px;
-              border: 1px solid #ddd;
-              border-top: none;
+              border: 1px solid #000;
               font-size: 8px;
               min-height: 18px;
             }
@@ -863,12 +860,12 @@ export function SalesOrderDetail({
             
             .amounts-table td {
               padding: 3px 5px;
-              border: 1px solid #ddd;
+              border: 1px solid #000;
               font-size: 8px;
             }
             
             .amounts-table td:first-child {
-              background: #f9f9f9;
+              font-weight: 600;
             }
             
             .amounts-table td:last-child {
@@ -876,21 +873,23 @@ export function SalesOrderDetail({
             }
             
             .amounts-header {
-              background: #8B7CB3;
-              color: #fff;
+              background: #fff;
+              color: #000;
               padding: 3px 5px;
               font-size: 7px;
               font-weight: 600;
+              border: 1px solid #000;
+              border-bottom: none;
             }
             
             .balance-row td {
               padding: 3px 5px;
-              border: 1px solid #ddd;
+              border: 1px solid #000;
               font-size: 8px;
             }
             
             .balance-row td:first-child {
-              background: #f9f9f9;
+              font-weight: 600;
             }
             
             .balance-row td:last-child {
@@ -901,9 +900,6 @@ export function SalesOrderDetail({
               .pdf-instructions { display: none !important; }
               body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               .invoice-container { padding: 8px; }
-              .items-table thead tr { background: #8B7CB3 !important; }
-              .section-header { background: #8B7CB3 !important; }
-              .amounts-header { background: #8B7CB3 !important; }
             }
             
             @page { size: A5; margin: 5mm; }

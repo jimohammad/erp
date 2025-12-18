@@ -63,12 +63,12 @@ export default function AccountStatement() {
           body { font-family: Arial, sans-serif; margin: 20px; }
           h1 { text-align: center; margin-bottom: 5px; }
           .subtitle { text-align: center; color: #666; margin-bottom: 20px; }
-          .filters { margin-bottom: 20px; padding: 10px; background: #f5f5f5; border-radius: 4px; }
+          .filters { margin-bottom: 20px; padding: 10px; border: 1px solid #000; border-radius: 4px; }
           table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #f0f0f0; }
+          th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+          th { font-weight: bold; }
           .text-right { text-align: right; }
-          .totals { font-weight: bold; background-color: #f9f9f9; }
+          .totals { font-weight: bold; border-top: 2px solid #000; }
           .in { color: green; }
           .out { color: red; }
           @media print { body { margin: 0; } }

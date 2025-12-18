@@ -109,12 +109,12 @@ export default function StockLookupPage() {
       const rows = filteredAndSortedStock.map(item => {
         const status = item.balance <= 0 ? "Out of Stock" : item.balance <= 5 ? "Low Stock" : "In Stock";
         return `<tr>
-          <td style="padding: 8px; border: 1px solid #ddd;">${item.itemName}</td>
-          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${item.purchased.toLocaleString()}</td>
-          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${item.sold.toLocaleString()}</td>
-          <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${item.openingStock.toLocaleString()}</td>
-          <td style="padding: 8px; border: 1px solid #ddd; text-align: right; font-weight: bold;">${item.balance.toLocaleString()}</td>
-          <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${status}</td>
+          <td style="padding: 8px; border: 1px solid #000;">${item.itemName}</td>
+          <td style="padding: 8px; border: 1px solid #000; text-align: right;">${item.purchased.toLocaleString()}</td>
+          <td style="padding: 8px; border: 1px solid #000; text-align: right;">${item.sold.toLocaleString()}</td>
+          <td style="padding: 8px; border: 1px solid #000; text-align: right;">${item.openingStock.toLocaleString()}</td>
+          <td style="padding: 8px; border: 1px solid #000; text-align: right; font-weight: bold;">${item.balance.toLocaleString()}</td>
+          <td style="padding: 8px; border: 1px solid #000; text-align: center;">${status}</td>
         </tr>`;
       }).join("");
 
@@ -128,11 +128,11 @@ export default function StockLookupPage() {
             h1 { margin-bottom: 5px; }
             .subtitle { color: #666; margin-bottom: 20px; }
             table { width: 100%; border-collapse: collapse; }
-            th { padding: 10px 8px; border: 1px solid #ddd; background: #f5f5f5; text-align: left; }
+            th { padding: 10px 8px; border: 1px solid #000; font-weight: bold; text-align: left; }
             th.right { text-align: right; }
             th.center { text-align: center; }
             .summary { margin-bottom: 20px; display: flex; gap: 20px; }
-            .summary-item { padding: 10px 15px; background: #f9f9f9; border-radius: 4px; }
+            .summary-item { padding: 10px 15px; border: 1px solid #000; border-radius: 4px; }
             .summary-label { font-size: 12px; color: #666; }
             .summary-value { font-size: 18px; font-weight: bold; }
           </style>

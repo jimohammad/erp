@@ -360,7 +360,6 @@ export default function PaymentOutPage() {
             padding: 8px; 
             margin: 10px 0; 
             text-align: center;
-            background: #f0f0f0;
           }
           .amount { font-size: 20px; font-weight: bold; }
           .words { font-size: 10px; font-style: italic; margin-top: 4px; }

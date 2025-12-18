@@ -382,8 +382,7 @@ export default function AllSalesPage() {
               text-align: center;
               padding: 2mm;
               margin: 2mm 0;
-              background: #000;
-              color: #fff;
+              border: 2px solid #000;
             }
             
             .total-label {
@@ -476,11 +475,11 @@ export default function AllSalesPage() {
 
     const itemsHtml = selectedSO.lineItems.map((li, idx) => `
       <tr>
-        <td style="padding:8px;border:1px solid #ddd;text-align:center;">${idx + 1}</td>
-        <td style="padding:8px;border:1px solid #ddd;">${escapeHtml(li.itemName)}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:center;">${li.quantity}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${parseFloat(li.priceKwd || "0").toFixed(3)}</td>
-        <td style="padding:8px;border:1px solid #ddd;text-align:right;">${(li.quantity * parseFloat(li.priceKwd || "0")).toFixed(3)}</td>
+        <td style="padding:8px;border:1px solid #000;text-align:center;">${idx + 1}</td>
+        <td style="padding:8px;border:1px solid #000;">${escapeHtml(li.itemName)}</td>
+        <td style="padding:8px;border:1px solid #000;text-align:center;">${li.quantity}</td>
+        <td style="padding:8px;border:1px solid #000;text-align:right;">${parseFloat(li.priceKwd || "0").toFixed(3)}</td>
+        <td style="padding:8px;border:1px solid #000;text-align:right;">${(li.quantity * parseFloat(li.priceKwd || "0")).toFixed(3)}</td>
       </tr>
     `).join("");
 
@@ -492,27 +491,28 @@ export default function AllSalesPage() {
         <style>
           @page { size: A5; margin: 10mm; }
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; font-size: 12px; color: #333; }
-          .header { background: linear-gradient(135deg, #8B7CB3 0%, #6B5B95 100%); color: white; padding: 20px; display: flex; align-items: center; gap: 20px; }
-          .logo { width: 80px; height: 80px; background: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+          body { font-family: Arial, sans-serif; font-size: 12px; color: #000; }
+          .header { border: 1px solid #000; padding: 20px; display: flex; align-items: center; gap: 20px; }
+          .logo { width: 80px; height: 80px; border: 1px solid #000; border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
           .logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
           .company-info { flex: 1; }
           .company-name { font-size: 24px; font-weight: bold; margin-bottom: 5px; }
-          .company-details { font-size: 11px; opacity: 0.9; }
+          .company-details { font-size: 11px; }
           .invoice-title { text-align: right; }
           .invoice-title h1 { font-size: 28px; margin-bottom: 5px; }
           .content { padding: 20px; }
           .info-section { display: flex; justify-content: space-between; margin-bottom: 20px; }
-          .info-box { background: #f8f8f8; padding: 15px; border-radius: 5px; width: 48%; }
-          .info-box h3 { color: #6B5B95; margin-bottom: 10px; font-size: 14px; }
+          .info-box { border: 1px solid #000; padding: 15px; border-radius: 5px; width: 48%; }
+          .info-box h3 { font-weight: bold; margin-bottom: 10px; font-size: 14px; }
           .info-row { margin: 5px 0; }
           .info-label { font-weight: bold; display: inline-block; width: 100px; }
           table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-          th { background: #6B5B95; color: white; padding: 10px; text-align: left; }
+          th { border: 1px solid #000; padding: 10px; text-align: left; font-weight: bold; }
+          td { border: 1px solid #000; }
           .totals-section { display: flex; justify-content: flex-end; }
-          .totals-box { width: 300px; background: #f8f8f8; padding: 15px; border-radius: 5px; }
+          .totals-box { width: 300px; border: 1px solid #000; padding: 15px; border-radius: 5px; }
           .totals-row { display: flex; justify-content: space-between; padding: 5px 0; }
-          .totals-row.total { font-weight: bold; font-size: 16px; border-top: 2px solid #6B5B95; padding-top: 10px; margin-top: 5px; color: #6B5B95; }
+          .totals-row.total { font-weight: bold; font-size: 16px; border-top: 2px solid #000; padding-top: 10px; margin-top: 5px; }
           .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; }
           .terms { font-size: 10px; color: #666; }
           .signature-section { display: flex; justify-content: space-between; margin-top: 40px; }

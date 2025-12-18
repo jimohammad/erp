@@ -100,8 +100,8 @@ export default function ExportImeiPage() {
             .title { font-size: 18px; margin-top: 10px; }
             .summary { margin: 20px 0; font-size: 14px; }
             table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
-            th { background: #f5f5f5; }
+            th, td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 12px; }
+            th { font-weight: bold; }
           </style>
         </head>
         <body>
@@ -147,10 +147,10 @@ export default function ExportImeiPage() {
             .date { font-size: 12px; color: #666; margin-top: 5px; }
             .summary { margin: 20px 0; font-size: 14px; }
             table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px; }
-            th { background: #f5f5f5; font-weight: bold; }
-            .footer { margin-top: 20px; text-align: center; font-size: 10px; color: #666; }
-            .instructions { margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 5px; text-align: center; }
+            th, td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 11px; }
+            th { font-weight: bold; }
+            .footer { margin-top: 20px; text-align: center; font-size: 10px; color: #333; }
+            .instructions { margin-top: 20px; padding: 15px; border: 1px dashed #000; border-radius: 5px; text-align: center; }
             .instructions p { margin: 5px 0; }
             @media print { .instructions { display: none; } }
           </style>

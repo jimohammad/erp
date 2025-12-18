@@ -466,7 +466,7 @@ export default function PaymentsPage() {
             .value { font-weight: bold; text-align: right; }
             .divider { border-top: 1px dashed #000; margin: 2mm 0; }
             .total-row { font-size: 12pt; font-weight: bold; }
-            .balance-section { background: #f0f0f0; padding: 2mm; margin: 2mm 0; }
+            .balance-section { border: 1px solid #000; padding: 2mm; margin: 2mm 0; }
             .footer { text-align: center; margin-top: 3mm; font-size: 8pt; border-top: 1px dashed #000; padding-top: 2mm; }
             @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
           </style>
@@ -716,13 +716,12 @@ export default function PaymentsPage() {
             }
             
             .amounts-table .header-row th {
-              background: #6b5b95;
-              color: white;
+              border: 1px solid #000;
               font-weight: bold;
             }
             
             .amounts-table .data-row td {
-              border-bottom: 1px solid #ddd;
+              border-bottom: 1px solid #000;
             }
             
             .amounts-table .amount-col {

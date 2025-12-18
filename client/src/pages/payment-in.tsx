@@ -522,7 +522,7 @@ export default function PaymentInPage() {
           .value { font-weight: bold; text-align: right; }
           .divider { border-top: 1px dashed #000; margin: 2mm 0; }
           .total-row { font-size: 12pt; font-weight: bold; }
-          .balance-section { background: #f0f0f0; padding: 2mm; margin: 2mm 0; }
+          .balance-section { border: 1px solid #000; padding: 2mm; margin: 2mm 0; }
           .footer { text-align: center; margin-top: 3mm; font-size: 8pt; border-top: 1px dashed #000; padding-top: 2mm; }
           @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
         </style>
@@ -638,8 +638,7 @@ export default function PaymentInPage() {
             padding: 10mm;
           }
           .voucher-title {
-            background: linear-gradient(135deg, #6b5b95 0%, #8b7bb5 100%);
-            color: white;
+            border: 2px solid #000;
             text-align: center;
             padding: 4mm;
             font-size: 14pt;
@@ -650,7 +649,7 @@ export default function PaymentInPage() {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            border-bottom: 2px solid #6b5b95;
+            border-bottom: 2px solid #000;
             padding-bottom: 5mm;
             margin-bottom: 8mm;
           }
@@ -662,8 +661,7 @@ export default function PaymentInPage() {
           .company-logo {
             width: 15mm;
             height: 15mm;
-            background: #6b5b95;
-            color: white;
+            border: 1px solid #000;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -672,24 +670,22 @@ export default function PaymentInPage() {
           }
           .company-arabic {
             font-size: 9pt;
-            color: #666;
+            color: #333;
           }
           .company-contact {
             text-align: right;
           }
           .company-name-right {
             font-weight: bold;
-            color: #6b5b95;
           }
           .phone-no {
             font-size: 9pt;
-            color: #666;
+            color: #333;
           }
           .main-title {
             text-align: center;
             font-size: 16pt;
             font-weight: bold;
-            color: #6b5b95;
             margin: 5mm 0;
           }
           .content-section {
@@ -737,8 +733,7 @@ export default function PaymentInPage() {
             font-size: 10pt;
           }
           .amounts-table .header-row th {
-            background: #6b5b95;
-            color: white;
+            border: 1px solid #000;
             font-weight: bold;
           }
           .amounts-table .data-row td {

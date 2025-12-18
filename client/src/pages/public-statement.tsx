@@ -78,14 +78,14 @@ export default function PublicStatementPage() {
             .header { text-align: center; margin-bottom: 20px; }
             .company { font-size: 24px; font-weight: bold; }
             .title { font-size: 18px; margin-top: 10px; }
-            .customer-info { margin: 20px 0; padding: 15px; background: #f5f5f5; border-radius: 5px; }
+            .customer-info { margin: 20px 0; padding: 15px; border: 1px solid #000; border-radius: 5px; }
             table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px; }
-            th { background: #f5f5f5; }
+            th, td { border: 1px solid #000; padding: 8px; text-align: left; font-size: 11px; }
+            th { font-weight: bold; }
             .amount { text-align: right; }
             .summary { margin-top: 20px; text-align: right; }
             .balance { font-weight: bold; font-size: 16px; }
-            .instructions { margin-top: 20px; padding: 15px; background: #f9f9f9; text-align: center; }
+            .instructions { margin-top: 20px; padding: 15px; border: 1px dashed #000; text-align: center; }
             @media print { .instructions { display: none; } }
           </style>
         </head>

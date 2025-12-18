@@ -414,19 +414,17 @@ export default function PurchaseOrdersPage() {
               margin: 20px 0;
             }
             .items-table th {
-              background: #1a1a2e;
-              color: #fff;
+              border: 1px solid #000;
               padding: 10px 8px;
               font-size: 11px;
-              font-weight: 500;
+              font-weight: 600;
               text-transform: uppercase;
             }
             .items-table td {
               padding: 10px 8px;
-              border-bottom: 1px solid #eee;
+              border: 1px solid #000;
               font-size: 12px;
             }
-            .items-table tbody tr:nth-child(even) { background: #f9f9f9; }
             .text-right { text-align: right; }
             .text-center { text-align: center; }
             .totals-section {
@@ -446,15 +444,14 @@ export default function PurchaseOrdersPage() {
             .totals-row.total {
               font-weight: 600;
               font-size: 14px;
-              background: #f0f0f0;
+              border: 1px solid #000;
               padding: 10px;
-              border: none;
               margin-top: 5px;
             }
             .notes-section {
               margin-top: 20px;
               padding: 10px;
-              background: #f9f9f9;
+              border: 1px solid #000;
               border-radius: 5px;
             }
             @media print {
@@ -522,7 +519,7 @@ export default function PurchaseOrdersPage() {
                     <td class="text-right">${formatCurrency(item.totalKwd)}</td>
                   </tr>
                 `).join("")}
-                <tr style="font-weight:500;background:#f0f0f0;">
+                <tr style="font-weight:500;border-top:2px solid #000;">
                   <td></td>
                   <td style="text-align:right;">Total Items: ${po.lineItems.length}</td>
                   <td class="text-center">${totalQuantity}</td>

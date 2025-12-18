@@ -317,33 +317,33 @@ export function SalesOrderForm({
         <style>
           @page { size: A5; margin: 6mm; }
           * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: Arial, sans-serif; font-size: 9px; color: #333; }
-          .header { background: linear-gradient(135deg, #8B7CB3 0%, #6B5B95 100%); color: white; padding: 10px 12px; display: flex; align-items: center; gap: 12px; }
-          .logo { width: 50px; height: 50px; background: white; border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+          body { font-family: Arial, sans-serif; font-size: 9px; color: #000; }
+          .header { border: 1px solid #000; padding: 10px 12px; display: flex; align-items: center; gap: 12px; }
+          .logo { width: 50px; height: 50px; border: 1px solid #000; border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
           .logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
           .company-info { flex: 1; }
           .company-name { font-size: 14px; font-weight: bold; margin-bottom: 2px; }
-          .company-details { font-size: 8px; opacity: 0.9; }
+          .company-details { font-size: 8px; }
           .invoice-title { text-align: right; }
           .invoice-title h1 { font-size: 16px; margin-bottom: 2px; }
           .invoice-title div { font-size: 9px; }
           .content { padding: 10px 12px; }
           .info-section { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
-          .info-box { background: #f8f8f8; padding: 8px; border-radius: 3px; flex: 1; }
-          .info-box h3 { color: #6B5B95; margin-bottom: 5px; font-size: 10px; }
+          .info-box { border: 1px solid #000; padding: 8px; border-radius: 3px; flex: 1; }
+          .info-box h3 { font-weight: bold; margin-bottom: 5px; font-size: 10px; }
           .info-row { margin: 2px 0; font-size: 9px; }
           .info-label { font-weight: bold; display: inline-block; width: 60px; }
           table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-          th { background: #6B5B95; color: white; padding: 4px 3px; text-align: left; font-size: 8px; }
-          td { font-size: 9px; }
+          th { border: 1px solid #000; padding: 4px 3px; text-align: left; font-size: 8px; font-weight: bold; }
+          td { font-size: 9px; border: 1px solid #000; }
           .totals-section { display: flex; justify-content: flex-end; }
-          .totals-box { width: 180px; background: #f8f8f8; padding: 8px; border-radius: 3px; }
+          .totals-box { width: 180px; border: 1px solid #000; padding: 8px; border-radius: 3px; }
           .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 9px; }
-          .totals-row.total { font-weight: bold; font-size: 10px; border-top: 1px solid #6B5B95; padding-top: 5px; margin-top: 3px; color: #6B5B95; }
-          .footer { margin-top: 15px; padding-top: 10px; border-top: 1px solid #ddd; }
+          .totals-row.total { font-weight: bold; font-size: 10px; border-top: 2px solid #000; padding-top: 5px; margin-top: 3px; }
+          .footer { margin-top: 15px; padding-top: 10px; border-top: 1px solid #000; }
           .signature-section { display: flex; justify-content: space-between; margin-top: 20px; }
           .signature-box { width: 120px; text-align: center; font-size: 8px; }
-          .signature-line { border-top: 1px solid #333; margin-top: 30px; padding-top: 3px; }
+          .signature-line { border-top: 1px solid #000; margin-top: 30px; padding-top: 3px; }
         </style>
       </head>
       <body>

@@ -596,37 +596,36 @@ export default function ReturnsPage() {
           <style>
             @page { size: A5; margin: 5mm; }
             * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; font-size: 8px; color: #333; }
+            body { font-family: Arial, sans-serif; font-size: 8px; color: #000; }
             .container { max-width: 100%; padding: 8px; }
-            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e40af; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #000; }
             .logo-section { }
-            .company-name { font-size: 14px; font-weight: bold; color: #1e40af; }
-            .company-sub { font-size: 7px; color: #64748b; }
+            .company-name { font-size: 14px; font-weight: bold; color: #000; }
+            .company-sub { font-size: 7px; color: #333; }
             .document-section { text-align: right; }
-            .document-title { font-size: 12px; font-weight: bold; color: #1e40af; margin-bottom: 2px; }
+            .document-title { font-size: 12px; font-weight: bold; color: #000; margin-bottom: 2px; }
             .return-number { font-size: 10px; font-weight: bold; }
-            .return-badge { display: inline-block; padding: 2px 8px; background: ${ret.returnType === "sale_return" ? "#dbeafe" : "#fef3c7"}; color: ${ret.returnType === "sale_return" ? "#1e40af" : "#92400e"}; border-radius: 2px; font-weight: 600; font-size: 7px; margin-top: 3px; }
+            .return-badge { display: inline-block; padding: 2px 8px; border: 1px solid #000; border-radius: 2px; font-weight: 600; font-size: 7px; margin-top: 3px; }
             .info-section { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-            .info-box { padding: 4px 6px; background: #f8fafc; border-radius: 3px; flex: 1; }
-            .info-label { font-size: 6px; color: #64748b; text-transform: uppercase; margin-bottom: 1px; }
+            .info-box { padding: 4px 6px; border: 1px solid #000; border-radius: 3px; flex: 1; }
+            .info-label { font-size: 6px; color: #333; text-transform: uppercase; margin-bottom: 1px; }
             .info-value { font-size: 8px; font-weight: 600; }
             table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-            thead { background: #1e40af; color: white; }
-            th { padding: 3px 4px; text-align: left; font-size: 7px; text-transform: uppercase; border: 1px solid #1e40af; }
+            thead { background: #fff; }
+            th { padding: 3px 4px; text-align: left; font-size: 7px; text-transform: uppercase; border: 1px solid #000; font-weight: bold; }
             th.text-center { text-align: center; }
             th.text-right { text-align: right; }
-            td { padding: 3px 4px; border: 1px solid #ddd; font-size: 8px; vertical-align: middle; }
+            td { padding: 3px 4px; border: 1px solid #000; font-size: 8px; vertical-align: middle; }
             td.text-center { text-align: center; }
             td.text-right { text-align: right; }
-            tbody tr:nth-child(even) { background: #f8fafc; }
-            .total-row { background: #f1f5f9; font-weight: bold; }
-            .total-row td { padding: 3px 4px; font-size: 8px; }
-            .balance-section { margin-top: 6px; padding: 6px; background: #f8fafc; border-radius: 3px; border: 1px solid #ddd; }
+            .total-row { font-weight: bold; }
+            .total-row td { padding: 3px 4px; font-size: 8px; border-top: 2px solid #000; }
+            .balance-section { margin-top: 6px; padding: 6px; border: 1px solid #000; border-radius: 3px; }
             .balance-table { width: 100%; border-collapse: collapse; }
-            .balance-table td { padding: 3px 4px; font-size: 8px; border-bottom: 1px solid #e5e7eb; }
-            .balance-table .current-balance { font-weight: bold; font-size: 9px; border-top: 1px solid #333; padding-top: 4px; }
-            .footer { margin-top: 10px; padding-top: 6px; border-top: 1px solid #e5e7eb; text-align: center; color: #64748b; font-size: 6px; }
-            @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } thead { background: #1e40af !important; } }
+            .balance-table td { padding: 3px 4px; font-size: 8px; border-bottom: 1px solid #000; }
+            .balance-table .current-balance { font-weight: bold; font-size: 9px; border-top: 2px solid #000; padding-top: 4px; }
+            .footer { margin-top: 10px; padding-top: 6px; border-top: 1px solid #000; text-align: center; color: #333; font-size: 6px; }
+            @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
           </style>
         </head>
         <body>
