@@ -299,6 +299,174 @@ function AppSidebar() {
                 </SidebarMenuItem>
               )}
 
+              {/* Sales - second after Dashboard */}
+              {canAccess("sales") && (
+                <Collapsible open={expandedMenu === "sales"} onOpenChange={() => handleMenuToggle("sales")} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <div className="flex items-center w-full">
+                      <SidebarMenuButton 
+                        asChild 
+                        isActive={location === "/sales"}
+                        className="flex-1"
+                      >
+                        <Link href="/sales" data-testid="link-sales">
+                          <TrendingUp className="h-4 w-4" />
+                          <span>Sales</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                          <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {salesSubItems.map((subItem) => (
+                          <SidebarMenuSubItem key={subItem.url}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location === subItem.url}
+                            >
+                              <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(" ", "-")}`}>
+                                {subItem.title}
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+
+              {/* Payment IN - third after Sales */}
+              {canAccess("payments") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/payments/in"}
+                  >
+                    <Link href="/payments/in" data-testid="link-payment-in">
+                      <ArrowDownLeft className="h-4 w-4" />
+                      <span>Payment IN</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
+              {/* Items - fourth after Payment IN */}
+              {canAccess("items") && (
+                <Collapsible open={expandedMenu === "items"} onOpenChange={() => handleMenuToggle("items")} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <div className="flex items-center w-full">
+                      <SidebarMenuButton 
+                        asChild 
+                        isActive={location === "/items"}
+                        className="flex-1"
+                      >
+                        <Link href="/items" data-testid="link-item-master">
+                          <Package className="h-4 w-4" />
+                          <span>Items</span>
+                        </Link>
+                      </SidebarMenuButton>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                          <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        {itemMasterSubItems.map((subItem) => (
+                          <SidebarMenuSubItem key={subItem.url}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location === subItem.url}
+                            >
+                              <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(" ", "-")}`}>
+                                {subItem.title}
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+
+              {/* Parties - fifth after Items */}
+              {canAccess("parties") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/parties"}
+                  >
+                    <Link href="/parties" data-testid="link-party-master">
+                      <Users className="h-4 w-4" />
+                      <span>Parties</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
+              {/* Purchase */}
+              {canAccess("purchases") && (
+                <Collapsible open={expandedMenu === "purchases"} onOpenChange={() => handleMenuToggle("purchases")} className="group/collapsible">
+                  <SidebarMenuItem>
+                    <CollapsibleTrigger asChild>
+                      <SidebarMenuButton isActive={location.startsWith("/purchases")}>
+                        <ShoppingCart className="h-4 w-4" />
+                        <span>Purchase</span>
+                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                      </SidebarMenuButton>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <SidebarMenuSub>
+                        <SidebarMenuSubItem>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={location === "/purchases"}
+                          >
+                            <Link href="/purchases" data-testid="link-new-purchase">
+                              New
+                            </Link>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                        {purchasesSubItems.map((subItem) => (
+                          <SidebarMenuSubItem key={subItem.url}>
+                            <SidebarMenuSubButton
+                              asChild
+                              isActive={location === subItem.url}
+                            >
+                              <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(/\s+/g, "-")}`}>
+                                {subItem.title}
+                              </Link>
+                            </SidebarMenuSubButton>
+                          </SidebarMenuSubItem>
+                        ))}
+                      </SidebarMenuSub>
+                    </CollapsibleContent>
+                  </SidebarMenuItem>
+                </Collapsible>
+              )}
+
+              {/* Payment OUT */}
+              {canAccess("payments") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/payments/out"}
+                  >
+                    <Link href="/payments/out" data-testid="link-payment-out">
+                      <ArrowUpRight className="h-4 w-4" />
+                      <span>Payment OUT</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
               {/* Stock - quick access */}
               {canAccess("reports") && (
                 <SidebarMenuItem>
@@ -359,118 +527,6 @@ function AppSidebar() {
                 </SidebarMenuItem>
               )}
 
-              {/* Purchase - second after Dashboard */}
-              {canAccess("purchases") && (
-                <Collapsible open={expandedMenu === "purchases"} onOpenChange={() => handleMenuToggle("purchases")} className="group/collapsible">
-                  <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton isActive={location.startsWith("/purchases")}>
-                        <ShoppingCart className="h-4 w-4" />
-                        <span>Purchase</span>
-                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                      </SidebarMenuButton>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={location === "/purchases"}
-                          >
-                            <Link href="/purchases" data-testid="link-new-purchase">
-                              New
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
-                        {purchasesSubItems.map((subItem) => (
-                          <SidebarMenuSubItem key={subItem.url}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={location === subItem.url}
-                            >
-                              <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(/\s+/g, "-")}`}>
-                                {subItem.title}
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
-
-              {/* Sales - third after Purchase */}
-              {canAccess("sales") && (
-                <Collapsible open={expandedMenu === "sales"} onOpenChange={() => handleMenuToggle("sales")} className="group/collapsible">
-                  <SidebarMenuItem>
-                    <div className="flex items-center w-full">
-                      <SidebarMenuButton 
-                        asChild 
-                        isActive={location === "/sales"}
-                        className="flex-1"
-                      >
-                        <Link href="/sales" data-testid="link-sales">
-                          <TrendingUp className="h-4 w-4" />
-                          <span>Sales</span>
-                        </Link>
-                      </SidebarMenuButton>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                          <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                        </Button>
-                      </CollapsibleTrigger>
-                    </div>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {salesSubItems.map((subItem) => (
-                          <SidebarMenuSubItem key={subItem.url}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={location === subItem.url}
-                            >
-                              <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(" ", "-")}`}>
-                                {subItem.title}
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
-
-              {/* Payment IN - separate menu item */}
-              {canAccess("payments") && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={location === "/payments/in"}
-                  >
-                    <Link href="/payments/in" data-testid="link-payment-in">
-                      <ArrowDownLeft className="h-4 w-4" />
-                      <span>Payment IN</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-
-              {/* Payment OUT - separate menu item */}
-              {canAccess("payments") && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={location === "/payments/out"}
-                  >
-                    <Link href="/payments/out" data-testid="link-payment-out">
-                      <ArrowUpRight className="h-4 w-4" />
-                      <span>Payment OUT</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-
               {/* Rest of menu items (excluding Dashboard which is handled above) */}
               {mainMenuItems.filter(item => item.title !== "Dashboard").map((item) => (
                 <SidebarMenuItem key={item.title}>
@@ -485,60 +541,6 @@ function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
-
-              {canAccess("items") && (
-                <Collapsible open={expandedMenu === "items"} onOpenChange={() => handleMenuToggle("items")} className="group/collapsible">
-                  <SidebarMenuItem>
-                    <div className="flex items-center w-full">
-                      <SidebarMenuButton 
-                        asChild 
-                        isActive={location === "/items"}
-                        className="flex-1"
-                      >
-                        <Link href="/items" data-testid="link-item-master">
-                          <Package className="h-4 w-4" />
-                          <span>Items</span>
-                        </Link>
-                      </SidebarMenuButton>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
-                          <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
-                        </Button>
-                      </CollapsibleTrigger>
-                    </div>
-                    <CollapsibleContent>
-                      <SidebarMenuSub>
-                        {itemMasterSubItems.map((subItem) => (
-                          <SidebarMenuSubItem key={subItem.url}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={location === subItem.url}
-                            >
-                              <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(" ", "-")}`}>
-                                {subItem.title}
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    </CollapsibleContent>
-                  </SidebarMenuItem>
-                </Collapsible>
-              )}
-
-              {canAccess("parties") && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={location === "/parties"}
-                  >
-                    <Link href="/parties" data-testid="link-party-master">
-                      <Users className="h-4 w-4" />
-                      <span>Parties</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
 
               {canAccess("reports") && (
                 <Collapsible open={expandedMenu === "reports"} onOpenChange={() => handleMenuToggle("reports")} className="group/collapsible">
