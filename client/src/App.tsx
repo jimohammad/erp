@@ -404,25 +404,25 @@ function AppSidebar() {
               {canAccess("sales") && (
                 <Collapsible open={expandedMenu === "sales"} onOpenChange={() => handleMenuToggle("sales")} className="group/collapsible">
                   <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton isActive={location.startsWith("/sales")}>
-                        <TrendingUp className="h-4 w-4" />
-                        <span>Sales</span>
-                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    <div className="flex items-center w-full">
+                      <SidebarMenuButton 
+                        asChild 
+                        isActive={location === "/sales"}
+                        className="flex-1"
+                      >
+                        <Link href="/sales" data-testid="link-sales">
+                          <TrendingUp className="h-4 w-4" />
+                          <span>Sales</span>
+                        </Link>
                       </SidebarMenuButton>
-                    </CollapsibleTrigger>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                          <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
                     <CollapsibleContent>
                       <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={location === "/sales"}
-                          >
-                            <Link href="/sales" data-testid="link-new-sale">
-                              New
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
                         {salesSubItems.map((subItem) => (
                           <SidebarMenuSubItem key={subItem.url}>
                             <SidebarMenuSubButton
@@ -430,7 +430,7 @@ function AppSidebar() {
                               isActive={location === subItem.url}
                             >
                               <Link href={subItem.url} data-testid={`link-${subItem.title.toLowerCase().replace(" ", "-")}`}>
-                                All
+                                {subItem.title}
                               </Link>
                             </SidebarMenuSubButton>
                           </SidebarMenuSubItem>
