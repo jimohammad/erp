@@ -497,7 +497,7 @@ function AppSidebar() {
                       >
                         <Link href="/items" data-testid="link-item-master">
                           <Package className="h-4 w-4" />
-                          <span>Item Master</span>
+                          <span>Items</span>
                         </Link>
                       </SidebarMenuButton>
                       <CollapsibleTrigger asChild>
@@ -662,9 +662,9 @@ function AuthenticatedLayout() {
       case "/accounts":
         return "Account Management";
       case "/items":
-        return "Item Master";
+        return "Items";
       case "/items/bulk-edit":
-        return "Item Master - Bulk Edit";
+        return "Items - Bulk Edit";
       case "/parties":
         return "Party Master";
       case "/reports":
