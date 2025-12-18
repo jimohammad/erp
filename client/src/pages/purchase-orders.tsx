@@ -212,6 +212,8 @@ export default function PurchaseOrdersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-order-drafts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-stats"] });
       toast({ title: "Purchase order converted to bill successfully" });
       setConvertDialogPO(null);
       setConvertInvoiceNumber("");

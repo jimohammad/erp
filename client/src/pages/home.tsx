@@ -83,6 +83,8 @@ export default function Home() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/purchase-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/stats/monthly"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard-stats"] });
       toast({ title: "Purchase order saved successfully" });
     },
     onError: () => {
