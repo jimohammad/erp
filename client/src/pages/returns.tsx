@@ -580,11 +580,11 @@ export default function ReturnsPage() {
 
     const lineItemsHtml = ret.lineItems?.map((item, idx) => `
       <tr>
-        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${idx + 1}</td>
-        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb;">${escapeHtml(item.itemName)}</td>
-        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: center;">${item.quantity}</td>
-        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${parseFloat(item.priceKwd || "0").toFixed(3)}</td>
-        <td style="padding: 10px 8px; border-bottom: 1px solid #e5e7eb; text-align: right;">${parseFloat(item.totalKwd || "0").toFixed(3)}</td>
+        <td class="text-center">${idx + 1}</td>
+        <td>${escapeHtml(item.itemName)}</td>
+        <td class="text-center">${item.quantity}</td>
+        <td class="text-right">${parseFloat(item.priceKwd || "0").toFixed(3)}</td>
+        <td class="text-right">${parseFloat(item.totalKwd || "0").toFixed(3)}</td>
       </tr>
     `).join("") || "";
 
@@ -594,44 +594,46 @@ export default function ReturnsPage() {
         <head>
           <title>Return - ${escapeHtml(ret.returnNumber)}</title>
           <style>
-            @page { size: A5; margin: 10mm; }
+            @page { size: A5; margin: 5mm; }
             * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; font-size: 12pt; color: #333; }
-            .container { max-width: 100%; }
-            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #1e40af; }
+            body { font-family: Arial, sans-serif; font-size: 8px; color: #333; }
+            .container { max-width: 100%; padding: 8px; }
+            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #1e40af; }
             .logo-section { }
-            .company-name { font-size: 24px; font-weight: bold; color: #1e40af; }
-            .company-sub { font-size: 12px; color: #64748b; }
+            .company-name { font-size: 14px; font-weight: bold; color: #1e40af; }
+            .company-sub { font-size: 7px; color: #64748b; }
             .document-section { text-align: right; }
-            .document-title { font-size: 22px; font-weight: bold; color: #1e40af; margin-bottom: 8px; }
-            .return-number { font-size: 16px; font-weight: bold; }
-            .return-badge { display: inline-block; padding: 6px 16px; background: ${ret.returnType === "sale_return" ? "#dbeafe" : "#fef3c7"}; color: ${ret.returnType === "sale_return" ? "#1e40af" : "#92400e"}; border-radius: 4px; font-weight: 600; margin-top: 8px; }
-            .info-section { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-            .info-box { padding: 15px; background: #f8fafc; border-radius: 6px; }
-            .info-label { font-size: 11px; color: #64748b; text-transform: uppercase; margin-bottom: 4px; }
-            .info-value { font-size: 14px; font-weight: 600; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+            .document-title { font-size: 12px; font-weight: bold; color: #1e40af; margin-bottom: 2px; }
+            .return-number { font-size: 10px; font-weight: bold; }
+            .return-badge { display: inline-block; padding: 2px 8px; background: ${ret.returnType === "sale_return" ? "#dbeafe" : "#fef3c7"}; color: ${ret.returnType === "sale_return" ? "#1e40af" : "#92400e"}; border-radius: 2px; font-weight: 600; font-size: 7px; margin-top: 3px; }
+            .info-section { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+            .info-box { padding: 4px 6px; background: #f8fafc; border-radius: 3px; flex: 1; }
+            .info-label { font-size: 6px; color: #64748b; text-transform: uppercase; margin-bottom: 1px; }
+            .info-value { font-size: 8px; font-weight: 600; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
             thead { background: #1e40af; color: white; }
-            th { padding: 12px 8px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-            th:nth-child(1) { width: 50px; text-align: center; }
-            th:nth-child(3) { text-align: center; }
-            th:nth-child(4), th:nth-child(5) { text-align: right; }
+            th { padding: 3px 4px; text-align: left; font-size: 7px; text-transform: uppercase; border: 1px solid #1e40af; }
+            th.text-center { text-align: center; }
+            th.text-right { text-align: right; }
+            td { padding: 3px 4px; border: 1px solid #ddd; font-size: 8px; vertical-align: middle; }
+            td.text-center { text-align: center; }
+            td.text-right { text-align: right; }
             tbody tr:nth-child(even) { background: #f8fafc; }
             .total-row { background: #f1f5f9; font-weight: bold; }
-            .total-row td { padding: 12px 8px; font-size: 14px; }
-            .balance-section { margin-top: 20px; padding: 15px; background: #f8fafc; border-radius: 6px; }
+            .total-row td { padding: 3px 4px; font-size: 8px; }
+            .balance-section { margin-top: 6px; padding: 6px; background: #f8fafc; border-radius: 3px; border: 1px solid #ddd; }
             .balance-table { width: 100%; border-collapse: collapse; }
-            .balance-table td { padding: 8px 0; font-size: 13px; }
-            .balance-table .current-balance { font-weight: bold; font-size: 14px; border-top: 1px solid #e5e7eb; padding-top: 12px; }
-            .footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center; color: #64748b; font-size: 10px; }
-            @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+            .balance-table td { padding: 3px 4px; font-size: 8px; border-bottom: 1px solid #e5e7eb; }
+            .balance-table .current-balance { font-weight: bold; font-size: 9px; border-top: 1px solid #333; padding-top: 4px; }
+            .footer { margin-top: 10px; padding-top: 6px; border-top: 1px solid #e5e7eb; text-align: center; color: #64748b; font-size: 6px; }
+            @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } thead { background: #1e40af !important; } }
           </style>
         </head>
         <body>
           <div class="container">
             <div class="header">
               <div class="logo-section">
-                ${logoBase64 ? `<img src="${logoBase64}" style="height: 60px; width: auto; margin-bottom: 8px;" alt="IEC" />` : `<div class="company-name">Iqbal Electronics</div>`}
+                ${logoBase64 ? `<img src="${logoBase64}" style="height: 35px; width: auto; margin-bottom: 2px;" alt="IEC" />` : `<div class="company-name">Iqbal Electronics</div>`}
                 <div class="company-sub">Co. WLL - Kuwait</div>
               </div>
               <div class="document-section">
@@ -644,7 +646,7 @@ export default function ReturnsPage() {
             <div class="info-section">
               <div class="info-box">
                 <div class="info-label">Return Date</div>
-                <div class="info-value">${format(new Date(ret.returnDate), "dd MMMM yyyy")}</div>
+                <div class="info-value">${format(new Date(ret.returnDate), "dd MMM yyyy")}</div>
               </div>
               <div class="info-box">
                 <div class="info-label">${partyLabel}</div>
@@ -655,18 +657,18 @@ export default function ReturnsPage() {
             <table>
               <thead>
                 <tr>
-                  <th>#</th>
+                  <th style="width: 25px;" class="text-center">#</th>
                   <th>Item Description</th>
-                  <th>Qty</th>
-                  <th>Unit Price (KWD)</th>
-                  <th>Amount (KWD)</th>
+                  <th style="width: 35px;" class="text-center">Qty</th>
+                  <th style="width: 55px;" class="text-right">Price</th>
+                  <th style="width: 60px;" class="text-right">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 ${lineItemsHtml}
                 <tr class="total-row">
-                  <td colspan="4" style="text-align: right; padding-right: 8px;">Grand Total:</td>
-                  <td style="text-align: right;">${grandTotal.toFixed(3)} KWD</td>
+                  <td colspan="4" style="text-align: right;">Grand Total:</td>
+                  <td class="text-right">${grandTotal.toFixed(3)} KWD</td>
                 </tr>
               </tbody>
             </table>
