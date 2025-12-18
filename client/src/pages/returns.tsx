@@ -130,11 +130,6 @@ export default function ReturnsPage() {
     queryKey: ["/api/customers"],
   });
 
-  // Fetch calculated customer balances (includes sales, payments, returns)
-  const { data: customerBalances = [] } = useQuery<{ customerId: number; balance: number }[]>({
-    queryKey: ["/api/customers/balances/all"],
-  });
-
   const { data: allSuppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
   });
@@ -182,6 +177,15 @@ export default function ReturnsPage() {
       customerId: "",
       supplierId: "",
     },
+  });
+
+  // Watch the selected customer ID to fetch their balance
+  const watchedCustomerId = form.watch("customerId");
+
+  // Fetch balance for the selected customer (same endpoint as sales invoice)
+  const { data: selectedCustomerBalance } = useQuery<{ balance: number }>({
+    queryKey: ["/api/customers", watchedCustomerId, "balance"],
+    enabled: !!watchedCustomerId && returnType === "sale_return",
   });
 
   // Initialize form with return number on mount
@@ -831,9 +835,8 @@ export default function ReturnsPage() {
                       name="customerId"
                       render={({ field }) => {
                         const selectedCustomer = customers.find(c => c.id.toString() === field.value);
-                        // Use calculated balance from customerBalances API
-                        const balanceData = customerBalances.find(b => b.customerId === selectedCustomer?.id);
-                        const customerBalance = balanceData?.balance || 0;
+                        // Use balance from dedicated endpoint (same as sales invoice page)
+                        const customerBalance = selectedCustomerBalance?.balance || 0;
                         return (
                           <FormItem>
                             <FormLabel>Customer</FormLabel>
