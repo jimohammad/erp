@@ -199,7 +199,6 @@ function AppSidebar() {
   ];
 
   const itemMasterSubItems = [
-    { title: "View Items", url: "/items" },
     { title: "Bulk Edit", url: "/items/bulk-edit" },
   ];
 
@@ -490,13 +489,23 @@ function AppSidebar() {
               {canAccess("items") && (
                 <Collapsible open={expandedMenu === "items"} onOpenChange={() => handleMenuToggle("items")} className="group/collapsible">
                   <SidebarMenuItem>
-                    <CollapsibleTrigger asChild>
-                      <SidebarMenuButton isActive={location.startsWith("/items")}>
-                        <Package className="h-4 w-4" />
-                        <span>Item Master</span>
-                        <ChevronDown className="ml-auto h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                    <div className="flex items-center w-full">
+                      <SidebarMenuButton 
+                        asChild 
+                        isActive={location === "/items"}
+                        className="flex-1"
+                      >
+                        <Link href="/items" data-testid="link-item-master">
+                          <Package className="h-4 w-4" />
+                          <span>Item Master</span>
+                        </Link>
                       </SidebarMenuButton>
-                    </CollapsibleTrigger>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0">
+                          <ChevronDown className="h-4 w-4 transition-transform group-data-[state=open]/collapsible:rotate-180" />
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
                     <CollapsibleContent>
                       <SidebarMenuSub>
                         {itemMasterSubItems.map((subItem) => (
