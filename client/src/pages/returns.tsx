@@ -193,12 +193,14 @@ export default function ReturnsPage() {
       if (validLineItems.length === 0) {
         throw new Error("At least one line item is required");
       }
+      const totalKwd = validLineItems.reduce((sum, item) => sum + (parseFloat(item.totalKwd) || 0), 0);
       const payload = {
         returnDate: data.returnDate,
         returnNumber: data.returnNumber,
         returnType: data.returnType,
         customerId: data.returnType === "sale_return" && data.customerId ? parseInt(data.customerId) : null,
         supplierId: data.returnType === "purchase_return" && data.supplierId ? parseInt(data.supplierId) : null,
+        totalKwd: totalKwd.toString(),
         lineItems: validLineItems.map(item => ({
           itemName: item.itemName,
           quantity: item.quantity,
