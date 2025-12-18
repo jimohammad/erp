@@ -557,6 +557,9 @@ export default function ReturnsPage() {
     const partyName = ret.returnType === "sale_return" 
       ? ret.customer?.name || "Not specified"
       : ret.supplier?.name || "Not specified";
+    const partyPhone = ret.returnType === "sale_return" 
+      ? ret.customer?.phone || ""
+      : ret.supplier?.phone || "";
     const partyLabel = ret.returnType === "sale_return" ? "Customer" : "Supplier";
     const returnTypeLabel = ret.returnType === "sale_return" ? "SALE RETURN" : "PURCHASE RETURN";
 
@@ -580,11 +583,11 @@ export default function ReturnsPage() {
 
     const lineItemsHtml = ret.lineItems?.map((item, idx) => `
       <tr>
-        <td class="text-center">${idx + 1}</td>
-        <td>${escapeHtml(item.itemName)}</td>
-        <td class="text-center">${item.quantity}</td>
-        <td class="text-right">${parseFloat(item.priceKwd || "0").toFixed(3)}</td>
-        <td class="text-right">${parseFloat(item.totalKwd || "0").toFixed(3)}</td>
+        <td style="padding:4px 3px;border:1px solid #000;text-align:center;">${idx + 1}</td>
+        <td style="padding:4px 3px;border:1px solid #000;">${escapeHtml(item.itemName)}</td>
+        <td style="padding:4px 3px;border:1px solid #000;text-align:center;">${item.quantity}</td>
+        <td style="padding:4px 3px;border:1px solid #000;text-align:right;">${parseFloat(item.priceKwd || "0").toFixed(3)}</td>
+        <td style="padding:4px 3px;border:1px solid #000;text-align:right;">${parseFloat(item.totalKwd || "0").toFixed(3)}</td>
       </tr>
     `).join("") || "";
 
@@ -594,108 +597,104 @@ export default function ReturnsPage() {
         <head>
           <title>Return - ${escapeHtml(ret.returnNumber)}</title>
           <style>
-            @page { size: A5; margin: 5mm; }
+            @page { size: A5; margin: 6mm; }
             * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; font-size: 8px; color: #000; }
-            .container { max-width: 100%; padding: 8px; }
-            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #000; }
-            .logo-section { }
-            .company-name { font-size: 14px; font-weight: bold; color: #000; }
-            .company-sub { font-size: 7px; color: #333; }
-            .document-section { text-align: right; }
-            .document-title { font-size: 12px; font-weight: bold; color: #000; margin-bottom: 2px; }
-            .return-number { font-size: 10px; font-weight: bold; }
-            .return-badge { display: inline-block; padding: 2px 8px; border: 1px solid #000; border-radius: 2px; font-weight: 600; font-size: 7px; margin-top: 3px; }
-            .info-section { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
-            .info-box { padding: 4px 6px; border: 1px solid #000; border-radius: 3px; flex: 1; }
-            .info-label { font-size: 6px; color: #333; text-transform: uppercase; margin-bottom: 1px; }
-            .info-value { font-size: 8px; font-weight: 600; }
-            table { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
-            thead { background: #fff; }
-            th { padding: 3px 4px; text-align: left; font-size: 7px; text-transform: uppercase; border: 1px solid #000; font-weight: bold; }
-            th.text-center { text-align: center; }
-            th.text-right { text-align: right; }
-            td { padding: 3px 4px; border: 1px solid #000; font-size: 8px; vertical-align: middle; }
-            td.text-center { text-align: center; }
-            td.text-right { text-align: right; }
-            .total-row { font-weight: bold; }
-            .total-row td { padding: 3px 4px; font-size: 8px; border-top: 2px solid #000; }
-            .balance-section { margin-top: 6px; padding: 6px; border: 1px solid #000; border-radius: 3px; }
-            .balance-table { width: 100%; border-collapse: collapse; }
-            .balance-table td { padding: 3px 4px; font-size: 8px; border-bottom: 1px solid #000; }
-            .balance-table .current-balance { font-weight: bold; font-size: 9px; border-top: 2px solid #000; padding-top: 4px; }
-            .footer { margin-top: 10px; padding-top: 6px; border-top: 1px solid #000; text-align: center; color: #333; font-size: 6px; }
-            @media print { body { print-color-adjust: exact; -webkit-print-color-adjust: exact; } }
+            body { font-family: Arial, sans-serif; font-size: 9px; color: #000; }
+            .header { border: 1px solid #000; padding: 10px 12px; display: flex; align-items: center; gap: 12px; }
+            .logo { width: 50px; height: 50px; border: 1px solid #000; border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+            .logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+            .company-info { flex: 1; }
+            .company-name { font-size: 14px; font-weight: bold; margin-bottom: 2px; }
+            .company-details { font-size: 8px; }
+            .return-title { text-align: right; }
+            .return-title h1 { font-size: 16px; margin-bottom: 2px; }
+            .return-title div { font-size: 9px; }
+            .content { padding: 10px 12px; }
+            .info-section { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
+            .info-box { border: 1px solid #000; padding: 8px; border-radius: 3px; flex: 1; }
+            .info-box h3 { font-weight: bold; margin-bottom: 5px; font-size: 10px; }
+            .info-row { margin: 2px 0; font-size: 9px; }
+            .info-label { font-weight: bold; display: inline-block; width: 60px; }
+            table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+            th { border: 1px solid #000; padding: 4px 3px; text-align: left; font-size: 8px; font-weight: bold; }
+            td { font-size: 9px; }
+            .totals-section { display: flex; justify-content: flex-end; }
+            .totals-box { width: 180px; border: 1px solid #000; padding: 8px; border-radius: 3px; }
+            .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 9px; }
+            .totals-row.total { font-weight: bold; font-size: 10px; border-top: 2px solid #000; padding-top: 5px; margin-top: 3px; }
+            .footer { margin-top: 15px; padding-top: 10px; border-top: 1px solid #000; }
+            .signature-section { display: flex; justify-content: space-between; margin-top: 20px; }
+            .signature-box { width: 120px; text-align: center; font-size: 8px; }
+            .signature-line { border-top: 1px solid #000; margin-top: 30px; padding-top: 3px; }
           </style>
         </head>
         <body>
-          <div class="container">
-            <div class="header">
-              <div class="logo-section">
-                ${logoBase64 ? `<img src="${logoBase64}" style="height: 35px; width: auto; margin-bottom: 2px;" alt="IEC" />` : `<div class="company-name">Iqbal Electronics</div>`}
-                <div class="company-sub">Co. WLL - Kuwait</div>
-              </div>
-              <div class="document-section">
-                <div class="document-title">Return Receipt</div>
-                <div class="return-number">${escapeHtml(ret.returnNumber)}</div>
-                <div class="return-badge">${returnTypeLabel}</div>
-              </div>
+          <div class="header">
+            <div class="logo">
+              ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : '<span style="font-weight:bold;font-size:10px;">IEC</span>'}
             </div>
-            
+            <div class="company-info">
+              <div class="company-name">Iqbal Electronics Co. WLL</div>
+              <div class="company-details">Mobile Phones & Accessories | Electronics</div>
+            </div>
+            <div class="return-title">
+              <h1>${returnTypeLabel}</h1>
+              <div>${escapeHtml(ret.returnNumber)}</div>
+            </div>
+          </div>
+          <div class="content">
             <div class="info-section">
               <div class="info-box">
-                <div class="info-label">Return Date</div>
-                <div class="info-value">${format(new Date(ret.returnDate), "dd MMM yyyy")}</div>
+                <h3>${ret.returnType === "sale_return" ? "Return From" : "Return To"}</h3>
+                <div class="info-row"><span class="info-label">${partyLabel}:</span> ${escapeHtml(partyName)}</div>
+                ${partyPhone ? `<div class="info-row"><span class="info-label">Phone:</span> ${escapeHtml(partyPhone)}</div>` : ""}
+                <div class="info-row"><span class="info-label">Location:</span> Kuwait</div>
               </div>
               <div class="info-box">
-                <div class="info-label">${partyLabel}</div>
-                <div class="info-value">${escapeHtml(partyName)}</div>
+                <h3>Return Details</h3>
+                <div class="info-row"><span class="info-label">Return No:</span> ${escapeHtml(ret.returnNumber)}</div>
+                <div class="info-row"><span class="info-label">Date:</span> ${format(new Date(ret.returnDate), "dd MMM yyyy")}</div>
               </div>
             </div>
             
             <table>
               <thead>
                 <tr>
-                  <th style="width: 25px;" class="text-center">#</th>
-                  <th>Item Description</th>
-                  <th style="width: 35px;" class="text-center">Qty</th>
-                  <th style="width: 55px;" class="text-right">Price</th>
-                  <th style="width: 60px;" class="text-right">Amount</th>
+                  <th style="width:30px;text-align:center;">#</th>
+                  <th>Description</th>
+                  <th style="width:50px;text-align:center;">Qty</th>
+                  <th style="width:70px;text-align:right;">Unit Price</th>
+                  <th style="width:70px;text-align:right;">Amount</th>
                 </tr>
               </thead>
               <tbody>
                 ${lineItemsHtml}
-                <tr class="total-row">
-                  <td colspan="4" style="text-align: right;">Grand Total:</td>
-                  <td class="text-right">${grandTotal.toFixed(3)} KWD</td>
-                </tr>
               </tbody>
             </table>
             
-            ${ret.returnType === "sale_return" ? `
-            <div class="balance-section">
-              <table class="balance-table">
-                <tr>
-                  <td>Previous Balance</td>
-                  <td style="text-align: right;">KWD ${balanceData.previousBalance.toFixed(3)}</td>
-                </tr>
-                <tr>
-                  <td>Return Amount (Credit)</td>
-                  <td style="text-align: right;">KWD ${balanceData.returnAmount.toFixed(3)}</td>
-                </tr>
-                <tr class="current-balance">
-                  <td>Current Balance</td>
-                  <td style="text-align: right;">KWD ${balanceData.currentBalance.toFixed(3)}</td>
-                </tr>
-              </table>
+            <div class="totals-section">
+              <div class="totals-box">
+                ${ret.returnType === "sale_return" ? `
+                <div class="totals-row"><span>Previous Balance:</span><span>${balanceData.previousBalance.toFixed(3)} KWD</span></div>
+                <div class="totals-row"><span>Return Amount:</span><span>${grandTotal.toFixed(3)} KWD</span></div>
+                <div class="totals-row total"><span>Current Balance:</span><span>${balanceData.currentBalance.toFixed(3)} KWD</span></div>
+                ` : `
+                <div class="totals-row total"><span>Total Return:</span><span>${grandTotal.toFixed(3)} KWD</span></div>
+                `}
+              </div>
             </div>
-            ` : ''}
             
             <div class="footer">
-              <p>Computer Generated Document - Iqbal Electronics Co. WLL</p>
+              <div class="signature-section">
+                <div class="signature-box">
+                  <div class="signature-line">${partyLabel} Signature</div>
+                </div>
+                <div class="signature-box">
+                  <div class="signature-line">Authorized Signature</div>
+                </div>
+              </div>
             </div>
           </div>
-          
           <script>window.onload = function() { window.print(); }</script>
         </body>
       </html>
