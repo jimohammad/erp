@@ -616,232 +616,115 @@ export default function PaymentInPage() {
     const receiptDate = new Date(payment.paymentDate).toLocaleDateString("en-GB", {
       day: "2-digit", month: "short", year: "numeric"
     });
-    const receiptTime = new Date().toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: true });
+
+    const paymentModeHtml = payment.splits && payment.splits.length > 0 
+      ? payment.splits.map((split: { paymentType: string; amount: string }) => 
+          `<tr><td style="padding:4px 3px;border:1px solid #000;">${split.paymentType.toUpperCase()}</td><td style="padding:4px 3px;border:1px solid #000;text-align:right;">${parseFloat(split.amount).toFixed(3)}</td></tr>`
+        ).join('')
+      : `<tr><td style="padding:4px 3px;border:1px solid #000;">${payment.paymentType.toUpperCase()}</td><td style="padding:4px 3px;border:1px solid #000;text-align:right;">${amountNum.toFixed(3)}</td></tr>`;
 
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
       <head>
-        <title>Payment Receipt</title>
+        <title>Payment Receipt ${payment.id}</title>
         <style>
-          @page { size: A5; margin: 10mm; }
-          body { 
-            font-family: Arial, sans-serif; 
-            max-width: 148mm;
-            margin: 0 auto;
-            padding: 10mm;
-            font-size: 10pt;
-            color: #333;
-          }
-          .receipt {
-            border: 1px solid #ddd;
-            padding: 10mm;
-          }
-          .voucher-title {
-            border: 2px solid #000;
-            text-align: center;
-            padding: 4mm;
-            font-size: 14pt;
-            font-weight: bold;
-            margin: -10mm -10mm 8mm -10mm;
-          }
-          .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            border-bottom: 2px solid #000;
-            padding-bottom: 5mm;
-            margin-bottom: 8mm;
-          }
-          .company-info {
-            display: flex;
-            align-items: center;
-            gap: 4mm;
-          }
-          .company-logo {
-            width: 15mm;
-            height: 15mm;
-            border: 1px solid #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            font-size: 10pt;
-          }
-          .company-arabic {
-            font-size: 9pt;
-            color: #333;
-          }
-          .company-contact {
-            text-align: right;
-          }
-          .company-name-right {
-            font-weight: bold;
-          }
-          .phone-no {
-            font-size: 9pt;
-            color: #333;
-          }
-          .main-title {
-            text-align: center;
-            font-size: 16pt;
-            font-weight: bold;
-            margin: 5mm 0;
-          }
-          .content-section {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 8mm;
-          }
-          .left-section {
-            flex: 1;
-          }
-          .right-section {
-            flex: 1;
-            text-align: right;
-          }
-          .section-title {
-            font-weight: bold;
-            font-size: 10pt;
-            color: #333;
-            margin-bottom: 1mm;
-          }
-          .party-name {
-            font-size: 12pt;
-            font-weight: bold;
-            margin-bottom: 2mm;
-          }
-          .party-details {
-            font-size: 10pt;
-            color: #333;
-          }
-          .receipt-details {
-            font-size: 10pt;
-          }
-          .receipt-details div {
-            margin-bottom: 1mm;
-          }
-          .amounts-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 5mm;
-          }
-          .amounts-table th,
-          .amounts-table td {
-            padding: 3mm 4mm;
-            text-align: left;
-            font-size: 10pt;
-          }
-          .amounts-table .header-row th {
-            border: 1px solid #000;
-            font-weight: bold;
-          }
-          .amounts-table .data-row td {
-            border-bottom: 1px solid #ddd;
-          }
-          .amounts-table .amount-col {
-            text-align: right;
-            width: 30%;
-          }
-          .footer {
-            text-align: center;
-            padding-top: 5mm;
-            margin-top: 5mm;
-            border-top: 1px solid #ddd;
-            font-size: 9pt;
-            color: #666;
-          }
-          @media print {
-            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          }
+          @page { size: A5; margin: 6mm; }
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; font-size: 9px; color: #000; }
+          .header { border: 1px solid #000; padding: 10px 12px; display: flex; align-items: center; gap: 12px; }
+          .logo { width: 50px; height: 50px; border: 1px solid #000; border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+          .logo img { max-width: 100%; max-height: 100%; object-fit: contain; }
+          .company-info { flex: 1; }
+          .company-name { font-size: 14px; font-weight: bold; margin-bottom: 2px; }
+          .company-details { font-size: 8px; }
+          .receipt-title { text-align: right; }
+          .receipt-title h1 { font-size: 16px; margin-bottom: 2px; }
+          .receipt-title div { font-size: 9px; }
+          .content { padding: 10px 12px; }
+          .info-section { display: flex; justify-content: space-between; margin-bottom: 10px; gap: 10px; }
+          .info-box { border: 1px solid #000; padding: 8px; border-radius: 3px; flex: 1; }
+          .info-box h3 { font-weight: bold; margin-bottom: 5px; font-size: 10px; }
+          .info-row { margin: 2px 0; font-size: 9px; }
+          .info-label { font-weight: bold; display: inline-block; width: 60px; }
+          table { width: 100%; border-collapse: collapse; margin: 8px 0; }
+          th { border: 1px solid #000; padding: 4px 3px; text-align: left; font-size: 8px; font-weight: bold; }
+          td { font-size: 9px; }
+          .amount-words { border: 1px solid #000; padding: 8px; margin: 8px 0; font-size: 10px; font-style: italic; text-align: center; }
+          .totals-section { display: flex; justify-content: flex-end; }
+          .totals-box { width: 180px; border: 1px solid #000; padding: 8px; border-radius: 3px; }
+          .totals-row { display: flex; justify-content: space-between; padding: 2px 0; font-size: 9px; }
+          .totals-row.total { font-weight: bold; font-size: 10px; border-top: 2px solid #000; padding-top: 5px; margin-top: 3px; }
+          .footer { margin-top: 15px; padding-top: 10px; border-top: 1px solid #000; }
+          .signature-section { display: flex; justify-content: space-between; margin-top: 20px; }
+          .signature-box { width: 120px; text-align: center; font-size: 8px; }
+          .signature-line { border-top: 1px solid #000; margin-top: 30px; padding-top: 3px; }
         </style>
       </head>
       <body>
-        <div class="receipt">
-          <div class="voucher-title">Payment Receipt Voucher</div>
-          
-          <div class="header">
-            <div class="company-info">
-              ${logoBase64 ? `<img src="${logoBase64}" style="height: 50px; width: auto;" alt="IEC" />` : `<div class="company-logo">IEC</div>`}
-              <div class="company-arabic">شركة إقبال للأجهزة الإلكترونية ذ.م.م</div>
+        <div class="header">
+          <div class="logo">
+            ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" />` : '<span style="font-weight:bold;font-size:10px;">IEC</span>'}
+          </div>
+          <div class="company-info">
+            <div class="company-name">Iqbal Electronics Co. WLL</div>
+            <div class="company-details">Mobile Phones & Accessories | Electronics</div>
+          </div>
+          <div class="receipt-title">
+            <h1>PAYMENT RECEIPT</h1>
+            <div>Receipt #${payment.id}</div>
+          </div>
+        </div>
+        <div class="content">
+          <div class="info-section">
+            <div class="info-box">
+              <h3>Received From</h3>
+              <div class="info-row"><span class="info-label">Customer:</span> ${customerName}</div>
+              ${customerPhone ? `<div class="info-row"><span class="info-label">Phone:</span> ${customerPhone}</div>` : ""}
+              <div class="info-row"><span class="info-label">Location:</span> Kuwait</div>
             </div>
-            <div class="company-contact">
-              <div class="company-name-right">Iqbal Electronics Co. WLL</div>
-              <div class="phone-no">Phone no.: +965 55584488</div>
+            <div class="info-box">
+              <h3>Receipt Details</h3>
+              <div class="info-row"><span class="info-label">Receipt No:</span> ${payment.id}</div>
+              <div class="info-row"><span class="info-label">Date:</span> ${receiptDate}</div>
+              ${payment.notes ? `<div class="info-row"><span class="info-label">Notes:</span> ${payment.notes}</div>` : ""}
             </div>
           </div>
           
-          <div class="main-title">Payment Receipt Voucher</div>
+          <div class="amount-words">${amountWords} Only</div>
           
-          <div class="content-section">
-            <div class="left-section">
-              <div class="section-title">Received From</div>
-              <div class="party-name">${customerName}</div>
-              <div class="party-details">Kuwait</div>
-              ${customerPhone ? `<div class="party-details">Contact No.: ${customerPhone}</div>` : ""}
+          <table>
+            <thead>
+              <tr>
+                <th>Payment Mode</th>
+                <th style="width:100px;text-align:right;">Amount (KWD)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${paymentModeHtml}
+            </tbody>
+          </table>
+          
+          <div class="totals-section">
+            <div class="totals-box">
+              <div class="totals-row"><span>Previous Balance:</span><span>${previousBalance.toFixed(3)} KWD</span></div>
+              <div class="totals-row"><span>Amount Received:</span><span>${amountNum.toFixed(3)} KWD</span></div>
+              <div class="totals-row total"><span>Current Balance:</span><span>${currentBalance.toFixed(3)} KWD</span></div>
             </div>
-            <div class="right-section">
-              <div class="section-title">Receipt Details</div>
-              <div class="receipt-details">
-                <div>Receipt No.: ${payment.id}</div>
-                <div>Date: ${receiptDate}</div>
-                <div>Time: ${receiptTime}</div>
+          </div>
+          
+          <div class="footer">
+            <div class="signature-section">
+              <div class="signature-box">
+                <div class="signature-line">Customer Signature</div>
+              </div>
+              <div class="signature-box">
+                <div class="signature-line">Authorized Signature</div>
               </div>
             </div>
           </div>
-          
-          <table class="amounts-table">
-            <tr class="header-row">
-              <th>Amount in words</th>
-              <th class="amount-col">Amounts</th>
-            </tr>
-            <tr class="data-row">
-              <td>${amountWords} only</td>
-              <td class="amount-col">Received</td>
-            </tr>
-            <tr class="data-row">
-              <td></td>
-              <td class="amount-col" style="font-weight: bold;">KWD ${amountNum.toFixed(3)}</td>
-            </tr>
-            <tr class="header-row">
-              <th>Payment mode</th>
-              <th class="amount-col"></th>
-            </tr>
-            ${payment.splits && payment.splits.length > 0 ? 
-              payment.splits.map((split: { paymentType: string; amount: string }) => `
-                <tr class="data-row">
-                  <td>${split.paymentType.toUpperCase()}: KWD ${parseFloat(split.amount).toFixed(3)}</td>
-                  <td class="amount-col"></td>
-                </tr>
-              `).join('') : `
-              <tr class="data-row">
-                <td>${payment.paymentType.toUpperCase()}</td>
-                <td class="amount-col"></td>
-              </tr>
-            `}
-            <tr class="data-row">
-              <td></td>
-              <td class="amount-col">Previous Balance</td>
-            </tr>
-            <tr class="data-row">
-              <td></td>
-              <td class="amount-col" style="font-weight: bold;">KWD ${previousBalance.toFixed(3)}</td>
-            </tr>
-            <tr class="data-row">
-              <td></td>
-              <td class="amount-col">Current Balance</td>
-            </tr>
-            <tr class="data-row">
-              <td></td>
-              <td class="amount-col" style="font-weight: bold;">KWD ${currentBalance.toFixed(3)}</td>
-            </tr>
-          </table>
-          
-          <div class="footer">
-            <p>Thank you for your payment!</p>
-            <p>Printed: ${new Date().toLocaleString()}</p>
-          </div>
         </div>
+        <script>window.onload = function() { window.print(); }</script>
       </body>
       </html>
     `);
