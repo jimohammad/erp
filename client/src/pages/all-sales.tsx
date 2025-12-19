@@ -594,13 +594,17 @@ export default function AllSalesPage() {
               2. Payment is due within the agreed credit period.<br/>
               3. All disputes are subject to local jurisdiction.
             </div>
-            <div class="signature-section">
-              <div class="signature-box">
-                <div class="signature-line">Customer Signature</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:20px;padding-top:10px;border-top:1px solid #000;">
+              <div style="font-size:9px;color:#666;flex:1;">
+                This is a computer generated document.<br/>
+                No signature required. Validate by scanning QR code.
               </div>
-              <div class="signature-box">
-                <div class="signature-line">Authorized Signature</div>
+              ${qrDataUrl ? `
+              <div style="text-align:center;">
+                <img src="${qrDataUrl}" alt="QR Code" style="width:60px;height:60px;" />
+                <div style="font-size:8px;margin-top:3px;">Scan to verify</div>
               </div>
+              ` : ''}
             </div>
           </div>
         </div>

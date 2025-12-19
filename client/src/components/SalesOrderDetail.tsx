@@ -641,13 +641,20 @@ export function SalesOrderDetail({
                     <td>KWD ${order.customerId ? (balanceData?.currentBalance || 0).toFixed(2) : subtotal.toFixed(2)}</td>
                   </tr>
                 </table>
-                ${qrDataUrl ? `
-                <div style="text-align:center;margin-top:10px;">
-                  <img src="${qrDataUrl}" alt="QR Code" style="width:50px;height:50px;" />
-                  <div style="font-size:7px;margin-top:2px;">Scan to verify</div>
-                </div>
-                ` : ''}
               </div>
+            </div>
+            
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;padding-top:10px;border-top:1px solid #000;">
+              <div style="font-size:7px;color:#666;flex:1;">
+                This is a computer generated document.<br/>
+                No signature required. Validate by scanning QR code.
+              </div>
+              ${qrDataUrl ? `
+              <div style="text-align:center;">
+                <img src="${qrDataUrl}" alt="QR Code" style="width:50px;height:50px;" />
+                <div style="font-size:7px;margin-top:2px;">Scan to verify</div>
+              </div>
+              ` : ''}
             </div>
           </div>
           

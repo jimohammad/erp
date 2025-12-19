@@ -739,9 +739,10 @@ export default function PaymentInPage() {
           </div>
           
           <div class="footer">
-            <div class="signature-section">
-              <div class="signature-box">
-                <div class="signature-line">Customer Signature</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:15px;padding-top:10px;border-top:1px solid #000;">
+              <div style="font-size:8px;color:#666;flex:1;">
+                This is a computer generated document.<br/>
+                No signature required. Validate by scanning QR code.
               </div>
               ${qrDataUrl ? `
               <div style="text-align:center;">
@@ -749,9 +750,6 @@ export default function PaymentInPage() {
                 <div style="font-size:7px;margin-top:2px;">Scan to verify</div>
               </div>
               ` : ''}
-              <div class="signature-box">
-                <div class="signature-line">Authorized Signature</div>
-              </div>
             </div>
           </div>
         </div>
