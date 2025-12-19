@@ -2565,15 +2565,17 @@ export async function registerRoutes(
         },
       };
 
+      console.log("[Bank Report] Generating PDF with", invoices.length, "invoices and", payments.length, "payments");
       const buffer = await generateBankPackPDF(bankPackData);
+      console.log("[Bank Report] PDF generated, size:", buffer.length, "bytes");
       
       const filename = `Bank_Report_${startDate}_to_${endDate}.pdf`;
       res.setHeader("Content-Type", "application/pdf");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       res.send(buffer);
-    } catch (error) {
-      console.error("Bank pack PDF generation error:", error);
-      res.status(500).json({ error: "Failed to generate bank pack PDF" });
+    } catch (error: any) {
+      console.error("[Bank Report] PDF generation error:", error?.message || error, error?.stack);
+      res.status(500).send("Failed to generate bank pack PDF: " + (error?.message || "Unknown error"));
     }
   });
 
