@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useToast } from "@/hooks/use-toast";
 import {
   Table,
   TableBody,
@@ -108,6 +109,7 @@ type Supplier = {
 };
 
 export default function ReportsPage() {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("stock");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -938,14 +940,21 @@ export default function ReportsPage() {
                     </div>
                     <Button
                       onClick={async () => {
-                        if (!bankStartDate || !bankEndDate) return;
+                        if (!bankStartDate || !bankEndDate) {
+                          toast({ title: "Please select both dates", variant: "destructive" });
+                          return;
+                        }
                         setIsDownloadingBankPack(true);
+                        toast({ title: "Generating PDF...", description: "Please wait" });
                         try {
                           const response = await fetch(
                             `/api/reports/bank-pack?startDate=${bankStartDate}&endDate=${bankEndDate}`,
                             { credentials: 'include' }
                           );
-                          if (!response.ok) throw new Error("Failed to generate PDF");
+                          if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(errorText || "Failed to generate PDF");
+                          }
                           const blob = await response.blob();
                           const url = window.URL.createObjectURL(blob);
                           const a = document.createElement("a");
@@ -955,8 +964,14 @@ export default function ReportsPage() {
                           a.click();
                           document.body.removeChild(a);
                           window.URL.revokeObjectURL(url);
+                          toast({ title: "PDF Downloaded!", variant: "default" });
                         } catch (error) {
                           console.error("Download error:", error);
+                          toast({ 
+                            title: "Download failed", 
+                            description: error instanceof Error ? error.message : "Unknown error",
+                            variant: "destructive" 
+                          });
                         } finally {
                           setIsDownloadingBankPack(false);
                         }
