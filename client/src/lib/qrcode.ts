@@ -1,5 +1,6 @@
 // @ts-ignore - qrcode types may not be fully compatible
 import QRCode from 'qrcode';
+import { apiRequest } from './queryClient';
 
 export interface QRCodeData {
   type: 'SALE' | 'PAYMENT_IN' | 'PAYMENT_OUT' | 'RETURN' | 'PURCHASE';
@@ -11,58 +12,61 @@ export interface QRCodeData {
   partyType?: 'customer' | 'supplier';
 }
 
-function getDocumentTypeName(type: string): string {
-  switch (type) {
-    case 'SALE': return 'Sales Invoice';
-    case 'PAYMENT_IN': return 'Payment Receipt';
-    case 'PAYMENT_OUT': return 'Payment Voucher';
-    case 'RETURN': return 'Return Note';
-    case 'PURCHASE': return 'Purchase Order';
-    default: return 'Document';
+export interface VerificationRecord {
+  id: number;
+  documentType: string;
+  documentId: number;
+  documentNumber: string;
+  verificationCode: string;
+  amount: string;
+  documentDate: string;
+  partyName: string | null;
+  partyType: string | null;
+}
+
+async function createVerificationRecord(data: QRCodeData): Promise<VerificationRecord | null> {
+  try {
+    const response = await apiRequest('POST', '/api/verification/create', {
+      documentType: data.type,
+      documentId: data.id,
+      documentNumber: data.number,
+      amount: data.amount,
+      documentDate: data.date,
+      partyName: data.partyName || null,
+      partyType: data.partyType || null,
+    });
+    return response.json();
+  } catch (error) {
+    console.error('Failed to create verification record:', error);
+    return null;
   }
 }
 
-function formatDate(dateStr: string): string {
-  try {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-GB', { 
-      day: '2-digit', 
-      month: 'short', 
-      year: 'numeric' 
-    });
-  } catch {
-    return dateStr;
+function getBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
   }
+  return '';
 }
 
 export async function generateQRCodeDataURL(data: QRCodeData): Promise<string> {
-  // Create a well-formatted verification message
-  const docType = getDocumentTypeName(data.type);
-  const formattedDate = formatDate(data.date);
-  const partyLabel = data.partyType === 'supplier' ? 'Supplier' : 'Customer';
+  let qrContent: string;
   
-  let qrContent = `IQBAL ELECTRONICS CO. WLL
-Document Verification
-
-${docType}
-No: ${data.number}
-Date: ${formattedDate}
-Amount: KWD ${data.amount}`;
-
-  if (data.partyName) {
-    qrContent += `
-${partyLabel}: ${data.partyName}`;
+  if (data.id) {
+    const verification = await createVerificationRecord(data);
+    if (verification?.verificationCode) {
+      qrContent = `${getBaseUrl()}/verify/${verification.verificationCode}`;
+    } else {
+      qrContent = `${data.type}|${data.number}|${data.amount}|${data.date}`;
+    }
+  } else {
+    qrContent = `${data.type}|${data.number}|${data.amount}|${data.date}`;
   }
-
-  qrContent += `
-
-This document is authentic.`;
   
   try {
     const dataUrl = await QRCode.toDataURL(qrContent, {
-      width: 120,
+      width: 80,
       margin: 1,
-      errorCorrectionLevel: 'M',
       color: {
         dark: '#000000',
         light: '#ffffff',
@@ -81,15 +85,15 @@ export function getQRCodeHtml(qrDataUrl: string, position: 'bottom' | 'right' = 
   if (position === 'bottom') {
     return `
       <div style="text-align:center;margin-top:15px;padding-top:10px;border-top:1px dashed #000;">
-        <img src="${qrDataUrl}" alt="QR Code" style="width:70px;height:70px;" />
-        <div style="font-size:8px;margin-top:3px;">Scan to verify document</div>
+        <img src="${qrDataUrl}" alt="QR Code" style="width:60px;height:60px;" />
+        <div style="font-size:8px;margin-top:3px;">Scan to verify</div>
       </div>
     `;
   }
   
   return `
     <div style="text-align:center;">
-      <img src="${qrDataUrl}" alt="QR Code" style="width:70px;height:70px;" />
+      <img src="${qrDataUrl}" alt="QR Code" style="width:60px;height:60px;" />
       <div style="font-size:7px;margin-top:2px;">Scan to verify</div>
     </div>
   `;
