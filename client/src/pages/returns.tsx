@@ -402,10 +402,12 @@ export default function ReturnsPage() {
     // Generate QR code
     const qrDataUrl = await generateQRCodeDataURL({
       type: 'RETURN',
-      number: ret.returnNumber,
+      id: ret.id,
+      number: ret.returnNumber || `RET-${ret.id}`,
       amount: grandTotal.toFixed(3),
       date: ret.returnDate,
-      customer: partyName,
+      partyName: partyName,
+      partyType: ret.returnType === "sale_return" ? 'customer' : 'supplier',
     });
 
     const printWindow = window.open("", "_blank");
@@ -593,10 +595,12 @@ export default function ReturnsPage() {
     // Generate QR code
     const qrDataUrl = await generateQRCodeDataURL({
       type: 'RETURN',
-      number: ret.returnNumber,
+      id: ret.id,
+      number: ret.returnNumber || `RET-${ret.id}`,
       amount: grandTotal.toFixed(3),
       date: ret.returnDate,
-      customer: partyName,
+      partyName: partyName,
+      partyType: ret.returnType === "sale_return" ? 'customer' : 'supplier',
     });
 
     // Fetch balance data for sale returns

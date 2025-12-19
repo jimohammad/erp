@@ -182,10 +182,12 @@ export function SalesOrderDetail({
     // Generate QR code
     const qrDataUrl = await generateQRCodeDataURL({
       type: 'SALE',
+      id: order.id,
       number: order.invoiceNumber || `INV-${order.id}`,
       amount: invoiceAmount.toFixed(3),
       date: order.saleDate,
-      customer: customerName,
+      partyName: customerName,
+      partyType: 'customer',
     });
     
     const printWindow = window.open("", "_blank", "width=350,height=600");
@@ -279,10 +281,12 @@ export function SalesOrderDetail({
     // Generate QR code
     const qrDataUrl = await generateQRCodeDataURL({
       type: 'SALE',
+      id: order.id,
       number: order.invoiceNumber || `INV-${order.id}`,
       amount: subtotal.toFixed(3),
       date: order.saleDate,
-      customer: order.customer?.name || "Walk-in Customer",
+      partyName: order.customer?.name || "Walk-in Customer",
+      partyType: 'customer',
     });
 
     const printWindow = window.open("", "_blank");

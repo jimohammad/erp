@@ -212,13 +212,14 @@ export function SalesOrderForm({
     
     const validItems = lineItems.filter(li => li.itemName && li.quantity > 0);
     
-    // Generate QR code
+    // Generate QR code (no ID since this is before save)
     const qrDataUrl = await generateQRCodeDataURL({
       type: 'SALE',
       number: invoiceNumber || 'N/A',
       amount: invoiceAmount.toFixed(3),
       date: saleDate,
-      customer: customerName,
+      partyName: customerName,
+      partyType: 'customer',
     });
     
     const printWindow = window.open("", "_blank", "width=350,height=600");
@@ -311,13 +312,14 @@ export function SalesOrderForm({
     const previousBalance = customerBalance?.balance || 0;
     const invoiceAmount = parseFloat(totalKwd) || 0;
     
-    // Generate QR code
+    // Generate QR code (no ID since this is before save)
     const qrDataUrl = await generateQRCodeDataURL({
       type: 'SALE',
       number: invoiceNumber || 'N/A',
       amount: invoiceAmount.toFixed(3),
       date: saleDate,
-      customer: customerName,
+      partyName: customerName,
+      partyType: 'customer',
     });
     const currentBalance = previousBalance + invoiceAmount;
     

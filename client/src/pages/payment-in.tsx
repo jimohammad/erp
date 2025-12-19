@@ -447,10 +447,12 @@ export default function PaymentInPage() {
     // Generate QR code
     const qrDataUrl = await generateQRCodeDataURL({
       type: 'PAYMENT_IN',
+      id: payment.id,
       number: `PAY-${payment.id}`,
       amount: amountNum.toFixed(3),
       date: payment.paymentDate,
-      customer: customerName,
+      partyName: customerName,
+      partyType: 'customer',
     });
 
     let currentBalance = 0;
@@ -611,10 +613,12 @@ export default function PaymentInPage() {
     // Generate QR code
     const qrDataUrl = await generateQRCodeDataURL({
       type: 'PAYMENT_IN',
+      id: payment.id,
       number: `PAY-${payment.id}`,
       amount: amountNum.toFixed(3),
       date: payment.paymentDate,
-      customer: customerName,
+      partyName: customerName,
+      partyType: 'customer',
     });
 
     let currentBalance = 0;

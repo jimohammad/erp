@@ -277,10 +277,12 @@ export default function AllSalesPage() {
     const invoiceAmount = parseFloat(selectedSO.totalKwd || "0");
     const qrDataUrl = await generateQRCodeDataURL({
       type: 'SALE',
+      id: selectedSO.id,
       number: selectedSO.invoiceNumber || `INV-${selectedSO.id}`,
       amount: invoiceAmount.toFixed(3),
       date: selectedSO.saleDate,
-      customer: selectedSO.customer?.name || "Walk-in Customer",
+      partyName: selectedSO.customer?.name || "Walk-in Customer",
+      partyType: 'customer',
     });
 
     const printWindow = window.open("", "_blank");
@@ -477,7 +479,7 @@ export default function AllSalesPage() {
     printWindow.document.close();
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!selectedSO) return;
     const pdfWindow = window.open("", "_blank", "width=800,height=900");
     if (!pdfWindow) return;
@@ -489,6 +491,17 @@ export default function AllSalesPage() {
     const invoiceAmount = parseFloat(selectedSO.totalKwd || "0");
     const currentBalance = previousBalance + invoiceAmount;
     const saleDate = format(new Date(selectedSO.saleDate), "yyyy-MM-dd");
+
+    // Generate QR code for A5 PDF
+    const qrDataUrl = await generateQRCodeDataURL({
+      type: 'SALE',
+      id: selectedSO.id,
+      number: selectedSO.invoiceNumber || `INV-${selectedSO.id}`,
+      amount: invoiceAmount.toFixed(3),
+      date: selectedSO.saleDate,
+      partyName: customerName,
+      partyType: 'customer',
+    });
 
     const itemsHtml = selectedSO.lineItems.map((li, idx) => `
       <tr>

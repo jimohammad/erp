@@ -1,16 +1,67 @@
 // @ts-ignore - qrcode types may not be fully compatible
 import QRCode from 'qrcode';
+import { apiRequest } from './queryClient';
 
 export interface QRCodeData {
   type: 'SALE' | 'PAYMENT_IN' | 'PAYMENT_OUT' | 'RETURN' | 'PURCHASE';
+  id?: number;
   number: string;
   amount: string;
   date: string;
-  customer?: string;
+  partyName?: string;
+  partyType?: 'customer' | 'supplier';
+}
+
+export interface VerificationRecord {
+  id: number;
+  documentType: string;
+  documentId: number;
+  documentNumber: string;
+  verificationCode: string;
+  amount: string;
+  documentDate: string;
+  partyName: string | null;
+  partyType: string | null;
+}
+
+async function createVerificationRecord(data: QRCodeData): Promise<VerificationRecord | null> {
+  try {
+    const response = await apiRequest('POST', '/api/verification/create', {
+      documentType: data.type,
+      documentId: data.id,
+      documentNumber: data.number,
+      amount: data.amount,
+      documentDate: data.date,
+      partyName: data.partyName || null,
+      partyType: data.partyType || null,
+    });
+    return response.json();
+  } catch (error) {
+    console.error('Failed to create verification record:', error);
+    return null;
+  }
+}
+
+function getBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  return '';
 }
 
 export async function generateQRCodeDataURL(data: QRCodeData): Promise<string> {
-  const qrContent = `${data.type}|${data.number}|${data.amount}|${data.date}${data.customer ? `|${data.customer}` : ''}`;
+  let qrContent: string;
+  
+  if (data.id) {
+    const verification = await createVerificationRecord(data);
+    if (verification?.verificationCode) {
+      qrContent = `${getBaseUrl()}/verify/${verification.verificationCode}`;
+    } else {
+      qrContent = `${data.type}|${data.number}|${data.amount}|${data.date}`;
+    }
+  } else {
+    qrContent = `${data.type}|${data.number}|${data.amount}|${data.date}`;
+  }
   
   try {
     const dataUrl = await QRCode.toDataURL(qrContent, {

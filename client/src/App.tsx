@@ -70,6 +70,7 @@ const UserManagementPage = lazy(() => import("@/pages/user-management"));
 const AIChatPage = lazy(() => import("@/pages/ai-chat"));
 const Landing = lazy(() => import("@/pages/landing"));
 const PublicStatementPage = lazy(() => import("@/pages/public-statement"));
+const VerifyPage = lazy(() => import("@/pages/verify"));
 const AllTransactionsPage = lazy(() => import("@/pages/all-transactions"));
 const CustomerAgingPage = lazy(() => import("@/pages/customer-aging"));
 const SendPriceListPage = lazy(() => import("@/pages/send-price-list"));
@@ -814,6 +815,7 @@ function App() {
         <Suspense fallback={<PageLoader />}>
           <Switch>
             <Route path="/statement/:customerId" component={PublicStatementPage} />
+            <Route path="/verify/:code" component={VerifyPage} />
             <Route component={Router} />
           </Switch>
         </Suspense>

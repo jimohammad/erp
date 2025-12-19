@@ -336,10 +336,12 @@ export default function PaymentOutPage() {
     // Generate QR code
     const qrDataUrl = await generateQRCodeDataURL({
       type: 'PAYMENT_OUT',
+      id: payment.id,
       number: `PV-${payment.id}`,
       amount: amountNum.toFixed(3),
       date: payment.paymentDate,
-      customer: supplierName,
+      partyName: supplierName,
+      partyType: 'supplier',
     });
 
     const printWindow = window.open("", "_blank");
