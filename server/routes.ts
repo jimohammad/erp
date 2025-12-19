@@ -2488,9 +2488,9 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invoice IDs are required" });
       }
 
-      // Get the sales orders for the specified IDs
-      const allSalesOrders = await storage.getAllSalesOrders();
-      const selectedOrders = allSalesOrders.filter(order => invoiceIds.includes(order.id));
+      // Get the sales orders with full details (includes customer and lineItems)
+      const result = await storage.getSalesOrders({});
+      const selectedOrders = result.data.filter(order => invoiceIds.includes(order.id));
       
       if (selectedOrders.length === 0) {
         return res.status(404).json({ error: "No invoices found" });
@@ -2504,13 +2504,13 @@ export async function registerRoutes(
         customerName: order.customer?.name || null,
         customerPhone: order.customer?.phone || null,
         totalKwd: order.totalKwd,
-        lineItems: (order.lineItems || []).map(item => ({
-          itemName: item.itemName,
+        lineItems: (order.lineItems || []).map((item: any) => ({
+          itemName: item.itemName || "Item",
           quantity: item.quantity,
           priceKwd: item.priceKwd,
           totalKwd: item.totalKwd,
         })),
-        verificationCode: order.verificationCode || undefined,
+        verificationCode: (order as any).verificationCode || undefined,
       }));
 
       const buffer = await generateMergedInvoicesPDF(invoicesForPdf, date || new Date().toISOString().split('T')[0]);

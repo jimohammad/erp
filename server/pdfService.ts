@@ -597,12 +597,13 @@ export async function generateMergedInvoicesPDF(invoices: MergedInvoice[], date:
           totalQuantity += qty;
           const price = parseFloat(item.priceKwd || "0");
           const amount = parseFloat(item.totalKwd || "0");
+          const itemName = item.itemName || "Item";
 
           x = margin;
           
           const rowData = [
             { text: `${idx + 1}`, align: "center" },
-            { text: item.itemName.substring(0, 25), align: "left" },
+            { text: itemName.substring(0, 25), align: "left" },
             { text: "—", align: "left" },
             { text: `${qty}`, align: "center" },
             { text: `KWD ${price.toFixed(1)}`, align: "right" },
