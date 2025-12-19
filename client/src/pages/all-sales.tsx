@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import companyLogoUrl from "@/assets/company-logo.jpg";
+import { generateQRCodeDataURL } from "@/lib/qrcode";
 import {
   Table,
   TableBody,
@@ -269,8 +270,19 @@ export default function AllSalesPage() {
       .replace(/'/g, "&#039;");
   };
 
-  const handlePrintInvoice = () => {
+  const handlePrintInvoice = async () => {
     if (!selectedSO) return;
+
+    // Generate QR code
+    const invoiceAmount = parseFloat(selectedSO.totalKwd || "0");
+    const qrDataUrl = await generateQRCodeDataURL({
+      type: 'SALE',
+      number: selectedSO.invoiceNumber || `INV-${selectedSO.id}`,
+      amount: invoiceAmount.toFixed(3),
+      date: selectedSO.saleDate,
+      customer: selectedSO.customer?.name || "Walk-in Customer",
+    });
+
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
 
@@ -451,6 +463,12 @@ export default function AllSalesPage() {
             <div class="footer">
               Thank You!
             </div>
+            ${qrDataUrl ? `
+            <div style="text-align:center;margin-top:8px;padding-top:8px;border-top:1px dashed #000;">
+              <img src="${qrDataUrl}" alt="QR Code" style="width:60px;height:60px;" />
+              <div style="font-size:8px;margin-top:3px;">Scan to verify</div>
+            </div>
+            ` : ''}
           </div>
           
           <script>window.onload = function() { setTimeout(function() { window.print(); }, 300); }</script>

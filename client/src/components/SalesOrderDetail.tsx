@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import companyLogoUrl from "@/assets/company-logo.jpg";
+import { generateQRCodeDataURL } from "@/lib/qrcode";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -172,11 +173,20 @@ export function SalesOrderDetail({
   };
 
   // Thermal printer print function (80mm receipt)
-  const printThermal = () => {
+  const printThermal = async () => {
     const customerName = order.customer?.name || "Walk-in Customer";
     const previousBalance = balanceData?.previousBalance || 0;
     const invoiceAmount = parseFloat(order.totalKwd || "0");
     const currentBalance = balanceData?.currentBalance || (previousBalance + invoiceAmount);
+
+    // Generate QR code
+    const qrDataUrl = await generateQRCodeDataURL({
+      type: 'SALE',
+      number: order.invoiceNumber || `INV-${order.id}`,
+      amount: invoiceAmount.toFixed(3),
+      date: order.saleDate,
+      customer: customerName,
+    });
     
     const printWindow = window.open("", "_blank", "width=350,height=600");
     if (!printWindow) return;
@@ -247,6 +257,12 @@ export function SalesOrderDetail({
         </div>
         <div class="divider"></div>
         <div class="footer">Thank You!</div>
+        ${qrDataUrl ? `
+        <div style="text-align:center;margin-top:10px;padding-top:8px;border-top:1px dashed #000;">
+          <img src="${qrDataUrl}" alt="QR Code" style="width:60px;height:60px;" />
+          <div style="font-size:10px;margin-top:3px;">Scan to verify</div>
+        </div>
+        ` : ''}
         <script>window.onload = function() { window.print(); }</script>
       </body>
       </html>
@@ -254,13 +270,22 @@ export function SalesOrderDetail({
     printWindow.document.close();
   };
 
-  const handlePrint = () => {
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
+  const handlePrint = async () => {
     const subtotal = order.lineItems.reduce((sum, item) => sum + (parseFloat(item.totalKwd || "0")), 0);
     const totalQuantity = order.lineItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
     const amountInWords = numberToWords(subtotal);
+
+    // Generate QR code
+    const qrDataUrl = await generateQRCodeDataURL({
+      type: 'SALE',
+      number: order.invoiceNumber || `INV-${order.id}`,
+      amount: subtotal.toFixed(3),
+      date: order.saleDate,
+      customer: order.customer?.name || "Walk-in Customer",
+    });
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -615,6 +640,12 @@ export function SalesOrderDetail({
                     <td>KWD ${order.customerId ? (balanceData?.currentBalance || 0).toFixed(2) : subtotal.toFixed(2)}</td>
                   </tr>
                 </table>
+                ${qrDataUrl ? `
+                <div style="text-align:center;margin-top:10px;">
+                  <img src="${qrDataUrl}" alt="QR Code" style="width:50px;height:50px;" />
+                  <div style="font-size:7px;margin-top:2px;">Scan to verify</div>
+                </div>
+                ` : ''}
               </div>
             </div>
           </div>
