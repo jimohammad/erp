@@ -465,8 +465,26 @@ export async function registerRoutes(
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+      const date = req.query.date as string | undefined;
+      
       const result = await storage.getSalesOrders({ limit, offset });
-      res.json(result);
+      
+      // Filter by date if provided
+      if (date) {
+        const filteredData = result.data.filter((order) => {
+          const orderDate = order.saleDate;
+          if (typeof orderDate === "string") {
+            return orderDate === date || orderDate.startsWith(date);
+          }
+          if (orderDate instanceof Date) {
+            return orderDate.toISOString().split('T')[0] === date;
+          }
+          return false;
+        });
+        res.json(filteredData);
+      } else {
+        res.json(result);
+      }
     } catch (error) {
       console.error("Error fetching sales orders:", error);
       res.status(500).json({ error: "Failed to fetch sales orders" });
