@@ -49,7 +49,7 @@ interface PurchaseOrderDraft {
 interface LineItemData {
   id: string;
   itemName: string;
-  quantity: number;
+  quantity: number | "";
   priceKwd: string;
   fxPrice: string;
   totalKwd: string;
@@ -78,7 +78,7 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
   const [kwdTransferred, setKwdTransferred] = useState("");
   const [notes, setNotes] = useState("");
   const [lineItems, setLineItems] = useState<LineItemData[]>([
-    { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
+    { id: generateItemId(), itemName: "", quantity: "", priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
   ]);
   const [imeiDialogOpen, setImeiDialogOpen] = useState(false);
   const [activeLineItemId, setActiveLineItemId] = useState<string | null>(null);
@@ -113,7 +113,7 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
     setKwdTransferred("");
     setNotes("");
     setLineItems([
-      { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
+      { id: generateItemId(), itemName: "", quantity: "", priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
     ]);
     setTotals({ totalKwd: "0.000", totalFx: "" });
     setInvoiceFile(null);
@@ -233,7 +233,8 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
 
         // Recalculate total KWD based on quantity and priceKwd
         if (field === "quantity" || field === "priceKwd" || field === "fxPrice") {
-          const qty = field === "quantity" ? (value as number) : item.quantity;
+          const qtyVal = field === "quantity" ? value : item.quantity;
+          const qty = typeof qtyVal === "number" ? qtyVal : (parseInt(qtyVal as string) || 0);
           const price = field === "priceKwd" 
             ? (parseFloat(value as string) || 0)
             : (field === "fxPrice" && rate > 0)
@@ -250,7 +251,7 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
   const handleAddRow = () => {
     setLineItems((prev) => [
       ...prev,
-      { id: generateItemId(), itemName: "", quantity: 1, priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
+      { id: generateItemId(), itemName: "", quantity: "", priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
     ]);
   };
 
@@ -658,9 +659,9 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
                       <td className="p-2">
                         <Input
                           type="number"
-                          min="1"
+                          min="0"
                           value={item.quantity}
-                          onChange={(e) => handleLineItemChange(item.id, "quantity", parseInt(e.target.value) || 1)}
+                          onChange={(e) => handleLineItemChange(item.id, "quantity", e.target.value === "" ? "" : (parseInt(e.target.value) || 0))}
                           className="text-right"
                           data-testid={`input-qty-${index}`}
                         />
