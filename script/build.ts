@@ -1,6 +1,7 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
-import { rm, readFile } from "fs/promises";
+import { rm, readFile, mkdir, copyFile, readdir } from "fs/promises";
+import { join } from "path";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -56,6 +57,20 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // Copy PDFKit font files to dist/data for PDF generation
+  console.log("copying PDFKit fonts...");
+  const fontSourceDir = join(process.cwd(), "node_modules", "pdfkit", "js", "data");
+  const fontDestDir = join(process.cwd(), "dist", "data");
+  await mkdir(fontDestDir, { recursive: true });
+  
+  const fontFiles = await readdir(fontSourceDir);
+  for (const file of fontFiles) {
+    if (file.endsWith(".afm") || file.endsWith(".icc")) {
+      await copyFile(join(fontSourceDir, file), join(fontDestDir, file));
+    }
+  }
+  console.log(`copied ${fontFiles.length} font files to dist/data`);
 }
 
 buildAll().catch((err) => {
