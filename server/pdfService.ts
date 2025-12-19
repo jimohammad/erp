@@ -1,4 +1,8 @@
 import PDFDocument from "pdfkit";
+import path from "path";
+
+// Set font path for PDFKit - use bundled fonts
+const fontPath = path.join(process.cwd(), 'node_modules', 'pdfkit', 'js', 'data');
 
 // Types for Bank Pack PDF generation
 type BankPackInvoice = {
@@ -81,6 +85,7 @@ export async function generateBankPackPDF(data: BankPackData): Promise<Buffer> {
         size: "A4", 
         margin: 50,
         bufferPages: true,
+        font: 'Helvetica',
       });
       const chunks: Buffer[] = [];
       
