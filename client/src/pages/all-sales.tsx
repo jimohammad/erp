@@ -421,7 +421,7 @@ export default function AllSalesPage() {
         <body>
           <div class="receipt">
             <div class="header">
-              ${logoBase64 ? `<img src="${logoBase64}" style="height: 40px; width: auto; margin-bottom: 2mm;" alt="IEC" />` : `<div class="company-name">Iqbal Electronics Co.</div><div class="company-sub">WLL</div>`}
+              ${logoBase64 ? `<img src="${logoBase64}" style="height: 40px; width: auto; margin-bottom: 1mm;" alt="IEC" /><div class="company-name">Iqbal Electronics Co. WLL</div>` : `<div class="company-name">Iqbal Electronics Co.</div><div class="company-sub">WLL</div>`}
               <div class="doc-type">Sales Invoice</div>
             </div>
             

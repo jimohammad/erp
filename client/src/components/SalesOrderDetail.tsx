@@ -229,6 +229,7 @@ export function SalesOrderDetail({
       </head>
       <body>
         <div class="header">
+          ${logoBase64 ? `<img src="${logoBase64}" style="height:40px;width:auto;margin-bottom:2mm;" alt="IEC" />` : ''}
           <div class="company">Iqbal Electronics Co. WLL</div>
         </div>
         <div class="divider"></div>

@@ -379,8 +379,7 @@ export default function PaymentOutPage() {
       </head>
       <body>
         <div class="header">
-          ${logoBase64 ? `<img src="${logoBase64}" class="logo" />` : ''}
-          <div class="company">Iqbal Electronics Co. WLL</div>
+          ${logoBase64 ? `<img src="${logoBase64}" class="logo" /><div class="company">Iqbal Electronics Co. WLL</div>` : '<div class="company">Iqbal Electronics Co. WLL</div>'}
           <div class="title">PAYMENT VOUCHER</div>
         </div>
         <div class="row"><span class="label">Voucher No:</span><span>PV-${payment.id}</span></div>

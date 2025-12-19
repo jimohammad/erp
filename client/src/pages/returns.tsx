@@ -532,7 +532,7 @@ export default function ReturnsPage() {
         <body>
           <div class="receipt">
             <div class="header">
-              ${logoBase64 ? `<img src="${logoBase64}" style="height: 40px; width: auto; margin-bottom: 2mm;" alt="IEC" />` : `<div class="company-name">Iqbal Electronics</div><div class="company-sub">Co. WLL - Kuwait</div>`}
+              ${logoBase64 ? `<img src="${logoBase64}" style="height: 40px; width: auto; margin-bottom: 1mm;" alt="IEC" /><div class="company-name">Iqbal Electronics Co. WLL</div>` : `<div class="company-name">Iqbal Electronics</div><div class="company-sub">Co. WLL - Kuwait</div>`}
               <div class="badge">${returnTypeLabel}</div>
             </div>
             
