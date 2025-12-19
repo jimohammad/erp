@@ -1,4 +1,4 @@
-const CACHE_NAME = 'iqbal-po-v2';
+const CACHE_NAME = 'iqbal-po-v3';
 const STATIC_ASSETS = [
   '/favicon.png'
 ];
@@ -32,6 +32,10 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   
   if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+  
+  if (url.pathname.includes('.vite') || url.pathname.includes('node_modules')) {
     return;
   }
   
