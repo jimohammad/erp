@@ -2483,17 +2483,34 @@ export async function registerRoutes(
       }
 
       console.log("[Bank Report] Date range:", startDate, "to", endDate);
+      
+      // Helper function to normalize date to YYYY-MM-DD string
+      const normalizeDate = (dateValue: string | Date | null | undefined): string => {
+        if (!dateValue) return "";
+        if (typeof dateValue === "string") {
+          // If it's already a YYYY-MM-DD string, return as is
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateValue)) return dateValue;
+          // Otherwise parse and format
+          return new Date(dateValue).toISOString().split('T')[0];
+        }
+        // It's a Date object
+        return dateValue.toISOString().split('T')[0];
+      };
 
       // Get all sales orders in the date range
       const allSalesOrders = await storage.getAllSalesOrders();
       console.log("[Bank Report] Total sales orders in DB:", allSalesOrders.length);
       if (allSalesOrders.length > 0) {
-        console.log("[Bank Report] Sample sale date:", allSalesOrders[0]?.saleDate, "type:", typeof allSalesOrders[0]?.saleDate);
+        console.log("[Bank Report] Sample sale date:", allSalesOrders[0]?.saleDate, "type:", typeof allSalesOrders[0]?.saleDate, "normalized:", normalizeDate(allSalesOrders[0]?.saleDate));
       }
       
+      const startDateStr = String(startDate);
+      const endDateStr = String(endDate);
+      
       const filteredSales = allSalesOrders.filter(order => {
-        const orderDate = order.saleDate;
-        return orderDate >= startDate && orderDate <= endDate;
+        const orderDate = normalizeDate(order.saleDate);
+        const matches = orderDate >= startDateStr && orderDate <= endDateStr;
+        return matches;
       });
       console.log("[Bank Report] Filtered sales:", filteredSales.length);
 
@@ -2504,7 +2521,7 @@ export async function registerRoutes(
       // Format invoices for PDF
       const invoices = filteredSales.map(order => ({
         invoiceNumber: order.invoiceNumber,
-        saleDate: order.saleDate,
+        saleDate: normalizeDate(order.saleDate),
         customerName: order.customerId ? customerMap.get(order.customerId) || null : null,
         totalKwd: order.totalKwd,
         fxCurrency: order.fxCurrency,
@@ -2517,12 +2534,13 @@ export async function registerRoutes(
       const allPayments = await storage.getAllPayments();
       console.log("[Bank Report] Total payments in DB:", allPayments.length);
       if (allPayments.length > 0) {
-        console.log("[Bank Report] Sample payment date:", allPayments[0]?.paymentDate, "type:", typeof allPayments[0]?.paymentDate);
+        console.log("[Bank Report] Sample payment date:", allPayments[0]?.paymentDate, "type:", typeof allPayments[0]?.paymentDate, "normalized:", normalizeDate(allPayments[0]?.paymentDate));
       }
       
       const filteredPayments = allPayments.filter(payment => {
-        const paymentDate = payment.paymentDate;
-        return paymentDate >= startDate && paymentDate <= endDate;
+        const paymentDate = normalizeDate(payment.paymentDate);
+        const matches = paymentDate >= startDateStr && paymentDate <= endDateStr;
+        return matches;
       });
       console.log("[Bank Report] Filtered payments:", filteredPayments.length);
 
@@ -2531,7 +2549,7 @@ export async function registerRoutes(
       const supplierMap = new Map(parties.map(p => [p.id, p.name]));
 
       // Format payments for PDF
-      const payments = filteredPayments.map(payment => {
+      const formattedPayments = filteredPayments.map(payment => {
         // Get party name from either customer or supplier
         let partyName: string | null = null;
         if (payment.customerId) {
@@ -2542,7 +2560,7 @@ export async function registerRoutes(
         
         return {
           voucherNumber: `PV-${payment.id}`,
-          paymentDate: payment.paymentDate,
+          paymentDate: normalizeDate(payment.paymentDate),
           partyName,
           amount: payment.amount,
           direction: payment.direction,
@@ -2568,7 +2586,7 @@ export async function registerRoutes(
         startDate: startDate as string,
         endDate: endDate as string,
         invoices,
-        payments,
+        payments: formattedPayments,
         summary: {
           totalInvoices: invoices.length,
           totalInvoiceAmount,
@@ -2579,7 +2597,7 @@ export async function registerRoutes(
         },
       };
 
-      console.log("[Bank Report] Generating PDF with", invoices.length, "invoices and", payments.length, "payments");
+      console.log("[Bank Report] Generating PDF with", invoices.length, "invoices and", formattedPayments.length, "payments");
       const buffer = await generateBankPackPDF(bankPackData);
       console.log("[Bank Report] PDF generated, size:", buffer.length, "bytes");
       
