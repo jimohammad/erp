@@ -26,6 +26,9 @@ import {
   Calculator,
   Clock,
   Search,
+  Building2,
+  Download,
+  FileText,
 } from "lucide-react";
 import {
   Select,
@@ -118,6 +121,15 @@ export default function ReportsPage() {
     const now = new Date();
     return now.toISOString().split('T')[0];
   });
+  const [bankStartDate, setBankStartDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+  });
+  const [bankEndDate, setBankEndDate] = useState(() => {
+    const now = new Date();
+    return now.toISOString().split('T')[0];
+  });
+  const [isDownloadingBankPack, setIsDownloadingBankPack] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
   const { selectedBranchId } = useBranch();
 
@@ -233,7 +245,7 @@ export default function ReportsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="no-print grid w-full grid-cols-5" data-testid="tabs-report-type">
+        <TabsList className="no-print grid w-full grid-cols-6" data-testid="tabs-report-type">
           <TabsTrigger value="stock" data-testid="tab-stock">
             <Package className="h-4 w-4 mr-2" />
             Available Stock
@@ -253,6 +265,10 @@ export default function ReportsPage() {
           <TabsTrigger value="profitloss" data-testid="tab-profitloss">
             <Calculator className="h-4 w-4 mr-2" />
             Profit & Loss
+          </TabsTrigger>
+          <TabsTrigger value="bankreports" data-testid="tab-bankreports">
+            <Building2 className="h-4 w-4 mr-2" />
+            Bank Reports
           </TabsTrigger>
         </TabsList>
 
@@ -878,6 +894,140 @@ export default function ReportsPage() {
                     Select a date range and click Refresh to generate the report
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="bankreports" className="space-y-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Building2 className="h-5 w-5" />
+                  Bank Compliance Reports (A4)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="bg-muted/50 rounded-lg p-4">
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Generate A4 formatted reports for bank documentation. This includes a cover summary, 
+                    all sales invoices, and payment vouchers for the selected period.
+                  </p>
+                  
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div className="space-y-1">
+                      <Label htmlFor="bank-start-date">Start Date</Label>
+                      <Input
+                        id="bank-start-date"
+                        type="date"
+                        value={bankStartDate}
+                        onChange={(e) => setBankStartDate(e.target.value)}
+                        className="w-[180px]"
+                        data-testid="input-bank-start-date"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor="bank-end-date">End Date</Label>
+                      <Input
+                        id="bank-end-date"
+                        type="date"
+                        value={bankEndDate}
+                        onChange={(e) => setBankEndDate(e.target.value)}
+                        className="w-[180px]"
+                        data-testid="input-bank-end-date"
+                      />
+                    </div>
+                    <Button
+                      onClick={async () => {
+                        if (!bankStartDate || !bankEndDate) return;
+                        setIsDownloadingBankPack(true);
+                        try {
+                          const response = await fetch(
+                            `/api/reports/bank-pack?startDate=${bankStartDate}&endDate=${bankEndDate}`
+                          );
+                          if (!response.ok) throw new Error("Failed to generate PDF");
+                          const blob = await response.blob();
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `Bank_Report_${bankStartDate}_to_${bankEndDate}.pdf`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          window.URL.revokeObjectURL(url);
+                        } catch (error) {
+                          console.error("Download error:", error);
+                        } finally {
+                          setIsDownloadingBankPack(false);
+                        }
+                      }}
+                      disabled={!bankStartDate || !bankEndDate || isDownloadingBankPack}
+                      data-testid="button-download-bank-pack"
+                    >
+                      {isDownloadingBankPack ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Download className="h-4 w-4 mr-2" />
+                      )}
+                      Download Bank Pack (A4 PDF)
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Report Contents
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">1</Badge>
+                        <span>Cover Summary Page with totals</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">2</Badge>
+                        <span>Section A: All Sales Invoices</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">3</Badge>
+                        <span>Section B: All Payment Vouchers</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">4</Badge>
+                        <span>Net Cash Flow Summary</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        Bank Compliance Features
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                        <span>Professional A4 format</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                        <span>Page numbers & headers</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                        <span>Signature lines for approval</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                        <span>Multi-currency support</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

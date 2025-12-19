@@ -2459,7 +2459,7 @@ export async function registerRoutes(
   });
 
   // Recommendations PDF download
-  const { generateRecommendationsPDF } = await import("./pdfService");
+  const { generateRecommendationsPDF, generateBankPackPDF } = await import("./pdfService");
   
   app.get("/api/recommendations/pdf", isAuthenticated, async (req, res) => {
     try {
@@ -2470,6 +2470,110 @@ export async function registerRoutes(
     } catch (error) {
       console.error("PDF generation error:", error);
       res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  });
+
+  // Bank Pack A4 PDF download - for bank compliance
+  app.get("/api/reports/bank-pack", isAuthenticated, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "Start date and end date are required" });
+      }
+
+      // Get all sales orders in the date range
+      const allSalesOrders = await storage.getAllSalesOrders();
+      const filteredSales = allSalesOrders.filter(order => {
+        const orderDate = order.saleDate;
+        return orderDate >= startDate && orderDate <= endDate;
+      });
+
+      // Get customer names for sales orders
+      const customers = await storage.getCustomers();
+      const customerMap = new Map(customers.map(c => [c.id, c.name]));
+
+      // Format invoices for PDF
+      const invoices = filteredSales.map(order => ({
+        invoiceNumber: order.invoiceNumber,
+        saleDate: order.saleDate,
+        customerName: order.customerId ? customerMap.get(order.customerId) || null : null,
+        totalKwd: order.totalKwd,
+        fxCurrency: order.fxCurrency,
+        fxRate: order.fxRate,
+        totalFx: order.totalFx,
+        lineItems: [],
+      }));
+
+      // Get all payments in the date range
+      const allPayments = await storage.getAllPayments();
+      const filteredPayments = allPayments.filter(payment => {
+        const paymentDate = payment.paymentDate;
+        return paymentDate >= startDate && paymentDate <= endDate;
+      });
+
+      // Get party names for payments - need both suppliers and customers
+      const parties = await storage.getSuppliers();
+      const supplierMap = new Map(parties.map(p => [p.id, p.name]));
+
+      // Format payments for PDF
+      const payments = filteredPayments.map(payment => {
+        // Get party name from either customer or supplier
+        let partyName: string | null = null;
+        if (payment.customerId) {
+          partyName = customerMap.get(payment.customerId) || null;
+        } else if (payment.supplierId) {
+          partyName = supplierMap.get(payment.supplierId) || null;
+        }
+        
+        return {
+          voucherNumber: `PV-${payment.id}`,
+          paymentDate: payment.paymentDate,
+          partyName,
+          amount: payment.amount,
+          direction: payment.direction,
+          paymentMethod: payment.paymentType,
+          accountName: null,
+          reference: payment.reference,
+        };
+      });
+
+      // Calculate summary
+      const totalInvoiceAmount = filteredSales.reduce((sum, order) => 
+        sum + parseFloat(order.totalKwd || "0"), 0);
+      
+      const paymentsIn = filteredPayments.filter(p => p.direction === "in");
+      const paymentsOut = filteredPayments.filter(p => p.direction === "out");
+      
+      const totalPaymentsInAmount = paymentsIn.reduce((sum, p) => 
+        sum + parseFloat(p.amount || "0"), 0);
+      const totalPaymentsOutAmount = paymentsOut.reduce((sum, p) => 
+        sum + parseFloat(p.amount || "0"), 0);
+
+      const bankPackData = {
+        startDate: startDate as string,
+        endDate: endDate as string,
+        invoices,
+        payments,
+        summary: {
+          totalInvoices: invoices.length,
+          totalInvoiceAmount,
+          totalPaymentsIn: paymentsIn.length,
+          totalPaymentsInAmount,
+          totalPaymentsOut: paymentsOut.length,
+          totalPaymentsOutAmount,
+        },
+      };
+
+      const buffer = await generateBankPackPDF(bankPackData);
+      
+      const filename = `Bank_Report_${startDate}_to_${endDate}.pdf`;
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Bank pack PDF generation error:", error);
+      res.status(500).json({ error: "Failed to generate bank pack PDF" });
     }
   });
 
