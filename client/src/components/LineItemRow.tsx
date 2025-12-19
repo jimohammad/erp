@@ -13,7 +13,7 @@ import * as XLSX from "xlsx";
 export interface LineItemData {
   id: string;
   itemName: string;
-  quantity: number;
+  quantity: number | "";
   priceKwd: string;
   fxPrice: string;
   totalKwd: string;
@@ -41,8 +41,12 @@ export function LineItemRow({
   const excelInputRef = useRef<HTMLInputElement>(null);
 
   const handleQuantityChange = (value: string) => {
-    const qty = parseInt(value) || 0;
-    onChange(item.id, "quantity", qty);
+    if (value === "") {
+      onChange(item.id, "quantity", "");
+    } else {
+      const qty = parseInt(value) || 0;
+      onChange(item.id, "quantity", qty);
+    }
   };
 
   const handlePriceChange = (value: string) => {
@@ -230,7 +234,7 @@ export function LineItemRow({
           type="number"
           min="0"
           step="1"
-          value={item.quantity || ""}
+          value={item.quantity}
           onChange={(e) => handleQuantityChange(e.target.value)}
           className="text-center text-sm"
           data-testid={`input-qty-${index}`}

@@ -57,7 +57,7 @@ export function PurchaseOrderForm({
   const [deliveryNoteFile, setDeliveryNoteFile] = useState<File | null>(null);
   const [ttCopyFile, setTtCopyFile] = useState<File | null>(null);
   const [lineItems, setLineItems] = useState<LineItemData[]>([
-    { id: generateItemId(), itemName: "", quantity: 0, priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
+    { id: generateItemId(), itemName: "", quantity: "", priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
   ]);
 
   const [totals, setTotals] = useState({ totalKwd: "0.000", totalFx: "" });
@@ -67,7 +67,7 @@ export function PurchaseOrderForm({
     const rate = parseFloat(fxRate) || 0;
 
     lineItems.forEach(item => {
-      const qty = item.quantity || 0;
+      const qty = typeof item.quantity === "number" ? item.quantity : (parseInt(item.quantity) || 0);
       const price = parseFloat(item.priceKwd) || 0;
       totalKwd += qty * price;
     });
@@ -85,7 +85,8 @@ export function PurchaseOrderForm({
       const updated = { ...item, [field]: value };
       
       if (field === "quantity" || field === "priceKwd") {
-        const qty = field === "quantity" ? (value as number) : item.quantity;
+        const qtyVal = field === "quantity" ? value : item.quantity;
+        const qty = typeof qtyVal === "number" ? qtyVal : (parseInt(qtyVal as string) || 0);
         const price = field === "priceKwd" ? parseFloat(value as string) || 0 : parseFloat(item.priceKwd) || 0;
         updated.totalKwd = (qty * price).toFixed(3);
       }
@@ -97,7 +98,7 @@ export function PurchaseOrderForm({
   const handleAddRow = () => {
     setLineItems(prev => [
       ...prev,
-      { id: generateItemId(), itemName: "", quantity: 0, priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
+      { id: generateItemId(), itemName: "", quantity: "", priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
     ]);
   };
 
@@ -116,7 +117,7 @@ export function PurchaseOrderForm({
     setDeliveryNoteFile(null);
     setTtCopyFile(null);
     setLineItems([
-      { id: generateItemId(), itemName: "", quantity: 0, priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
+      { id: generateItemId(), itemName: "", quantity: "", priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
     ]);
   };
 
