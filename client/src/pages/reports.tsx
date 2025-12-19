@@ -30,11 +30,7 @@ import {
   Building2,
   Download,
   FileText,
-  CheckSquare,
 } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
-import type { SalesOrderWithDetails, User } from "@shared/schema";
-import { generateQRCodeDataURL } from "@/lib/qrcode";
 import companyLogoUrl from "@/assets/company-logo.jpg";
 import {
   Select,
@@ -137,30 +133,9 @@ export default function ReportsPage() {
     return now.toISOString().split('T')[0];
   });
   const [isDownloadingBankPack, setIsDownloadingBankPack] = useState(false);
-  const [invoicePrintDate, setInvoicePrintDate] = useState(() => {
-    return new Date().toISOString().split('T')[0];
-  });
-  const [selectedInvoices, setSelectedInvoices] = useState<Set<number>>(new Set());
-  const [isPrintingInvoices, setIsPrintingInvoices] = useState(false);
   const [logoBase64, setLogoBase64] = useState<string>("");
   const printRef = useRef<HTMLDivElement>(null);
   const { selectedBranchId } = useBranch();
-
-  // Query for sales orders by date for invoice printing
-  const invoicePrintQueryKey = invoicePrintDate 
-    ? `/api/sales-orders?date=${invoicePrintDate}`
-    : null;
-  
-  const { data: invoicesForDate = [], isLoading: invoicesLoading } = useQuery<SalesOrderWithDetails[]>({
-    queryKey: [invoicePrintQueryKey],
-    enabled: !!invoicePrintQueryKey,
-  });
-
-  // Get user's printer preference
-  const { data: userData } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-  });
-  const userPrinterType = userData?.printerType || "a5";
 
   const { data: stockBalance = [], isLoading: stockLoading } = useQuery<StockBalanceItem[]>({
     queryKey: ["/api/reports/stock-balance"],
@@ -230,177 +205,6 @@ export default function ReportsPage() {
     window.print();
   };
 
-  // Print invoice function for A5/Thermal formats
-  const printInvoice = async (order: SalesOrderWithDetails, printerType: string) => {
-    const customerName = order.customer?.name || "Walk-in Customer";
-    const subtotal = order.lineItems?.reduce((sum, item) => sum + (parseFloat(item.totalKwd || "0")), 0) || 0;
-    
-    // Generate QR code
-    const qrDataUrl = await generateQRCodeDataURL({
-      type: 'SALE',
-      id: order.id,
-      number: order.invoiceNumber || `INV-${order.id}`,
-      amount: subtotal.toFixed(3),
-      date: order.saleDate,
-      partyName: customerName,
-      partyType: 'customer',
-    });
-
-    if (printerType === "thermal") {
-      printThermalInvoice(order, customerName, subtotal, qrDataUrl);
-    } else {
-      printA5Invoice(order, customerName, subtotal, qrDataUrl);
-    }
-  };
-
-  const printThermalInvoice = (order: SalesOrderWithDetails, customerName: string, subtotal: number, qrDataUrl: string) => {
-    const printWindow = window.open("", "_blank", "width=350,height=600");
-    if (!printWindow) return;
-    
-    const itemsHtml = order.lineItems?.map(li => `
-      <tr>
-        <td style="text-align:left;padding:2px 0;">${li.itemName}</td>
-        <td style="text-align:center;padding:2px 0;">${li.quantity}</td>
-        <td style="text-align:right;padding:2px 0;">${parseFloat(li.priceKwd || "0").toFixed(3)}</td>
-        <td style="text-align:right;padding:2px 0;">${li.totalKwd}</td>
-      </tr>
-    `).join("") || "";
-    
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <title>Invoice ${order.invoiceNumber || order.id}</title>
-        <style>
-          @page { size: 80mm auto; margin: 0; }
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: 'Courier New', monospace; font-size: 12px; width: 80mm; padding: 5mm; color: #000; }
-          .header { text-align: center; margin-bottom: 10px; }
-          .company { font-size: 14px; font-weight: bold; }
-          .divider { border-top: 1px dashed #000; margin: 8px 0; }
-          .info-row { display: flex; justify-content: space-between; margin: 3px 0; }
-          table { width: 100%; border-collapse: collapse; }
-          th { text-align: left; border-bottom: 1px solid #000; padding: 3px 0; font-size: 11px; }
-          .totals { margin-top: 10px; }
-          .totals .row { display: flex; justify-content: space-between; padding: 2px 0; }
-          .totals .total-row { font-weight: bold; font-size: 14px; border-top: 1px solid #000; padding-top: 5px; }
-          .qr-section { text-align: center; margin-top: 10px; }
-          .footer { text-align: center; margin-top: 15px; font-size: 14px; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="company">IQBAL ELECTRONICS CO. WLL</div>
-          <div>Mobile Distribution</div>
-          <div>Tel: +965 55787980</div>
-        </div>
-        <div class="divider"></div>
-        <div class="info-row"><span>Invoice:</span><span>${order.invoiceNumber || `INV-${order.id}`}</span></div>
-        <div class="info-row"><span>Date:</span><span>${order.saleDate}</span></div>
-        <div class="info-row"><span>Customer:</span><span>${customerName}</span></div>
-        <div class="divider"></div>
-        <table>
-          <thead><tr><th>Item</th><th style="text-align:center">Qty</th><th style="text-align:right">Price</th><th style="text-align:right">Total</th></tr></thead>
-          <tbody>${itemsHtml}</tbody>
-        </table>
-        <div class="totals">
-          <div class="row total-row"><span>TOTAL:</span><span>${subtotal.toFixed(3)} KWD</span></div>
-        </div>
-        <div class="qr-section">
-          <img src="${qrDataUrl}" alt="QR Code" style="width: 60px; height: 60px;" />
-        </div>
-        <div class="footer">Thank You!</div>
-        <script>window.onload = function() { window.print(); }</script>
-      </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
-  const printA5Invoice = (order: SalesOrderWithDetails, customerName: string, subtotal: number, qrDataUrl: string) => {
-    const totalQuantity = order.lineItems?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0;
-    
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-
-    const itemsHtml = order.lineItems?.map((li, index) => `
-      <tr>
-        <td style="border:1px solid #000;padding:4px;text-align:center;">${index + 1}</td>
-        <td style="border:1px solid #000;padding:4px;">${li.itemName}</td>
-        <td style="border:1px solid #000;padding:4px;text-align:center;">${li.quantity}</td>
-        <td style="border:1px solid #000;padding:4px;text-align:right;">${parseFloat(li.priceKwd || "0").toFixed(3)}</td>
-        <td style="border:1px solid #000;padding:4px;text-align:right;">${li.totalKwd}</td>
-      </tr>
-    `).join("") || "";
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Credit Invoice ${order.invoiceNumber || order.id} - Iqbal Electronics</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; background: #fff; color: #000; line-height: 1.3; font-size: 10px; }
-            .invoice-container { max-width: 560px; margin: 0 auto; padding: 10px; }
-            .top-title { text-align: center; margin-bottom: 8px; }
-            .top-title h1 { font-size: 12px; font-weight: 600; text-decoration: underline; }
-            .header-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
-            .logo-section .iec-text { font-size: 24px; font-weight: 700; }
-            .company-section { text-align: right; }
-            .company-section .company-name { font-size: 12px; font-weight: 600; }
-            .info-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
-            .items-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
-            .items-table th { border: 1px solid #000; padding: 4px; background: #f0f0f0; font-size: 9px; }
-            .items-table td { border: 1px solid #000; padding: 4px; font-size: 9px; }
-            .footer-row { display: flex; justify-content: space-between; margin-top: 10px; }
-            .qr-section { text-align: center; }
-          </style>
-        </head>
-        <body>
-          <div class="invoice-container">
-            <div class="top-title"><h1>CREDIT INVOICE</h1></div>
-            <div class="header-row">
-              <div class="logo-section"><div class="iec-text">IEC</div></div>
-              <div class="company-section">
-                <div class="company-name">Iqbal Electronics Co. WLL</div>
-                <div>Tel: +965 55787980</div>
-              </div>
-            </div>
-            <div class="info-row">
-              <div><strong>Bill To:</strong> ${customerName}</div>
-              <div><strong>Invoice:</strong> ${order.invoiceNumber || `INV-${order.id}`}<br/><strong>Date:</strong> ${order.saleDate}</div>
-            </div>
-            <table class="items-table">
-              <thead><tr><th>#</th><th>Description</th><th>Qty</th><th>Price</th><th>Amount</th></tr></thead>
-              <tbody>${itemsHtml}</tbody>
-              <tfoot>
-                <tr style="font-weight:bold;background:#f0f0f0;">
-                  <td colspan="2" style="border:1px solid #000;padding:4px;">TOTAL</td>
-                  <td style="border:1px solid #000;padding:4px;text-align:center;">${totalQuantity}</td>
-                  <td style="border:1px solid #000;padding:4px;"></td>
-                  <td style="border:1px solid #000;padding:4px;text-align:right;">${subtotal.toFixed(3)} KWD</td>
-                </tr>
-              </tfoot>
-            </table>
-            <div class="footer-row">
-              <div class="qr-section">
-                <img src="${qrDataUrl}" alt="QR Code" style="width: 70px; height: 70px;" />
-              </div>
-              <div style="text-align:right;">
-                <p><strong>Authorized Signature</strong></p>
-                <div style="border-bottom:1px solid #000;width:150px;margin-top:30px;"></div>
-              </div>
-            </div>
-          </div>
-          <script>
-            window.onload = function() { setTimeout(function() { window.print(); }, 300); }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-  };
-
   const stockTotals = stockBalance.reduce(
     (acc, item) => ({
       openingStock: acc.openingStock + (item.openingStock || 0),
@@ -445,7 +249,7 @@ export default function ReportsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="no-print grid w-full grid-cols-7" data-testid="tabs-report-type">
+        <TabsList className="no-print grid w-full grid-cols-6" data-testid="tabs-report-type">
           <TabsTrigger value="stock" data-testid="tab-stock">
             <Package className="h-4 w-4 mr-2" />
             Available Stock
@@ -465,10 +269,6 @@ export default function ReportsPage() {
           <TabsTrigger value="profitloss" data-testid="tab-profitloss">
             <Calculator className="h-4 w-4 mr-2" />
             Profit & Loss
-          </TabsTrigger>
-          <TabsTrigger value="invoiceprint" data-testid="tab-invoiceprint">
-            <CheckSquare className="h-4 w-4 mr-2" />
-            Invoice Printing
           </TabsTrigger>
           <TabsTrigger value="bankreports" data-testid="tab-bankreports">
             <Building2 className="h-4 w-4 mr-2" />
@@ -1097,155 +897,6 @@ export default function ReportsPage() {
                   <div className="text-center py-8 text-muted-foreground">
                     Select a date range and click Refresh to generate the report
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="invoiceprint" className="space-y-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <CheckSquare className="h-5 w-5" />
-                  Print Sales Invoices by Date
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex flex-wrap items-end gap-4">
-                  <div className="space-y-1">
-                    <Label htmlFor="invoice-print-date">Select Date</Label>
-                    <Input
-                      id="invoice-print-date"
-                      type="date"
-                      value={invoicePrintDate}
-                      onChange={(e) => {
-                        setInvoicePrintDate(e.target.value);
-                        setSelectedInvoices(new Set());
-                      }}
-                      className="w-[180px]"
-                      data-testid="input-invoice-print-date"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge variant="secondary" className="font-mono">
-                      {invoicesForDate.length} invoices found
-                    </Badge>
-                    {selectedInvoices.size > 0 && (
-                      <Badge variant="default" className="font-mono">
-                        {selectedInvoices.size} selected
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                {invoicesLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                  </div>
-                ) : invoicesForDate.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    No sales invoices found for {invoicePrintDate ? formatDate(invoicePrintDate) : "selected date"}
-                  </div>
-                ) : (
-                  <>
-                    <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[50px]">
-                              <Checkbox
-                                checked={selectedInvoices.size === invoicesForDate.length && invoicesForDate.length > 0}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelectedInvoices(new Set(invoicesForDate.map(inv => inv.id)));
-                                  } else {
-                                    setSelectedInvoices(new Set());
-                                  }
-                                }}
-                                data-testid="checkbox-select-all"
-                              />
-                            </TableHead>
-                            <TableHead>Invoice #</TableHead>
-                            <TableHead>Customer</TableHead>
-                            <TableHead className="text-right">Amount (KWD)</TableHead>
-                            <TableHead className="text-right">Items</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {invoicesForDate.map((invoice) => (
-                            <TableRow key={invoice.id} data-testid={`row-invoice-${invoice.id}`}>
-                              <TableCell>
-                                <Checkbox
-                                  checked={selectedInvoices.has(invoice.id)}
-                                  onCheckedChange={(checked) => {
-                                    const newSet = new Set(selectedInvoices);
-                                    if (checked) {
-                                      newSet.add(invoice.id);
-                                    } else {
-                                      newSet.delete(invoice.id);
-                                    }
-                                    setSelectedInvoices(newSet);
-                                  }}
-                                  data-testid={`checkbox-invoice-${invoice.id}`}
-                                />
-                              </TableCell>
-                              <TableCell className="font-mono font-medium">
-                                {invoice.invoiceNumber || `INV-${invoice.id}`}
-                              </TableCell>
-                              <TableCell>{invoice.customer?.name || "Walk-in"}</TableCell>
-                              <TableCell className="text-right font-mono">
-                                {parseFloat(invoice.totalKwd || "0").toFixed(3)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <Badge variant="outline">{invoice.lineItems?.length || 0}</Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">
-                        Total: {formatAmount(invoicesForDate.reduce((sum, inv) => sum + parseFloat(inv.totalKwd || "0"), 0))} KWD
-                      </div>
-                      <Button
-                        onClick={async () => {
-                          if (selectedInvoices.size === 0) {
-                            toast({
-                              title: "No invoices selected",
-                              description: "Please select at least one invoice to print",
-                              variant: "destructive",
-                            });
-                            return;
-                          }
-                          
-                          setIsPrintingInvoices(true);
-                          const invoicesToPrint = invoicesForDate.filter(inv => selectedInvoices.has(inv.id));
-                          
-                          for (const invoice of invoicesToPrint) {
-                            await printInvoice(invoice, userPrinterType);
-                            await new Promise(resolve => setTimeout(resolve, 500));
-                          }
-                          
-                          setIsPrintingInvoices(false);
-                          toast({
-                            title: "Printing complete",
-                            description: `Printed ${invoicesToPrint.length} invoice(s)`,
-                          });
-                        }}
-                        disabled={isPrintingInvoices || selectedInvoices.size === 0}
-                        data-testid="button-print-selected"
-                      >
-                        {isPrintingInvoices ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Printer className="h-4 w-4 mr-2" />
-                        )}
-                        Print Selected ({selectedInvoices.size})
-                      </Button>
-                    </div>
-                  </>
                 )}
               </CardContent>
             </Card>

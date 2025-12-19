@@ -2477,7 +2477,52 @@ export async function registerRoutes(
   });
 
   // Recommendations PDF download
-  const { generateRecommendationsPDF, generateBankPackPDF } = await import("./pdfService");
+  const { generateRecommendationsPDF, generateBankPackPDF, generateMergedInvoicesPDF } = await import("./pdfService");
+  
+  // Merged Invoices PDF download - for batch printing
+  app.post("/api/reports/merged-invoices-pdf", isAuthenticated, async (req, res) => {
+    try {
+      const { invoiceIds, date } = req.body;
+      
+      if (!invoiceIds || !Array.isArray(invoiceIds) || invoiceIds.length === 0) {
+        return res.status(400).json({ error: "Invoice IDs are required" });
+      }
+
+      // Get the sales orders for the specified IDs
+      const allSalesOrders = await storage.getAllSalesOrders();
+      const selectedOrders = allSalesOrders.filter(order => invoiceIds.includes(order.id));
+      
+      if (selectedOrders.length === 0) {
+        return res.status(404).json({ error: "No invoices found" });
+      }
+
+      // Transform to the format expected by PDF generator
+      const invoicesForPdf = selectedOrders.map(order => ({
+        id: order.id,
+        invoiceNumber: order.invoiceNumber,
+        saleDate: order.saleDate,
+        customerName: order.customer?.name || null,
+        customerPhone: order.customer?.phone || null,
+        totalKwd: order.totalKwd,
+        lineItems: (order.lineItems || []).map(item => ({
+          itemName: item.itemName,
+          quantity: item.quantity,
+          priceKwd: item.priceKwd,
+          totalKwd: item.totalKwd,
+        })),
+        verificationCode: order.verificationCode || undefined,
+      }));
+
+      const buffer = await generateMergedInvoicesPDF(invoicesForPdf, date || new Date().toISOString().split('T')[0]);
+      
+      res.setHeader("Content-Type", "application/pdf");
+      res.setHeader("Content-Disposition", `attachment; filename="Invoices_${date || 'batch'}.pdf"`);
+      res.send(buffer);
+    } catch (error) {
+      console.error("Merged invoices PDF generation error:", error);
+      res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  });
   
   app.get("/api/recommendations/pdf", isAuthenticated, async (req, res) => {
     try {
