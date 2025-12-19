@@ -528,9 +528,15 @@ export async function generateMergedInvoicesPDF(invoices: MergedInvoice[], date:
         // Header Row - Logo section (left) and Company section (right)
         const headerY = doc.y;
         
-        // Left - IEC Logo text
-        doc.fontSize(20).font('Helvetica-Bold').fillColor("#1a1a2e").text("IEC", margin, headerY);
-        doc.fontSize(6).font('Helvetica').fillColor("#333").text("شركة إقبال للأجهزة إلكترونية ذ.م.م", margin, headerY + 22);
+        // Left - Company Logo image
+        const logoPath = path.join(process.cwd(), 'attached_assets', 'erpLogo_2_1765470830494.png');
+        try {
+          doc.image(logoPath, margin, headerY, { height: 30 });
+        } catch (e) {
+          // Fallback to text if image fails
+          doc.fontSize(20).font('Helvetica-Bold').fillColor("#1a1a2e").text("IEC", margin, headerY);
+        }
+        doc.fontSize(6).font('Helvetica').fillColor("#333").text("شركة إقبال للأجهزة إلكترونية ذ.م.م", margin, headerY + 32);
         
         // Right - Company info
         doc.fontSize(10).font('Helvetica-Bold').fillColor("#1a1a2e").text("Iqbal Electronics Co. WLL", margin, headerY, { 
