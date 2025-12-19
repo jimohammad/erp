@@ -1,11 +1,63 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, insertLineItemSchema, insertCustomerSchema, insertSalesOrderSchema, insertSalesLineItemSchema, insertPaymentSchema, PAYMENT_TYPES, PAYMENT_DIRECTIONS, insertExpenseCategorySchema, insertExpenseSchema, insertAccountTransferSchema, insertReturnSchema, insertReturnLineItemSchema, insertUserRoleAssignmentSchema, insertDiscountSchema, insertBranchSchema, insertStockTransferSchema, insertStockTransferLineItemSchema, insertInventoryAdjustmentSchema, insertOpeningBalanceSchema, ROLE_TYPES, MODULE_NAMES } from "@shared/schema";
+import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, insertLineItemSchema, insertCustomerSchema, insertSalesOrderSchema, insertSalesLineItemSchema, insertPaymentSchema, PAYMENT_TYPES, PAYMENT_DIRECTIONS, insertExpenseCategorySchema, insertExpenseSchema, insertAccountTransferSchema, insertReturnSchema, insertReturnLineItemSchema, insertUserRoleAssignmentSchema, insertDiscountSchema, insertBranchSchema, insertStockTransferSchema, insertStockTransferLineItemSchema, insertInventoryAdjustmentSchema, insertOpeningBalanceSchema, ROLE_TYPES, MODULE_NAMES, type InsertAuditTrail } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupAuth, isAuthenticated, isAdmin } from "./localAuth";
 import { listBackups, getBackupDownloadUrl, createBackup } from "./backupScheduler";
 import { sendSaleNotification } from "./whatsapp";
+
+// Helper function to create audit log entries
+async function createAuditLog(
+  req: any,
+  module: string,
+  action: string,
+  recordId: number,
+  recordReference: string | null,
+  previousData: any = null,
+  newData: any = null,
+  notes: string | null = null
+) {
+  try {
+    const userId = req.user?.id || req.user?.claims?.sub || null;
+    const userName = req.user?.firstName && req.user?.lastName 
+      ? `${req.user.firstName} ${req.user.lastName}` 
+      : req.user?.email || req.user?.username || null;
+    
+    // Get branch info if available
+    const branchId = newData?.branchId || previousData?.branchId || null;
+    let branchName = null;
+    if (branchId) {
+      const branches = await storage.getBranches();
+      const branch = branches.find((b: any) => b.id === branchId);
+      branchName = branch?.name || null;
+    }
+    
+    const changedFields = storage.getChangedFields(previousData, newData);
+    
+    const auditData: InsertAuditTrail = {
+      module,
+      action,
+      recordId,
+      recordReference,
+      userId,
+      userName,
+      branchId,
+      branchName,
+      previousData,
+      newData,
+      changedFields: changedFields.length > 0 ? changedFields : null,
+      ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
+      userAgent: req.headers['user-agent'] || null,
+      notes,
+    };
+    
+    await storage.createAuditLog(auditData);
+  } catch (error) {
+    console.error("[Audit] Failed to create audit log:", error);
+    // Don't throw - audit logging should never break the main operation
+  }
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -546,6 +598,24 @@ export async function registerRoutes(
             }
           }
         }
+        
+        // Validate IMEI count matches quantity
+        for (const lineItem of lineItems) {
+          if (lineItem.imeiNumbers && Array.isArray(lineItem.imeiNumbers) && lineItem.imeiNumbers.length > 0) {
+            const imeiCount = lineItem.imeiNumbers.filter((imei: string) => imei && imei.trim()).length;
+            const quantity = parseInt(lineItem.quantity) || 0;
+            
+            if (imeiCount !== quantity) {
+              return res.status(400).json({ 
+                error: `IMEI count mismatch for "${lineItem.itemName}". You entered ${imeiCount} IMEI number(s) but quantity is ${quantity}. They must match.`,
+                imeiValidationError: true,
+                itemName: lineItem.itemName,
+                imeiCount,
+                quantity
+              });
+            }
+          }
+        }
       }
       
       // Handle customerId - Party Master customers have IDs offset by 100000
@@ -562,6 +632,27 @@ export async function registerRoutes(
           }
         } else {
           customerId = orderData.customerId;
+        }
+      }
+      
+      // Credit limit validation
+      if (customerId && orderData.totalKwd) {
+        const creditLimit = await storage.getCustomerCreditLimit(customerId);
+        if (creditLimit !== null && creditLimit > 0) {
+          const currentBalance = await storage.getCustomerCurrentBalance(customerId);
+          const saleAmount = parseFloat(orderData.totalKwd);
+          const newBalance = currentBalance + saleAmount;
+          
+          if (newBalance > creditLimit) {
+            return res.status(400).json({ 
+              error: `Credit limit exceeded. Customer credit limit: ${creditLimit.toFixed(3)} KWD, Current balance: ${currentBalance.toFixed(3)} KWD, Sale amount: ${saleAmount.toFixed(3)} KWD. New balance (${newBalance.toFixed(3)} KWD) would exceed limit.`,
+              creditLimitError: true,
+              creditLimit,
+              currentBalance,
+              saleAmount,
+              newBalance
+            });
+          }
         }
       }
       
@@ -655,6 +746,18 @@ export async function registerRoutes(
         }
       }
       
+      // Audit log for sales order creation
+      await createAuditLog(
+        req,
+        "sales_order",
+        "create",
+        order.id,
+        order.invoiceNumber || null,
+        null,
+        { ...order, lineItems },
+        null
+      );
+      
       res.status(201).json(order);
     } catch (error: any) {
       console.error("Error creating sales order:", error);
@@ -669,6 +772,9 @@ export async function registerRoutes(
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid order ID" });
       }
+      
+      // Get previous data for audit
+      const previousOrder = await storage.getSalesOrder(id);
       
       const { lineItems, ...orderData } = req.body;
       
@@ -701,6 +807,18 @@ export async function registerRoutes(
         return res.status(404).json({ error: "Sales order not found" });
       }
       
+      // Audit log for sales order update
+      await createAuditLog(
+        req,
+        "sales_order",
+        "update",
+        id,
+        updatedOrder.invoiceNumber || null,
+        previousOrder,
+        { ...updatedOrder, lineItems },
+        null
+      );
+      
       res.json(updatedOrder);
     } catch (error) {
       console.error("Error updating sales order:", error);
@@ -714,10 +832,27 @@ export async function registerRoutes(
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid order ID" });
       }
+      
+      // Get data before deletion for audit
+      const orderToDelete = await storage.getSalesOrder(id);
+      
       const deleted = await storage.deleteSalesOrder(id);
       if (!deleted) {
         return res.status(404).json({ error: "Sales order not found" });
       }
+      
+      // Audit log for sales order deletion
+      await createAuditLog(
+        req,
+        "sales_order",
+        "delete",
+        id,
+        orderToDelete?.invoiceNumber || null,
+        orderToDelete,
+        null,
+        null
+      );
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting sales order:", error);
@@ -829,6 +964,19 @@ export async function registerRoutes(
       }
       
       const payment = await storage.createPayment(parsed.data, splits);
+      
+      // Audit log for payment creation
+      await createAuditLog(
+        req,
+        "payment",
+        "create",
+        payment.id,
+        payment.reference || `PAY-${payment.id}`,
+        null,
+        { ...payment, splits },
+        null
+      );
+      
       res.status(201).json(payment);
     } catch (error) {
       console.error("[Payment] Error creating payment:", error);
@@ -842,10 +990,27 @@ export async function registerRoutes(
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid payment ID" });
       }
+      
+      // Get data before deletion for audit
+      const paymentToDelete = await storage.getPayment(id);
+      
       const deleted = await storage.deletePayment(id);
       if (!deleted) {
         return res.status(404).json({ error: "Payment not found" });
       }
+      
+      // Audit log for payment deletion
+      await createAuditLog(
+        req,
+        "payment",
+        "delete",
+        id,
+        paymentToDelete?.reference || `PAY-${id}`,
+        paymentToDelete,
+        null,
+        null
+      );
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting payment:", error);

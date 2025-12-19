@@ -1,13 +1,90 @@
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import session from "express-session";
-import type { Express, RequestHandler } from "express";
+import type { Express, RequestHandler, Request, Response, NextFunction } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq, count } from "drizzle-orm";
+
+// Rate limiting for login attempts
+const loginAttempts = new Map<string, { count: number; lastAttempt: number; lockedUntil: number }>();
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const ATTEMPT_WINDOW_MS = 5 * 60 * 1000; // 5 minute window to count attempts
+
+function getClientIP(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') {
+    return forwarded.split(',')[0].trim();
+  }
+  return req.ip || req.socket.remoteAddress || 'unknown';
+}
+
+function checkRateLimit(req: Request, res: Response, next: NextFunction) {
+  const ip = getClientIP(req);
+  const now = Date.now();
+  const attemptData = loginAttempts.get(ip);
+  
+  if (attemptData) {
+    // Check if currently locked out
+    if (attemptData.lockedUntil > now) {
+      const remainingMs = attemptData.lockedUntil - now;
+      const remainingMins = Math.ceil(remainingMs / 60000);
+      console.log(`[RateLimit] Blocked login attempt from ${ip} - locked for ${remainingMins} more minutes`);
+      return res.status(429).json({ 
+        message: `Too many login attempts. Please try again in ${remainingMins} minute${remainingMins > 1 ? 's' : ''}.`,
+        retryAfter: remainingMs 
+      });
+    }
+    
+    // Reset count if outside the attempt window
+    if (now - attemptData.lastAttempt > ATTEMPT_WINDOW_MS) {
+      attemptData.count = 0;
+    }
+  }
+  
+  next();
+}
+
+function recordLoginAttempt(ip: string, success: boolean) {
+  const now = Date.now();
+  let attemptData = loginAttempts.get(ip);
+  
+  if (!attemptData) {
+    attemptData = { count: 0, lastAttempt: now, lockedUntil: 0 };
+    loginAttempts.set(ip, attemptData);
+  }
+  
+  if (success) {
+    // Clear attempts on successful login
+    loginAttempts.delete(ip);
+    console.log(`[RateLimit] Login success from ${ip} - cleared attempt counter`);
+  } else {
+    attemptData.count++;
+    attemptData.lastAttempt = now;
+    
+    console.log(`[RateLimit] Failed login attempt ${attemptData.count}/${MAX_LOGIN_ATTEMPTS} from ${ip}`);
+    
+    if (attemptData.count >= MAX_LOGIN_ATTEMPTS) {
+      attemptData.lockedUntil = now + LOCKOUT_DURATION_MS;
+      console.log(`[RateLimit] IP ${ip} locked out for 15 minutes after ${attemptData.count} failed attempts`);
+    }
+  }
+}
+
+// Clean up old entries periodically (every 30 minutes)
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, data] of loginAttempts.entries()) {
+    // Remove entries that are unlocked and haven't had activity in 30 minutes
+    if (data.lockedUntil < now && now - data.lastAttempt > 30 * 60 * 1000) {
+      loginAttempts.delete(ip);
+    }
+  }
+}, 30 * 60 * 1000);
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000;
@@ -96,12 +173,17 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  app.post("/api/login", (req, res, next) => {
+  // Login endpoint with rate limiting
+  app.post("/api/login", checkRateLimit, (req, res, next) => {
+    const ip = getClientIP(req);
+    
     passport.authenticate("local", (err: any, user: any, info: any) => {
       if (err) {
+        recordLoginAttempt(ip, false);
         return res.status(500).json({ message: "Authentication error" });
       }
       if (!user) {
+        recordLoginAttempt(ip, false);
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
       // Regenerate session to prevent session fixation attacks
@@ -113,6 +195,7 @@ export async function setupAuth(app: Express) {
           if (loginErr) {
             return res.status(500).json({ message: "Login error" });
           }
+          recordLoginAttempt(ip, true);
           return res.json({ user });
         });
       });

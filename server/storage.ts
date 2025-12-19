@@ -139,6 +139,10 @@ import {
   documentVerifications,
   type DocumentVerification,
   type InsertDocumentVerification,
+  auditTrail,
+  type AuditTrail,
+  type InsertAuditTrail,
+  type AuditTrailWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql, or, isNull, asc } from "drizzle-orm";
@@ -1906,6 +1910,49 @@ export class DatabaseStorage implements IStorage {
     `);
 
     return result.rows as { id: number; date: string; type: string; reference: string; description: string; debit: number; credit: number; balance: number }[];
+  }
+
+  // Get customer's current outstanding balance (for credit limit validation before sale creation)
+  async getCustomerCurrentBalance(customerId: number): Promise<number> {
+    const result = await db.execute(sql`
+      WITH opening_balance AS (
+        SELECT 
+          COALESCE(CAST(balance_amount AS DECIMAL), 0)::float as balance
+        FROM opening_balances
+        WHERE party_type = 'customer' AND party_id = ${customerId}
+        LIMIT 1
+      ),
+      all_sales AS (
+        SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
+        FROM sales_orders
+        WHERE customer_id = ${customerId}
+      ),
+      all_payments AS (
+        SELECT COALESCE(SUM(CAST(amount AS DECIMAL)), 0)::float as total
+        FROM payments
+        WHERE customer_id = ${customerId} AND direction = 'IN'
+      ),
+      all_returns AS (
+        SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
+        FROM returns
+        WHERE customer_id = ${customerId} AND return_type = 'sale_return'
+      )
+      SELECT 
+        (COALESCE((SELECT balance FROM opening_balance), 0) + 
+         COALESCE((SELECT total FROM all_sales), 0) - 
+         COALESCE((SELECT total FROM all_payments), 0) - 
+         COALESCE((SELECT total FROM all_returns), 0))::float as balance
+    `);
+    
+    const row = result.rows[0] as { balance: number } | undefined;
+    return row?.balance || 0;
+  }
+
+  // Get customer credit limit
+  async getCustomerCreditLimit(customerId: number): Promise<number | null> {
+    const customer = await this.getCustomer(customerId);
+    if (!customer?.creditLimit) return null;
+    return parseFloat(customer.creditLimit);
   }
 
   async getCustomerBalanceForSale(customerId: number, saleOrderId: number): Promise<{ previousBalance: number; currentBalance: number }> {
@@ -3800,6 +3847,92 @@ export class DatabaseStorage implements IStorage {
       code += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return code;
+  }
+
+  // ==================== Audit Trail ====================
+
+  async createAuditLog(data: InsertAuditTrail): Promise<AuditTrail> {
+    const [audit] = await db.insert(auditTrail)
+      .values(data)
+      .returning();
+    return audit;
+  }
+
+  async getAuditLogs(options?: {
+    module?: string;
+    recordId?: number;
+    userId?: string;
+    fromDate?: string;
+    toDate?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ data: AuditTrailWithDetails[]; total: number }> {
+    const conditions = [];
+    
+    if (options?.module) {
+      conditions.push(eq(auditTrail.module, options.module));
+    }
+    if (options?.recordId) {
+      conditions.push(eq(auditTrail.recordId, options.recordId));
+    }
+    if (options?.userId) {
+      conditions.push(eq(auditTrail.userId, options.userId));
+    }
+    if (options?.fromDate) {
+      conditions.push(gte(auditTrail.createdAt, new Date(options.fromDate)));
+    }
+    if (options?.toDate) {
+      conditions.push(lte(auditTrail.createdAt, new Date(options.toDate)));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const [data, countResult] = await Promise.all([
+      db.select()
+        .from(auditTrail)
+        .leftJoin(users, eq(auditTrail.userId, users.id))
+        .leftJoin(branches, eq(auditTrail.branchId, branches.id))
+        .where(whereClause)
+        .orderBy(desc(auditTrail.createdAt))
+        .limit(options?.limit ?? 100)
+        .offset(options?.offset ?? 0),
+      db.select({ count: sql<number>`count(*)` })
+        .from(auditTrail)
+        .where(whereClause),
+    ]);
+
+    const audits: AuditTrailWithDetails[] = data.map(row => ({
+      ...row.audit_trail,
+      user: row.users || null,
+      branch: row.branches || null,
+    }));
+
+    return { data: audits, total: Number(countResult[0]?.count ?? 0) };
+  }
+
+  async getAuditLogsForRecord(module: string, recordId: number): Promise<AuditTrail[]> {
+    return await db.select()
+      .from(auditTrail)
+      .where(and(
+        eq(auditTrail.module, module),
+        eq(auditTrail.recordId, recordId)
+      ))
+      .orderBy(desc(auditTrail.createdAt));
+  }
+
+  // Helper to detect changed fields between two objects
+  getChangedFields(previousData: any, newData: any): string[] {
+    if (!previousData || !newData) return [];
+    const changedFields: string[] = [];
+    const allKeys = new Set([...Object.keys(previousData), ...Object.keys(newData)]);
+    
+    for (const key of allKeys) {
+      if (JSON.stringify(previousData[key]) !== JSON.stringify(newData[key])) {
+        changedFields.push(key);
+      }
+    }
+    
+    return changedFields;
   }
 }
 

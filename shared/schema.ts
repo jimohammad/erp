@@ -1062,3 +1062,57 @@ export type AllTransaction = {
   createdBy: string | null;
   createdAt: string;
 };
+
+// ==================== AUDIT TRAIL ====================
+// Immutable audit log for all financial transactions
+
+export const AUDIT_ACTIONS = ["create", "update", "delete", "void", "approve", "reject"] as const;
+export type AuditAction = typeof AUDIT_ACTIONS[number];
+
+export const AUDIT_MODULES = [
+  "sales_order",
+  "purchase_order", 
+  "payment",
+  "return",
+  "expense",
+  "stock_transfer",
+  "inventory_adjustment",
+  "account_transfer",
+  "party",
+  "item",
+  "discount",
+] as const;
+export type AuditModule = typeof AUDIT_MODULES[number];
+
+export const auditTrail = pgTable("audit_trail", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  module: text("module").notNull(), // sales_order, purchase_order, payment, etc.
+  action: text("action").notNull(), // create, update, delete, void
+  recordId: integer("record_id").notNull(), // ID of the affected record
+  recordReference: text("record_reference"), // Invoice number, PO number, etc.
+  userId: varchar("user_id").references(() => users.id),
+  userName: text("user_name"), // Stored for historical reference
+  branchId: integer("branch_id").references(() => branches.id),
+  branchName: text("branch_name"), // Stored for historical reference
+  previousData: jsonb("previous_data"), // Snapshot before change
+  newData: jsonb("new_data"), // Snapshot after change
+  changedFields: text("changed_fields").array(), // List of fields that changed
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  notes: text("notes"), // Optional reason for change
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_audit_module").on(table.module),
+  index("idx_audit_record").on(table.module, table.recordId),
+  index("idx_audit_user").on(table.userId),
+  index("idx_audit_date").on(table.createdAt),
+]);
+
+export const insertAuditTrailSchema = createInsertSchema(auditTrail).omit({ id: true, createdAt: true });
+export type InsertAuditTrail = z.infer<typeof insertAuditTrailSchema>;
+export type AuditTrail = typeof auditTrail.$inferSelect;
+
+export type AuditTrailWithDetails = AuditTrail & {
+  user?: User | null;
+  branch?: Branch | null;
+};
