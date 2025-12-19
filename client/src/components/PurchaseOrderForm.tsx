@@ -233,7 +233,7 @@ export function PurchaseOrderForm({
               data-testid="button-add-row"
             >
               <Plus className="h-3 w-3 mr-1" />
-              Add item row
+              Add Item
             </Button>
           </div>
 
