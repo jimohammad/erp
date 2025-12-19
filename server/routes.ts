@@ -2482,12 +2482,20 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Start date and end date are required" });
       }
 
+      console.log("[Bank Report] Date range:", startDate, "to", endDate);
+
       // Get all sales orders in the date range
       const allSalesOrders = await storage.getAllSalesOrders();
+      console.log("[Bank Report] Total sales orders in DB:", allSalesOrders.length);
+      if (allSalesOrders.length > 0) {
+        console.log("[Bank Report] Sample sale date:", allSalesOrders[0]?.saleDate, "type:", typeof allSalesOrders[0]?.saleDate);
+      }
+      
       const filteredSales = allSalesOrders.filter(order => {
         const orderDate = order.saleDate;
         return orderDate >= startDate && orderDate <= endDate;
       });
+      console.log("[Bank Report] Filtered sales:", filteredSales.length);
 
       // Get customer names for sales orders
       const customers = await storage.getCustomers();
@@ -2507,10 +2515,16 @@ export async function registerRoutes(
 
       // Get all payments in the date range
       const allPayments = await storage.getAllPayments();
+      console.log("[Bank Report] Total payments in DB:", allPayments.length);
+      if (allPayments.length > 0) {
+        console.log("[Bank Report] Sample payment date:", allPayments[0]?.paymentDate, "type:", typeof allPayments[0]?.paymentDate);
+      }
+      
       const filteredPayments = allPayments.filter(payment => {
         const paymentDate = payment.paymentDate;
         return paymentDate >= startDate && paymentDate <= endDate;
       });
+      console.log("[Bank Report] Filtered payments:", filteredPayments.length);
 
       // Get party names for payments - need both suppliers and customers
       const parties = await storage.getSuppliers();
