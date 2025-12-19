@@ -427,16 +427,6 @@ function AppSidebar() {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <SidebarMenuSub>
-                        <SidebarMenuSubItem>
-                          <SidebarMenuSubButton
-                            asChild
-                            isActive={location === "/purchases"}
-                          >
-                            <Link href="/purchases" data-testid="link-new-purchase">
-                              New
-                            </Link>
-                          </SidebarMenuSubButton>
-                        </SidebarMenuSubItem>
                         {purchasesSubItems.map((subItem) => (
                           <SidebarMenuSubItem key={subItem.url}>
                             <SidebarMenuSubButton
