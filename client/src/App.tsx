@@ -73,6 +73,7 @@ const PublicStatementPage = lazy(() => import("@/pages/public-statement"));
 const AllTransactionsPage = lazy(() => import("@/pages/all-transactions"));
 const CustomerAgingPage = lazy(() => import("@/pages/customer-aging"));
 const SendPriceListPage = lazy(() => import("@/pages/send-price-list"));
+const BankDocumentsPage = lazy(() => import("@/pages/bank-documents"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -204,6 +205,7 @@ function AppSidebar() {
 
   const reportsSubItems = [
     { title: "General Reports", url: "/reports" },
+    { title: "Bank Documents", url: "/reports/bank-documents" },
     { title: "Customer Aging", url: "/reports/customer-aging" },
     { title: "Party Statement", url: "/reports/party-statement" },
     { title: "Account Statement", url: "/reports/account-statement" },
@@ -681,6 +683,8 @@ function AuthenticatedLayout() {
         return "Customer Statement";
       case "/reports/export-imei":
         return "Export IMEI";
+      case "/reports/bank-documents":
+        return "Bank Documents";
       case "/all-transactions":
         return "All Transactions";
       case "/settings/users":
@@ -755,6 +759,7 @@ function AuthenticatedLayout() {
                 <Route path="/reports/customer-statement" component={CustomerStatementPage} />
                 <Route path="/all-transactions" component={AllTransactionsPage} />
                 <Route path="/reports/customer-aging" component={CustomerAgingPage} />
+                <Route path="/reports/bank-documents" component={BankDocumentsPage} />
                 <Route path="/send-price-list" component={SendPriceListPage} />
                 <Route path="/settings/users" component={UserManagementPage} />
                 <Route path="/settings/user-roles" component={UserRolesPage} />
