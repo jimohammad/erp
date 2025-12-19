@@ -177,4 +177,123 @@ export async function sendSaleNotification(
   return sendWhatsAppMessage(customerPhone, message);
 }
 
+/**
+ * Build a formatted sales invoice message for WhatsApp
+ */
+export function buildSalesInvoiceMessage(order: {
+  id: number;
+  invoiceNumber?: string | null;
+  saleDate?: string | null;
+  totalKwd?: string | null;
+  customer?: { name: string } | null;
+  lineItems: Array<{
+    itemName: string;
+    quantity: number | null;
+    priceKwd?: string | null;
+    totalKwd?: string | null;
+    imeiNumbers?: string[] | null;
+  }>;
+}): string {
+  const formatDate = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatNumber = (value: string | null | undefined, decimals: number): string => {
+    if (!value) return "—";
+    return Number(value).toFixed(decimals);
+  };
+
+  const lineItemsText = order.lineItems
+    .map((item, index) => {
+      let text = `${index + 1}. ${item.itemName}\n   Qty: ${item.quantity ?? 1} × ${formatNumber(item.priceKwd, 3)} KWD = ${formatNumber(item.totalKwd, 3)} KWD`;
+      if (item.imeiNumbers && item.imeiNumbers.length > 0) {
+        text += `\n   IMEI: ${item.imeiNumbers.join(", ")}`;
+      }
+      return text;
+    })
+    .join("\n\n");
+
+  return `*SALES INVOICE*
+Iqbal Electronics Co. WLL
+━━━━━━━━━━━━━━━━━━
+
+*Invoice No:* ${order.invoiceNumber || `INV-${order.id}`}
+*Date:* ${formatDate(order.saleDate)}
+*Customer:* ${order.customer?.name || "Walk-in Customer"}
+
+*Items:*
+${lineItemsText}
+
+━━━━━━━━━━━━━━━━━━
+*TOTAL: ${formatNumber(order.totalKwd, 3)} KWD*
+━━━━━━━━━━━━━━━━━━
+
+Thank you for your business!
+Iqbal Electronics Co. WLL`;
+}
+
+/**
+ * Build a formatted payment receipt message for WhatsApp
+ */
+export function buildPaymentReceiptMessage(payment: {
+  id: number;
+  reference?: string | null;
+  paymentDate?: string | null;
+  direction: string;
+  paymentType: string;
+  amount: string;
+  notes?: string | null;
+  customer?: { name: string } | null;
+  supplier?: { name: string } | null;
+}): string {
+  const formatDate = (dateStr: string | null | undefined): string => {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const formatNumber = (value: string | null | undefined, decimals: number): string => {
+    if (!value) return "—";
+    return Number(value).toFixed(decimals);
+  };
+
+  const partyName = payment.direction === "IN" 
+    ? payment.customer?.name 
+    : payment.supplier?.name;
+  
+  const partyType = payment.direction === "IN" ? "Customer" : "Supplier";
+  const receiptType = payment.direction === "IN" ? "PAYMENT RECEIVED" : "PAYMENT MADE";
+
+  return `*${receiptType}*
+Iqbal Electronics Co. WLL
+━━━━━━━━━━━━━━━━━━
+
+*Receipt No:* ${payment.reference || `PMT-${payment.id}`}
+*Date:* ${formatDate(payment.paymentDate)}
+*${partyType}:* ${partyName || "—"}
+
+*Payment Method:* ${payment.paymentType}
+*Amount:* ${formatNumber(payment.amount, 3)} KWD
+
+${payment.notes ? `*Notes:* ${payment.notes}\n` : ""}━━━━━━━━━━━━━━━━━━
+
+Thank you!
+Iqbal Electronics Co. WLL`;
+}
+
+/**
+ * Check if WhatsApp is configured
+ */
+export function isWhatsAppConfigured(): boolean {
+  return !!process.env.WHATSAPP_ACCESS_TOKEN;
+}
+
 export type { SaleDetails, WhatsAppMessageResult };

@@ -2475,11 +2475,11 @@ export async function registerRoutes(
 
   // WhatsApp Business API Integration
   const { 
-    sendWhatsAppMessage, 
+    sendWhatsAppMessage: sendWhatsAppMsg,
     buildSalesInvoiceMessage, 
     buildPaymentReceiptMessage,
     isWhatsAppConfigured 
-  } = await import("./whatsappService");
+  } = await import("./whatsapp");
 
   app.get("/api/whatsapp/status", isAuthenticated, (req, res) => {
     res.json({ configured: isWhatsAppConfigured() });
@@ -2499,7 +2499,7 @@ export async function registerRoutes(
       }
 
       const message = buildSalesInvoiceMessage(order);
-      const result = await sendWhatsAppMessage(phoneNumber, message);
+      const result = await sendWhatsAppMsg(phoneNumber, message);
 
       if (result.success) {
         res.json({ success: true, messageId: result.messageId });
@@ -2559,7 +2559,7 @@ export async function registerRoutes(
       }
 
       const message = buildPaymentReceiptMessage(payment);
-      const result = await sendWhatsAppMessage(phoneNumber, message);
+      const result = await sendWhatsAppMsg(phoneNumber, message);
 
       if (result.success) {
         res.json({ success: true, messageId: result.messageId });
@@ -2625,7 +2625,7 @@ export async function registerRoutes(
       lines.push(`Thank you!`);
 
       const message = lines.join('\n');
-      const result = await sendWhatsAppMessage(customer.phone, message);
+      const result = await sendWhatsAppMsg(customer.phone, message);
 
       if (result.success) {
         console.log(`[WhatsApp] Price list sent to ${customer.name} (${customer.phone})`);
