@@ -942,7 +942,8 @@ export default function ReportsPage() {
                         setIsDownloadingBankPack(true);
                         try {
                           const response = await fetch(
-                            `/api/reports/bank-pack?startDate=${bankStartDate}&endDate=${bankEndDate}`
+                            `/api/reports/bank-pack?startDate=${bankStartDate}&endDate=${bankEndDate}`,
+                            { credentials: 'include' }
                           );
                           if (!response.ok) throw new Error("Failed to generate PDF");
                           const blob = await response.blob();
