@@ -1008,6 +1008,29 @@ export type ImeiEventWithDetails = ImeiEvent & {
   supplier?: Supplier | null;
 };
 
+// ==================== DOCUMENT VERIFICATION ====================
+
+export const documentVerifications = pgTable("document_verifications", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  documentType: text("document_type").notNull(), // SALE, PAYMENT_IN, PAYMENT_OUT, RETURN
+  documentId: integer("document_id").notNull(),
+  documentNumber: text("document_number").notNull(),
+  verificationCode: text("verification_code").notNull().unique(),
+  amount: numeric("amount", { precision: 12, scale: 3 }).notNull(),
+  documentDate: text("document_date").notNull(),
+  partyName: text("party_name"),
+  partyType: text("party_type"), // customer, supplier
+  additionalData: jsonb("additional_data"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_verification_code").on(table.verificationCode),
+  index("idx_verification_doc").on(table.documentType, table.documentId),
+]);
+
+export const insertDocumentVerificationSchema = createInsertSchema(documentVerifications).omit({ id: true, createdAt: true });
+export type InsertDocumentVerification = z.infer<typeof insertDocumentVerificationSchema>;
+export type DocumentVerification = typeof documentVerifications.$inferSelect;
+
 // ==================== ALL TRANSACTIONS ====================
 // Unified view of all financial transactions across modules
 
