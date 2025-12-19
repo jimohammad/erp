@@ -1,4 +1,4 @@
-const CACHE_NAME = 'iqbal-po-v3';
+const CACHE_NAME = 'iqbal-po-v4';
 const STATIC_ASSETS = [
   '/favicon.png'
 ];
