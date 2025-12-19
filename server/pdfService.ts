@@ -726,7 +726,7 @@ function numberToWords(num: number): string {
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
   const teens = ['Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
 
-  if (num === 0) return 'Zero Dinars Only';
+  if (num === 0) return 'Zero Kuwaiti Dinars Only';
   
   const intPart = Math.floor(num);
   const decPart = Math.round((num - intPart) * 1000);
@@ -743,12 +743,18 @@ function numberToWords(num: number): string {
   if (intPart >= 1000) {
     result += convertHundreds(Math.floor(intPart / 1000)) + ' Thousand ';
   }
-  result += convertHundreds(intPart % 1000);
+  if (intPart > 0) {
+    result += convertHundreds(intPart % 1000);
+    result += ' Kuwaiti Dinar' + (intPart > 1 ? 's' : '');
+  }
   
   if (decPart > 0) {
-    result += ' and ' + convertHundreds(decPart) + ' Fils';
-  } else {
-    result += ' Dinars Only';
+    if (intPart > 0) {
+      result += ' and ';
+    }
+    result += convertHundreds(decPart) + ' Fils';
+  } else if (intPart > 0) {
+    result += ' Only';
   }
   
   return result.trim();
