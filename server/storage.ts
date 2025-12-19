@@ -136,6 +136,9 @@ import {
   type ImeiInventoryWithDetails,
   type ImeiEventWithDetails,
   type AllTransaction,
+  documentVerifications,
+  type DocumentVerification,
+  type InsertDocumentVerification,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql, or, isNull, asc } from "drizzle-orm";
@@ -3749,6 +3752,54 @@ export class DatabaseStorage implements IStorage {
     const total = Number((countResult.rows as any[])[0]?.total ?? 0);
 
     return { data, total };
+  }
+
+  // ==================== Document Verification ====================
+
+  async createOrGetDocumentVerification(data: Omit<InsertDocumentVerification, 'verificationCode'>): Promise<DocumentVerification> {
+    // Check if verification already exists for this document
+    const existing = await db.select()
+      .from(documentVerifications)
+      .where(and(
+        eq(documentVerifications.documentType, data.documentType),
+        eq(documentVerifications.documentId, data.documentId)
+      ))
+      .limit(1);
+
+    if (existing.length > 0) {
+      return existing[0];
+    }
+
+    // Generate a unique verification code
+    const verificationCode = this.generateVerificationCode();
+
+    const [verification] = await db.insert(documentVerifications)
+      .values({
+        ...data,
+        verificationCode,
+      })
+      .returning();
+
+    return verification;
+  }
+
+  async getDocumentVerification(code: string): Promise<DocumentVerification | undefined> {
+    const [verification] = await db.select()
+      .from(documentVerifications)
+      .where(eq(documentVerifications.verificationCode, code))
+      .limit(1);
+
+    return verification;
+  }
+
+  private generateVerificationCode(): string {
+    // Generate a secure, URL-safe verification code
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = '';
+    for (let i = 0; i < 12; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
   }
 }
 
