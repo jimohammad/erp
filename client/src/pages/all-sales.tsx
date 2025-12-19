@@ -293,7 +293,6 @@ export default function AllSalesPage() {
       </div>
     `).join("");
 
-    const invoiceAmount = parseFloat(selectedSO.totalKwd || "0");
     const prevBalance = parseFloat(selectedSO.customer?.balance || "0");
     const currBalance = prevBalance + invoiceAmount;
 
