@@ -529,7 +529,7 @@ export async function generateMergedInvoicesPDF(invoices: MergedInvoice[], date:
         const headerY = doc.y;
         
         // Left - Company Logo image
-        const logoPath = path.join(process.cwd(), 'attached_assets', 'erpLogo_2_1765470830494.png');
+        const logoPath = path.join(process.cwd(), 'client', 'src', 'assets', 'company-logo.jpg');
         try {
           doc.image(logoPath, margin, headerY, { height: 30 });
         } catch (e) {
