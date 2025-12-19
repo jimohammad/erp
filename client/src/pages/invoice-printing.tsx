@@ -13,7 +13,11 @@ import type { SalesOrderWithDetails } from "@shared/schema";
 
 export default function InvoicePrinting() {
   const { toast } = useToast();
-  const [selectedDate, setSelectedDate] = useState(() => {
+  const [fromDate, setFromDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
+  const [toDate, setToDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
@@ -21,8 +25,8 @@ export default function InvoicePrinting() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   const { data: invoicesData, isLoading } = useQuery<SalesOrderWithDetails[]>({
-    queryKey: [`/api/sales-orders?date=${selectedDate}`],
-    enabled: !!selectedDate,
+    queryKey: [`/api/sales-orders?fromDate=${fromDate}&toDate=${toDate}`],
+    enabled: !!fromDate && !!toDate,
   });
 
   const invoices = invoicesData || [];
@@ -62,7 +66,7 @@ export default function InvoicePrinting() {
         },
         body: JSON.stringify({ 
           invoiceIds, 
-          date: selectedDate 
+          date: `${fromDate}_to_${toDate}` 
         }),
       });
 
@@ -74,7 +78,7 @@ export default function InvoicePrinting() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Invoices_${selectedDate}.pdf`;
+      a.download = `Invoices_${fromDate}_to_${toDate}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -108,17 +112,31 @@ export default function InvoicePrinting() {
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-end gap-4">
             <div className="space-y-1">
-              <Label htmlFor="invoice-date">Select Date</Label>
+              <Label htmlFor="from-date">From Date</Label>
               <Input
-                id="invoice-date"
+                id="from-date"
                 type="date"
-                value={selectedDate}
+                value={fromDate}
                 onChange={(e) => {
-                  setSelectedDate(e.target.value);
+                  setFromDate(e.target.value);
                   setSelectedInvoices(new Set());
                 }}
-                className="w-[180px]"
-                data-testid="input-invoice-date"
+                className="w-[160px]"
+                data-testid="input-from-date"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="to-date">To Date</Label>
+              <Input
+                id="to-date"
+                type="date"
+                value={toDate}
+                onChange={(e) => {
+                  setToDate(e.target.value);
+                  setSelectedInvoices(new Set());
+                }}
+                className="w-[160px]"
+                data-testid="input-to-date"
               />
             </div>
             <div className="flex items-center gap-2">
@@ -139,7 +157,7 @@ export default function InvoicePrinting() {
             </div>
           ) : invoices.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No sales invoices found for {selectedDate ? formatDate(selectedDate) : "selected date"}
+              No sales invoices found for the selected date range
             </div>
           ) : (
             <>

@@ -466,20 +466,32 @@ export async function registerRoutes(
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
       const date = req.query.date as string | undefined;
+      const fromDate = req.query.fromDate as string | undefined;
+      const toDate = req.query.toDate as string | undefined;
       
       const result = await storage.getSalesOrders({ limit, offset });
       
-      // Filter by date if provided
-      if (date) {
+      // Helper to get date string from order
+      const getDateString = (orderDate: string | Date): string => {
+        if (typeof orderDate === "string") {
+          return orderDate.substring(0, 10);
+        }
+        return orderDate.toISOString().split('T')[0];
+      };
+      
+      // Filter by date range if provided
+      if (fromDate && toDate) {
         const filteredData = result.data.filter((order) => {
-          const orderDate = order.saleDate;
-          if (typeof orderDate === "string") {
-            return orderDate === date || orderDate.startsWith(date);
-          }
-          if (orderDate instanceof Date) {
-            return orderDate.toISOString().split('T')[0] === date;
-          }
-          return false;
+          const orderDateStr = getDateString(order.saleDate);
+          return orderDateStr >= fromDate && orderDateStr <= toDate;
+        });
+        res.json(filteredData);
+      }
+      // Filter by single date if provided
+      else if (date) {
+        const filteredData = result.data.filter((order) => {
+          const orderDateStr = getDateString(order.saleDate);
+          return orderDateStr === date || orderDateStr.startsWith(date);
         });
         res.json(filteredData);
       } else {
