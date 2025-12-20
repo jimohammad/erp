@@ -1798,23 +1798,14 @@ export class DatabaseStorage implements IStorage {
 
   async getInvoicesForCustomer(customerId: number): Promise<{ id: number; invoiceNumber: string; totalKwd: string; outstandingBalance: string }[]> {
     // Get invoices with outstanding balance calculated
+    // Note: Payments are at customer level, not invoice level, so we calculate discounts and returns only
     const result = await db.execute(sql`
-      WITH invoice_payments AS (
-        SELECT 
-          sp.sales_order_id,
-          COALESCE(SUM(CAST(sp.amount AS DECIMAL)), 0) as paid
-        FROM sales_payment_allocations sp
-        JOIN sales_orders so ON so.id = sp.sales_order_id
-        WHERE so.customer_id = ${customerId}
-        GROUP BY sp.sales_order_id
-      ),
-      invoice_discounts AS (
+      WITH invoice_discounts AS (
         SELECT 
           d.sales_order_id,
           COALESCE(SUM(CAST(d.discount_amount AS DECIMAL)), 0) as discounted
         FROM discounts d
-        JOIN sales_orders so ON so.id = d.sales_order_id
-        WHERE so.customer_id = ${customerId}
+        WHERE d.sales_order_id IN (SELECT id FROM sales_orders WHERE customer_id = ${customerId})
         GROUP BY d.sales_order_id
       ),
       invoice_returns AS (
@@ -1822,8 +1813,9 @@ export class DatabaseStorage implements IStorage {
           r.sales_order_id,
           COALESCE(SUM(CAST(r.total_kwd AS DECIMAL)), 0) as returned
         FROM returns r
-        JOIN sales_orders so ON so.id = r.sales_order_id
-        WHERE so.customer_id = ${customerId} AND r.return_type = 'sale_return' AND r.sales_order_id IS NOT NULL
+        WHERE r.sales_order_id IN (SELECT id FROM sales_orders WHERE customer_id = ${customerId}) 
+          AND r.return_type = 'sale_return' 
+          AND r.sales_order_id IS NOT NULL
         GROUP BY r.sales_order_id
       )
       SELECT 
@@ -1831,11 +1823,9 @@ export class DatabaseStorage implements IStorage {
         so.invoice_number as "invoiceNumber",
         so.total_kwd as "totalKwd",
         (COALESCE(CAST(so.total_kwd AS DECIMAL), 0) - 
-         COALESCE(ip.paid, 0) - 
          COALESCE(id.discounted, 0) - 
          COALESCE(ir.returned, 0))::text as "outstandingBalance"
       FROM sales_orders so
-      LEFT JOIN invoice_payments ip ON ip.sales_order_id = so.id
       LEFT JOIN invoice_discounts id ON id.sales_order_id = so.id
       LEFT JOIN invoice_returns ir ON ir.sales_order_id = so.id
       WHERE so.customer_id = ${customerId}
@@ -1851,17 +1841,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInvoiceOutstandingBalance(salesOrderId: number): Promise<{ invoiceTotal: number; paidAmount: number; discountAmount: number; returnAmount: number; outstandingBalance: number }> {
+    // Note: Payments are tracked at customer level, not invoice level
+    // paidAmount will be 0 until invoice-level payment allocations are implemented
     const result = await db.execute(sql`
       WITH invoice_data AS (
         SELECT 
           COALESCE(CAST(total_kwd AS DECIMAL), 0)::float as invoice_total
         FROM sales_orders
         WHERE id = ${salesOrderId}
-      ),
-      paid_amount AS (
-        SELECT COALESCE(SUM(CAST(amount AS DECIMAL)), 0)::float as total
-        FROM sales_payment_allocations
-        WHERE sales_order_id = ${salesOrderId}
       ),
       discount_amount AS (
         SELECT COALESCE(SUM(CAST(discount_amount AS DECIMAL)), 0)::float as total
@@ -1875,11 +1862,10 @@ export class DatabaseStorage implements IStorage {
       )
       SELECT 
         COALESCE((SELECT invoice_total FROM invoice_data), 0)::float as "invoiceTotal",
-        COALESCE((SELECT total FROM paid_amount), 0)::float as "paidAmount",
+        0::float as "paidAmount",
         COALESCE((SELECT total FROM discount_amount), 0)::float as "discountAmount",
         COALESCE((SELECT total FROM return_amount), 0)::float as "returnAmount",
         (COALESCE((SELECT invoice_total FROM invoice_data), 0) - 
-         COALESCE((SELECT total FROM paid_amount), 0) - 
          COALESCE((SELECT total FROM discount_amount), 0) - 
          COALESCE((SELECT total FROM return_amount), 0))::float as "outstandingBalance"
     `);
