@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation, useSearch } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,6 +90,9 @@ export default function AllSalesPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const { requestPasswordConfirmation, PasswordDialog } = usePasswordProtection();
+  const [, navigate] = useLocation();
+  const searchParams = useSearch();
+  const viewId = new URLSearchParams(searchParams).get("viewId");
   
   // Edit state
   const [editSO, setEditSO] = useState<SalesOrder | null>(null);
@@ -109,6 +113,30 @@ export default function AllSalesPage() {
   const salesOrders = salesData?.data ?? [];
   const totalOrders = salesData?.total ?? 0;
   const totalPages = Math.ceil(totalOrders / PAGE_SIZE);
+
+  // Auto-select transaction when viewId is in URL
+  useEffect(() => {
+    if (viewId && salesOrders.length > 0) {
+      const id = parseInt(viewId);
+      const found = salesOrders.find(so => so.id === id);
+      if (found) {
+        setSelectedSO(found);
+        // Clear the viewId from URL
+        navigate("/sales", { replace: true });
+      } else {
+        // Fetch the specific order if not in current page
+        fetch(`/api/sales-orders/${id}`, { credentials: "include" })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data) {
+              setSelectedSO(data);
+              navigate("/sales", { replace: true });
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [viewId, salesOrders, navigate]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {

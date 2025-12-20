@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { useLocation, useSearch } from "wouter";
 import companyLogoUrl from "@/assets/company-logo.jpg";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -92,6 +93,9 @@ export default function PaymentsPage() {
   const [paymentToDelete, setPaymentToDelete] = useState<PaymentWithDetails | null>(null);
   const [page, setPage] = useState(1);
   const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
+  const [, navigate] = useLocation();
+  const searchParams = useSearch();
+  const viewId = new URLSearchParams(searchParams).get("viewId");
   const [whatsAppPhone, setWhatsAppPhone] = useState("");
   const [whatsAppPayment, setWhatsAppPayment] = useState<PaymentWithDetails | null>(null);
   
@@ -165,6 +169,29 @@ export default function PaymentsPage() {
   const payments = paymentsData?.data ?? [];
   const totalPayments = paymentsData?.total ?? 0;
   const totalPages = Math.ceil(totalPayments / PAGE_SIZE);
+
+  // Auto-select payment when viewId is in URL
+  useEffect(() => {
+    if (viewId && payments.length > 0) {
+      const id = parseInt(viewId);
+      const found = payments.find(p => p.id === id);
+      if (found) {
+        setSelectedPayment(found);
+        navigate("/payments", { replace: true });
+      } else {
+        // Fetch the specific payment if not in current page
+        fetch(`/api/payments/${id}`, { credentials: "include" })
+          .then(res => res.ok ? res.json() : null)
+          .then(data => {
+            if (data) {
+              setSelectedPayment(data);
+              navigate("/payments", { replace: true });
+            }
+          })
+          .catch(() => {});
+      }
+    }
+  }, [viewId, payments, navigate]);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
