@@ -250,7 +250,8 @@ export interface IStorage {
   getDiscount(id: number): Promise<DiscountWithDetails | undefined>;
   createDiscount(discount: InsertDiscount): Promise<DiscountWithDetails>;
   deleteDiscount(id: number): Promise<boolean>;
-  getInvoicesForCustomer(customerId: number): Promise<{ id: number; invoiceNumber: string; totalKwd: string }[]>;
+  getInvoicesForCustomer(customerId: number): Promise<{ id: number; invoiceNumber: string; totalKwd: string; outstandingBalance: string }[]>;
+  getInvoiceOutstandingBalance(salesOrderId: number): Promise<{ invoiceTotal: number; paidAmount: number; discountAmount: number; returnAmount: number; outstandingBalance: number }>;
 
   // Export IMEI
   getExportImei(filters: { customerId?: number; itemName?: string; invoiceNumber?: string; dateFrom?: string; dateTo?: string }): Promise<{ imei: string; itemName: string; customerName: string; invoiceNumber: string; saleDate: string }[]>;
@@ -1795,20 +1796,102 @@ export class DatabaseStorage implements IStorage {
     return result.length > 0;
   }
 
-  async getInvoicesForCustomer(customerId: number): Promise<{ id: number; invoiceNumber: string; totalKwd: string }[]> {
-    const orders = await db.select({
-      id: salesOrders.id,
-      invoiceNumber: salesOrders.invoiceNumber,
-      totalKwd: salesOrders.totalKwd,
-    }).from(salesOrders)
-      .where(eq(salesOrders.customerId, customerId))
-      .orderBy(desc(salesOrders.invoiceDate));
+  async getInvoicesForCustomer(customerId: number): Promise<{ id: number; invoiceNumber: string; totalKwd: string; outstandingBalance: string }[]> {
+    // Get invoices with outstanding balance calculated
+    const result = await db.execute(sql`
+      WITH invoice_payments AS (
+        SELECT 
+          so.sales_order_id,
+          COALESCE(SUM(CAST(sp.amount AS DECIMAL)), 0) as paid
+        FROM sales_payment_allocations sp
+        JOIN sales_orders so ON so.id = sp.sales_order_id
+        WHERE so.customer_id = ${customerId}
+        GROUP BY so.sales_order_id
+      ),
+      invoice_discounts AS (
+        SELECT 
+          d.sales_order_id,
+          COALESCE(SUM(CAST(d.discount_amount AS DECIMAL)), 0) as discounted
+        FROM discounts d
+        JOIN sales_orders so ON so.id = d.sales_order_id
+        WHERE so.customer_id = ${customerId}
+        GROUP BY d.sales_order_id
+      ),
+      invoice_returns AS (
+        SELECT 
+          r.sales_order_id,
+          COALESCE(SUM(CAST(r.total_kwd AS DECIMAL)), 0) as returned
+        FROM returns r
+        JOIN sales_orders so ON so.id = r.sales_order_id
+        WHERE so.customer_id = ${customerId} AND r.return_type = 'sale_return' AND r.sales_order_id IS NOT NULL
+        GROUP BY r.sales_order_id
+      )
+      SELECT 
+        so.id,
+        so.invoice_number as "invoiceNumber",
+        so.total_kwd as "totalKwd",
+        (COALESCE(CAST(so.total_kwd AS DECIMAL), 0) - 
+         COALESCE(ip.paid, 0) - 
+         COALESCE(id.discounted, 0) - 
+         COALESCE(ir.returned, 0))::text as "outstandingBalance"
+      FROM sales_orders so
+      LEFT JOIN invoice_payments ip ON ip.sales_order_id = so.id
+      LEFT JOIN invoice_discounts id ON id.sales_order_id = so.id
+      LEFT JOIN invoice_returns ir ON ir.sales_order_id = so.id
+      WHERE so.customer_id = ${customerId}
+      ORDER BY so.invoice_date DESC
+    `);
     
-    return orders.map(o => ({
+    return (result.rows as any[]).map(o => ({
       id: o.id,
       invoiceNumber: o.invoiceNumber || `INV-${o.id}`,
       totalKwd: o.totalKwd || "0",
+      outstandingBalance: o.outstandingBalance || "0",
     }));
+  }
+
+  async getInvoiceOutstandingBalance(salesOrderId: number): Promise<{ invoiceTotal: number; paidAmount: number; discountAmount: number; returnAmount: number; outstandingBalance: number }> {
+    const result = await db.execute(sql`
+      WITH invoice_data AS (
+        SELECT 
+          COALESCE(CAST(total_kwd AS DECIMAL), 0)::float as invoice_total
+        FROM sales_orders
+        WHERE id = ${salesOrderId}
+      ),
+      paid_amount AS (
+        SELECT COALESCE(SUM(CAST(amount AS DECIMAL)), 0)::float as total
+        FROM sales_payment_allocations
+        WHERE sales_order_id = ${salesOrderId}
+      ),
+      discount_amount AS (
+        SELECT COALESCE(SUM(CAST(discount_amount AS DECIMAL)), 0)::float as total
+        FROM discounts
+        WHERE sales_order_id = ${salesOrderId}
+      ),
+      return_amount AS (
+        SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
+        FROM returns
+        WHERE sales_order_id = ${salesOrderId} AND return_type = 'sale_return'
+      )
+      SELECT 
+        COALESCE((SELECT invoice_total FROM invoice_data), 0)::float as "invoiceTotal",
+        COALESCE((SELECT total FROM paid_amount), 0)::float as "paidAmount",
+        COALESCE((SELECT total FROM discount_amount), 0)::float as "discountAmount",
+        COALESCE((SELECT total FROM return_amount), 0)::float as "returnAmount",
+        (COALESCE((SELECT invoice_total FROM invoice_data), 0) - 
+         COALESCE((SELECT total FROM paid_amount), 0) - 
+         COALESCE((SELECT total FROM discount_amount), 0) - 
+         COALESCE((SELECT total FROM return_amount), 0))::float as "outstandingBalance"
+    `);
+    
+    const row = result.rows[0] as any;
+    return {
+      invoiceTotal: row?.invoiceTotal || 0,
+      paidAmount: row?.paidAmount || 0,
+      discountAmount: row?.discountAmount || 0,
+      returnAmount: row?.returnAmount || 0,
+      outstandingBalance: row?.outstandingBalance || 0,
+    };
   }
 
   // ==================== CUSTOMER STATEMENT ====================
@@ -1895,6 +1978,22 @@ export class DatabaseStorage implements IStorage {
         FROM returns
         WHERE customer_id = ${customerId} AND return_type = 'sale_return'
         ${dateFilter}
+        
+        UNION ALL
+        
+        -- Discounts for this customer (reduces what they owe - credit)
+        SELECT 
+          id,
+          created_at::date as date,
+          'discount' as type,
+          'DIS-' || id::text as reference,
+          'Discount Applied' as description,
+          0::float as debit,
+          COALESCE(CAST(discount_amount AS DECIMAL), 0)::float as credit,
+          created_at
+        FROM discounts
+        WHERE customer_id = ${customerId}
+        ${dateFilter}
       )
       SELECT 
         id,
@@ -1936,12 +2035,18 @@ export class DatabaseStorage implements IStorage {
         SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
         FROM returns
         WHERE customer_id = ${customerId} AND return_type = 'sale_return'
+      ),
+      all_discounts AS (
+        SELECT COALESCE(SUM(CAST(discount_amount AS DECIMAL)), 0)::float as total
+        FROM discounts
+        WHERE customer_id = ${customerId}
       )
       SELECT 
         (COALESCE((SELECT balance FROM opening_balance), 0) + 
          COALESCE((SELECT total FROM all_sales), 0) - 
          COALESCE((SELECT total FROM all_payments), 0) - 
-         COALESCE((SELECT total FROM all_returns), 0))::float as balance
+         COALESCE((SELECT total FROM all_returns), 0) -
+         COALESCE((SELECT total FROM all_discounts), 0))::float as balance
     `);
     
     const row = result.rows[0] as { balance: number } | undefined;

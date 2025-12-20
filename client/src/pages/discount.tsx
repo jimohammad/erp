@@ -15,6 +15,15 @@ interface Invoice {
   id: number;
   invoiceNumber: string;
   totalKwd: string;
+  outstandingBalance: string;
+}
+
+interface InvoiceBalance {
+  invoiceTotal: number;
+  paidAmount: number;
+  discountAmount: number;
+  returnAmount: number;
+  outstandingBalance: number;
 }
 
 export default function DiscountPage() {
@@ -41,7 +50,17 @@ export default function DiscountPage() {
     enabled: !!customerId,
   });
 
+  const { data: invoiceBalance } = useQuery<InvoiceBalance>({
+    queryKey: ["/api/invoice-balance", salesOrderId],
+    enabled: !!salesOrderId,
+  });
+
   const selectedInvoice = invoices.find(inv => inv.id.toString() === salesOrderId);
+  
+  // Calculate if discount exceeds outstanding balance
+  const discountValue = parseFloat(discountAmount) || 0;
+  const outstandingBalance = invoiceBalance?.outstandingBalance || 0;
+  const exceedsBalance = discountValue > outstandingBalance && outstandingBalance > 0;
 
   const createDiscountMutation = useMutation({
     mutationFn: async (data: { customerId: number; salesOrderId: number; discountAmount: string; notes?: string }) => {
@@ -50,6 +69,9 @@ export default function DiscountPage() {
     },
     onSuccess: (discount: DiscountWithDetails) => {
       queryClient.invalidateQueries({ queryKey: ["/api/discounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/invoice-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices-for-customer"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-statement"] });
       setSavedDiscount(discount);
       toast({
         title: "Discount Saved",
@@ -75,6 +97,9 @@ export default function DiscountPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/discounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/invoice-balance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices-for-customer"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customer-statement"] });
       toast({
         title: "Discount Deleted",
         description: "Discount has been deleted successfully.",
@@ -185,42 +210,51 @@ export default function DiscountPage() {
     printDiscountReceipt(savedDiscount);
   };
 
-  const handleSaveAndPrint = () => {
+  const validateAndSave = (print: boolean) => {
     if (!customerId || !salesOrderId || !discountAmount) {
       toast({
         title: "Validation Error",
         description: "Please fill in all required fields",
         variant: "destructive",
       });
-      return;
+      return false;
+    }
+    
+    const amount = parseFloat(discountAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter a valid discount amount",
+        variant: "destructive",
+      });
+      return false;
+    }
+    
+    if (invoiceBalance && amount > invoiceBalance.outstandingBalance) {
+      toast({
+        title: "Validation Error",
+        description: `Discount amount cannot exceed outstanding balance (${invoiceBalance.outstandingBalance.toFixed(3)} KWD)`,
+        variant: "destructive",
+      });
+      return false;
     }
 
-    setShouldPrintAfterSave(true);
+    setShouldPrintAfterSave(print);
     createDiscountMutation.mutate({
       customerId: parseInt(customerId),
       salesOrderId: parseInt(salesOrderId),
       discountAmount,
       notes: notes || undefined,
     });
+    return true;
+  };
+
+  const handleSaveAndPrint = () => {
+    validateAndSave(true);
   };
 
   const handleSave = () => {
-    if (!customerId || !salesOrderId || !discountAmount) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setShouldPrintAfterSave(false);
-    createDiscountMutation.mutate({
-      customerId: parseInt(customerId),
-      salesOrderId: parseInt(salesOrderId),
-      discountAmount,
-      notes: notes || undefined,
-    });
+    validateAndSave(false);
   };
 
   const handleClear = () => {
@@ -284,11 +318,33 @@ export default function DiscountPage() {
               </div>
             </div>
 
-            {selectedInvoice && (
-              <div className="p-3 rounded-md bg-muted/50 text-sm">
+            {selectedInvoice && invoiceBalance && (
+              <div className="p-3 rounded-md bg-muted/50 text-sm space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Invoice Total:</span>
-                  <span className="font-medium">{selectedInvoice.totalKwd} KWD</span>
+                  <span className="font-medium">{invoiceBalance.invoiceTotal.toFixed(3)} KWD</span>
+                </div>
+                {invoiceBalance.paidAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Already Paid:</span>
+                    <span className="font-medium text-green-600 dark:text-green-400">-{invoiceBalance.paidAmount.toFixed(3)} KWD</span>
+                  </div>
+                )}
+                {invoiceBalance.discountAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Previous Discounts:</span>
+                    <span className="font-medium text-blue-600 dark:text-blue-400">-{invoiceBalance.discountAmount.toFixed(3)} KWD</span>
+                  </div>
+                )}
+                {invoiceBalance.returnAmount > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Returns:</span>
+                    <span className="font-medium text-orange-600 dark:text-orange-400">-{invoiceBalance.returnAmount.toFixed(3)} KWD</span>
+                  </div>
+                )}
+                <div className="flex justify-between border-t pt-2">
+                  <span className="font-medium">Outstanding Balance:</span>
+                  <span className="font-bold text-lg">{invoiceBalance.outstandingBalance.toFixed(3)} KWD</span>
                 </div>
               </div>
             )}
@@ -300,12 +356,18 @@ export default function DiscountPage() {
                 type="number"
                 step="0.001"
                 min="0"
+                max={outstandingBalance > 0 ? outstandingBalance : undefined}
                 value={discountAmount}
                 onChange={(e) => setDiscountAmount(e.target.value)}
                 placeholder="Enter discount amount"
-                className="!text-3xl h-14 font-semibold placeholder:text-muted-foreground/30 placeholder:font-normal"
+                className={`!text-3xl h-14 font-semibold placeholder:text-muted-foreground/30 placeholder:font-normal ${exceedsBalance ? 'border-destructive' : ''}`}
                 data-testid="input-discount-amount"
               />
+              {exceedsBalance && (
+                <p className="text-sm text-destructive">
+                  Discount amount cannot exceed outstanding balance ({outstandingBalance.toFixed(3)} KWD)
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

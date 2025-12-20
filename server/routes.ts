@@ -1707,32 +1707,109 @@ export async function registerRoutes(
 
   app.post("/api/discounts", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = req.user?.id;
+      const { customerId, salesOrderId, discountAmount, notes } = req.body;
+      
+      // Validate required fields
+      if (!customerId || !salesOrderId || !discountAmount) {
+        return res.status(400).json({ error: "Customer, invoice, and discount amount are required" });
+      }
+      
+      // Validate discount amount is a positive number
+      const discountValue = parseFloat(discountAmount);
+      if (isNaN(discountValue) || discountValue <= 0) {
+        return res.status(400).json({ error: "Discount amount must be a positive number" });
+      }
+      
+      // Get invoice outstanding balance and validate discount doesn't exceed it
+      const balanceInfo = await storage.getInvoiceOutstandingBalance(parseInt(salesOrderId));
+      if (discountValue > balanceInfo.outstandingBalance) {
+        return res.status(400).json({ 
+          error: `Discount amount (${discountValue.toFixed(3)} KWD) exceeds outstanding balance (${balanceInfo.outstandingBalance.toFixed(3)} KWD)` 
+        });
+      }
+      
       const parsed = insertDiscountSchema.safeParse({
-        ...req.body,
-        createdBy: userId,
+        customerId: parseInt(customerId),
+        salesOrderId: parseInt(salesOrderId),
+        discountAmount: discountValue.toFixed(3),
+        notes: notes || null,
+        createdBy: userId?.toString(),
       });
       if (!parsed.success) {
         return res.status(400).json({ error: parsed.error.message });
       }
       const discount = await storage.createDiscount(parsed.data);
+      
+      // Create audit log entry
+      await storage.createAuditLog({
+        userId: userId || 0,
+        action: 'CREATE',
+        entityType: 'discount',
+        entityId: discount.id,
+        newValues: JSON.stringify({
+          customerId: discount.customerId,
+          salesOrderId: discount.salesOrderId,
+          discountAmount: discount.discountAmount,
+          notes: discount.notes,
+        }),
+      });
+      
       res.status(201).json(discount);
     } catch (error) {
       console.error("Error creating discount:", error);
       res.status(500).json({ error: "Failed to create discount" });
     }
   });
+  
+  // Get invoice outstanding balance for discount validation
+  app.get("/api/invoice-balance/:salesOrderId", isAuthenticated, async (req, res) => {
+    try {
+      const salesOrderId = parseInt(req.params.salesOrderId);
+      if (isNaN(salesOrderId)) {
+        return res.status(400).json({ error: "Invalid sales order ID" });
+      }
+      const balance = await storage.getInvoiceOutstandingBalance(salesOrderId);
+      res.json(balance);
+    } catch (error) {
+      console.error("Error fetching invoice balance:", error);
+      res.status(500).json({ error: "Failed to fetch invoice balance" });
+    }
+  });
 
-  app.delete("/api/discounts/:id", isAuthenticated, isAdmin, async (req, res) => {
+  app.delete("/api/discounts/:id", isAuthenticated, isAdmin, async (req: any, res) => {
     try {
       const id = parseInt(req.params.id);
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid discount ID" });
       }
+      
+      // Get discount before deletion for audit trail
+      const discount = await storage.getDiscount(id);
+      if (!discount) {
+        return res.status(404).json({ error: "Discount not found" });
+      }
+      
       const deleted = await storage.deleteDiscount(id);
       if (!deleted) {
         return res.status(404).json({ error: "Discount not found" });
       }
+      
+      // Create audit log entry for deletion
+      const userId = req.user?.id;
+      await storage.createAuditLog({
+        userId: userId || 0,
+        action: 'DELETE',
+        entityType: 'discount',
+        entityId: id,
+        previousValues: JSON.stringify({
+          customerId: discount.customerId,
+          salesOrderId: discount.salesOrderId,
+          discountAmount: discount.discountAmount,
+          notes: discount.notes,
+        }),
+      });
+      
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting discount:", error);
