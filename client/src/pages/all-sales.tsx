@@ -114,27 +114,25 @@ export default function AllSalesPage() {
   const totalOrders = salesData?.total ?? 0;
   const totalPages = Math.ceil(totalOrders / PAGE_SIZE);
 
-  // Auto-select transaction when viewId is in URL
+  // Fetch specific order when viewId is present
+  const viewIdNum = viewId ? parseInt(viewId) : null;
+  const { data: viewIdOrder } = useQuery<SalesOrder>({
+    queryKey: ["/api/sales-orders", viewIdNum],
+    queryFn: async () => {
+      const res = await fetch(`/api/sales-orders/${viewIdNum}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Not found");
+      return res.json();
+    },
+    enabled: !!viewIdNum,
+  });
+
+  // Auto-open dialog when viewId order is loaded
   useEffect(() => {
-    console.log("[all-sales] viewId effect triggered, viewId:", viewId, "searchParams:", searchParams);
-    if (viewId) {
-      const id = parseInt(viewId);
-      console.log("[all-sales] Fetching sales order:", id);
-      fetch(`/api/sales-orders/${id}`, { credentials: "include" })
-        .then(res => {
-          console.log("[all-sales] Response status:", res.status);
-          return res.ok ? res.json() : null;
-        })
-        .then(data => {
-          console.log("[all-sales] Fetched data:", data);
-          if (data) {
-            setSelectedSO(data);
-            navigate("/sales", { replace: true });
-          }
-        })
-        .catch(err => console.error("[all-sales] Fetch error:", err));
+    if (viewIdOrder && viewId) {
+      setSelectedSO(viewIdOrder);
+      navigate("/sales", { replace: true });
     }
-  }, [viewId, navigate]);
+  }, [viewIdOrder, viewId, navigate]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {

@@ -170,22 +170,25 @@ export default function PaymentsPage() {
   const totalPayments = paymentsData?.total ?? 0;
   const totalPages = Math.ceil(totalPayments / PAGE_SIZE);
 
-  // Auto-select payment when viewId is in URL
+  // Fetch specific payment when viewId is present
+  const viewIdNum = viewId ? parseInt(viewId) : null;
+  const { data: viewIdPayment } = useQuery<PaymentWithDetails>({
+    queryKey: ["/api/payments", viewIdNum],
+    queryFn: async () => {
+      const res = await fetch(`/api/payments/${viewIdNum}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Not found");
+      return res.json();
+    },
+    enabled: !!viewIdNum,
+  });
+
+  // Auto-open dialog when viewId payment is loaded
   useEffect(() => {
-    if (viewId) {
-      const id = parseInt(viewId);
-      // Fetch the specific payment directly
-      fetch(`/api/payments/${id}`, { credentials: "include" })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data) {
-            setSelectedPayment(data);
-            navigate("/payments", { replace: true });
-          }
-        })
-        .catch(() => {});
+    if (viewIdPayment && viewId) {
+      setSelectedPayment(viewIdPayment);
+      navigate("/payments", { replace: true });
     }
-  }, [viewId, navigate]);
+  }, [viewIdPayment, viewId, navigate]);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],

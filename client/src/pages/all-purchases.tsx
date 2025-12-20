@@ -84,22 +84,25 @@ export default function AllPurchasesPage() {
   const totalOrders = purchaseData?.total ?? 0;
   const totalPages = Math.ceil(totalOrders / PAGE_SIZE);
 
-  // Auto-select transaction when viewId is in URL
+  // Fetch specific order when viewId is present
+  const viewIdNum = viewId ? parseInt(viewId) : null;
+  const { data: viewIdOrder } = useQuery<PurchaseOrder>({
+    queryKey: ["/api/purchase-orders", viewIdNum],
+    queryFn: async () => {
+      const res = await fetch(`/api/purchase-orders/${viewIdNum}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Not found");
+      return res.json();
+    },
+    enabled: !!viewIdNum,
+  });
+
+  // Auto-open dialog when viewId order is loaded
   useEffect(() => {
-    if (viewId) {
-      const id = parseInt(viewId);
-      // Fetch the specific order directly
-      fetch(`/api/purchase-orders/${id}`, { credentials: "include" })
-        .then(res => res.ok ? res.json() : null)
-        .then(data => {
-          if (data) {
-            setSelectedPO(data);
-            navigate("/purchase-orders", { replace: true });
-          }
-        })
-        .catch(() => {});
+    if (viewIdOrder && viewId) {
+      setSelectedPO(viewIdOrder);
+      navigate("/purchase-orders", { replace: true });
     }
-  }, [viewId, navigate]);
+  }, [viewIdOrder, viewId, navigate]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
