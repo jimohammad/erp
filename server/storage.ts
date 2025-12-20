@@ -1801,12 +1801,12 @@ export class DatabaseStorage implements IStorage {
     const result = await db.execute(sql`
       WITH invoice_payments AS (
         SELECT 
-          so.sales_order_id,
+          sp.sales_order_id,
           COALESCE(SUM(CAST(sp.amount AS DECIMAL)), 0) as paid
         FROM sales_payment_allocations sp
         JOIN sales_orders so ON so.id = sp.sales_order_id
         WHERE so.customer_id = ${customerId}
-        GROUP BY so.sales_order_id
+        GROUP BY sp.sales_order_id
       ),
       invoice_discounts AS (
         SELECT 
