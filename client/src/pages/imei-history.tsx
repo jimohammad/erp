@@ -130,7 +130,7 @@ export default function ImeiHistoryPage() {
         <h1 className="text-2xl font-semibold">IMEI History</h1>
       </div>
 
-      <Card>
+      <Card className="bg-sky-100 dark:bg-sky-900/30">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Search className="h-5 w-5" />
