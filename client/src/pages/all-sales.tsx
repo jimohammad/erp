@@ -116,18 +116,23 @@ export default function AllSalesPage() {
 
   // Auto-select transaction when viewId is in URL
   useEffect(() => {
+    console.log("[all-sales] viewId effect triggered, viewId:", viewId, "searchParams:", searchParams);
     if (viewId) {
       const id = parseInt(viewId);
-      // Fetch the specific order directly
+      console.log("[all-sales] Fetching sales order:", id);
       fetch(`/api/sales-orders/${id}`, { credentials: "include" })
-        .then(res => res.ok ? res.json() : null)
+        .then(res => {
+          console.log("[all-sales] Response status:", res.status);
+          return res.ok ? res.json() : null;
+        })
         .then(data => {
+          console.log("[all-sales] Fetched data:", data);
           if (data) {
             setSelectedSO(data);
             navigate("/sales", { replace: true });
           }
         })
-        .catch(() => {});
+        .catch(err => console.error("[all-sales] Fetch error:", err));
     }
   }, [viewId, navigate]);
 
