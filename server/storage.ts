@@ -2495,7 +2495,7 @@ export class DatabaseStorage implements IStorage {
         sli.item_name as name,
         COALESCE(SUM(CAST(sli.total_kwd AS DECIMAL)), 0)::float as "totalSales",
         COALESCE(SUM(sli.quantity), 0)::int as quantity
-      FROM sales_line_items sli
+      FROM sales_order_line_items sli
       JOIN sales_orders so ON sli.sales_order_id = so.id
       GROUP BY sli.item_name
       ORDER BY "totalSales" DESC
