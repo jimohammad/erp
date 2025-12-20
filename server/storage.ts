@@ -727,11 +727,11 @@ export class DatabaseStorage implements IStorage {
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0];
     
-    // Get from suppliers table where partyType='customer'
+    // Get from suppliers table where partyType='salesman' (field sales reps who need stock checks)
     const results = await db.select().from(suppliers)
       .where(
         and(
-          eq(suppliers.partyType, 'customer'),
+          eq(suppliers.partyType, 'salesman'),
           or(
             isNull(suppliers.lastStockCheckDate),
             sql`${suppliers.lastStockCheckDate} <= ${threeMonthsAgoStr}`

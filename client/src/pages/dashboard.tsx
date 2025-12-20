@@ -367,154 +367,159 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {topSellingItems && topSellingItems.length > 0 && (
-            <Card data-testid="card-top-selling-items">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/40">
-                    <PieChartIcon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+          <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+            {topSellingItems && topSellingItems.length > 0 && (
+              <Card data-testid="card-top-selling-items">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/40">
+                      <PieChartIcon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-sm font-semibold">Top Selling Items</CardTitle>
+                      <p className="text-xs text-muted-foreground">By sales amount (KWD)</p>
+                    </div>
                   </div>
-                  <div>
-                    <CardTitle className="text-sm font-semibold">Top Selling Items</CardTitle>
-                    <p className="text-xs text-muted-foreground">By sales amount (KWD)</p>
+                </CardHeader>
+                <CardContent className="p-4 pt-0">
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={topSellingItems.slice(0, 8).map(item => ({
+                            name: item.name.length > 15 ? item.name.substring(0, 13) + '...' : item.name,
+                            value: item.totalSales,
+                            fullName: item.name,
+                            quantity: item.quantity
+                          }))}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={70}
+                          paddingAngle={2}
+                          dataKey="value"
+                          label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                          labelLine={false}
+                        >
+                          {topSellingItems.slice(0, 8).map((_, index) => (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={[
+                                'hsl(262, 83%, 58%)',
+                                'hsl(199, 89%, 48%)',
+                                'hsl(142, 76%, 36%)',
+                                'hsl(24, 95%, 53%)',
+                                'hsl(350, 89%, 60%)',
+                                'hsl(47, 96%, 53%)',
+                                'hsl(201, 96%, 32%)',
+                                'hsl(322, 81%, 43%)',
+                              ][index % 8]}
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: number, name: string, props: any) => [
+                            `${formatCurrency(value)} KWD (${props.payload.quantity} units)`,
+                            props.payload.fullName
+                          ]}
+                        />
+                        <Legend 
+                          layout="vertical" 
+                          align="right" 
+                          verticalAlign="middle"
+                          formatter={(value: string) => <span className="text-xs">{value}</span>}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={topSellingItems.slice(0, 8).map(item => ({
-                          name: item.name.length > 20 ? item.name.substring(0, 18) + '...' : item.name,
-                          value: item.totalSales,
-                          fullName: item.name,
-                          quantity: item.quantity
-                        }))}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        paddingAngle={2}
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
-                        labelLine={false}
-                      >
-                        {topSellingItems.slice(0, 8).map((_, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={[
-                              'hsl(262, 83%, 58%)',  // violet
-                              'hsl(199, 89%, 48%)',  // sky
-                              'hsl(142, 76%, 36%)',  // green
-                              'hsl(24, 95%, 53%)',   // orange
-                              'hsl(350, 89%, 60%)',  // rose
-                              'hsl(47, 96%, 53%)',   // yellow
-                              'hsl(201, 96%, 32%)',  // blue
-                              'hsl(322, 81%, 43%)',  // pink
-                            ][index % 8]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip 
-                        formatter={(value: number, name: string, props: any) => [
-                          `${formatCurrency(value)} KWD (${props.payload.quantity} units)`,
-                          props.payload.fullName
-                        ]}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
+            )}
 
-          {lowStockItems && lowStockItems.length > 0 && (
-            <Card data-testid="card-low-stock-alerts" className="border-amber-200 dark:border-amber-800">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/40">
-                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-sm font-semibold">Low Stock Alerts</CardTitle>
-                    <p className="text-xs text-muted-foreground">Items below minimum level</p>
-                  </div>
-                </div>
-                <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100">
-                  {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''}
-                </Badge>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {lowStockItems.map((item) => (
-                    <div 
-                      key={item.itemName}
-                      className="flex items-center justify-between p-2 rounded-md bg-amber-50 dark:bg-amber-900/20"
-                      data-testid={`low-stock-item-${item.itemName}`}
-                    >
-                      <span className="font-medium text-sm">{item.itemName}</span>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={item.currentStock <= 0 ? "destructive" : "secondary"} className="text-xs">
-                          {item.currentStock} / {item.minStockLevel}
-                        </Badge>
+            <div className="space-y-3">
+              {customersDueForStockCheck && customersDueForStockCheck.length > 0 && (
+                <Card data-testid="card-stock-check-reminders" className="border-blue-200 dark:border-blue-800">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
+                        <ClipboardCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-sm font-semibold">Stock Check Reminders</CardTitle>
+                        <p className="text-xs text-muted-foreground">Salesmen due for field visit (3+ months)</p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+                      {customersDueForStockCheck.length} salesman{customersDueForStockCheck.length !== 1 ? 'men' : ''}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {customersDueForStockCheck.slice(0, 5).map((customer) => (
+                        <div 
+                          key={customer.id}
+                          className="flex items-center justify-between p-2 rounded-md bg-blue-50 dark:bg-blue-900/20 cursor-pointer hover-elevate"
+                          data-testid={`stock-check-customer-${customer.id}`}
+                          onClick={() => setLocation("/parties")}
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium text-sm">{customer.name}</span>
+                            {customer.phone && (
+                              <span className="text-xs text-muted-foreground">{customer.phone}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {customer.lastStockCheckDate 
+                                ? `Last: ${new Date(customer.lastStockCheckDate).toLocaleDateString()}`
+                                : 'Never checked'}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
 
-          {customersDueForStockCheck && customersDueForStockCheck.length > 0 && (
-            <Card data-testid="card-stock-check-reminders" className="border-blue-200 dark:border-blue-800">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
-                    <ClipboardCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-sm font-semibold">Stock Check Reminders</CardTitle>
-                    <p className="text-xs text-muted-foreground">Customers due for field visit (3+ months)</p>
-                  </div>
-                </div>
-                <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
-                  {customersDueForStockCheck.length} customer{customersDueForStockCheck.length !== 1 ? 's' : ''}
-                </Badge>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                  {customersDueForStockCheck.slice(0, 10).map((customer) => (
-                    <div 
-                      key={customer.id}
-                      className="flex items-center justify-between p-2 rounded-md bg-blue-50 dark:bg-blue-900/20 cursor-pointer hover-elevate"
-                      data-testid={`stock-check-customer-${customer.id}`}
-                      onClick={() => setLocation("/parties")}
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-medium text-sm">{customer.name}</span>
-                        {customer.phone && (
-                          <span className="text-xs text-muted-foreground">{customer.phone}</span>
-                        )}
+              {lowStockItems && lowStockItems.length > 0 && (
+                <Card data-testid="card-low-stock-alerts" className="border-amber-200 dark:border-amber-800">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/40">
+                        <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs">
-                          {customer.lastStockCheckDate 
-                            ? `Last: ${new Date(customer.lastStockCheckDate).toLocaleDateString()}`
-                            : 'Never checked'}
-                        </Badge>
+                      <div>
+                        <CardTitle className="text-sm font-semibold">Low Stock Alerts</CardTitle>
+                        <p className="text-xs text-muted-foreground">Items below minimum level</p>
                       </div>
                     </div>
-                  ))}
-                  {customersDueForStockCheck.length > 10 && (
-                    <p className="text-xs text-muted-foreground text-center pt-2">
-                      +{customersDueForStockCheck.length - 10} more customers
-                    </p>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                    <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100">
+                      {lowStockItems.length} item{lowStockItems.length !== 1 ? 's' : ''}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent className="p-4 pt-0">
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {lowStockItems.slice(0, 5).map((item) => (
+                        <div 
+                          key={item.itemName}
+                          className="flex items-center justify-between p-2 rounded-md bg-amber-50 dark:bg-amber-900/20"
+                          data-testid={`low-stock-item-${item.itemName}`}
+                        >
+                          <span className="font-medium text-sm truncate flex-1">{item.itemName}</span>
+                          <div className="flex items-center gap-2 ml-2">
+                            <Badge variant={item.currentStock <= 0 ? "destructive" : "secondary"} className="text-xs">
+                              {item.currentStock} / {item.minStockLevel}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
