@@ -287,7 +287,7 @@ export default function PartyMaster() {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
+              <div className="flex items-center justify-between p-3 border rounded-md bg-sky-100 dark:bg-sky-900/30">
                 <div className="space-y-0.5">
                   <Label htmlFor="partyType" className="text-base">Party Type</Label>
                   <p className="text-sm text-muted-foreground">
