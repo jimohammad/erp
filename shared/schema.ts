@@ -57,6 +57,13 @@ export const suppliers = pgTable("suppliers", {
   area: text("area"),
   lastStockCheckDate: text("last_stock_check_date"),
   commissionRate: numeric("commission_rate", { precision: 5, scale: 2 }),
+  country: text("country"),
+  email: text("email"),
+  beneficiaryName: text("beneficiary_name"),
+  ibanAccountNumber: text("iban_account_number"),
+  swiftCode: text("swift_code"),
+  bankName: text("bank_name"),
+  bankAddress: text("bank_address"),
 }, (table) => [
   index("idx_supplier_party_type").on(table.partyType),
   index("idx_supplier_area").on(table.area),

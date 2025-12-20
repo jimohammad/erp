@@ -31,7 +31,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Pencil, Trash2, Loader2, Users, RotateCcw, Save, ClipboardCheck, AlertTriangle } from "lucide-react";
+import { Pencil, Trash2, Loader2, Users, RotateCcw, Save, ClipboardCheck, AlertTriangle, Building2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Supplier, PartyType } from "@shared/schema";
 
@@ -48,6 +48,13 @@ export default function PartyMaster() {
   const [partyArea, setPartyArea] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
   const [commissionRate, setCommissionRate] = useState("");
+  const [partyCountry, setPartyCountry] = useState("");
+  const [partyEmail, setPartyEmail] = useState("");
+  const [beneficiaryName, setBeneficiaryName] = useState("");
+  const [ibanAccountNumber, setIbanAccountNumber] = useState("");
+  const [swiftCode, setSwiftCode] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [bankAddress, setBankAddress] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [partyToDelete, setPartyToDelete] = useState<Supplier | null>(null);
   
@@ -96,6 +103,13 @@ export default function PartyMaster() {
     setCreditLimit("");
     setPartyArea("");
     setCommissionRate("");
+    setPartyCountry("");
+    setPartyEmail("");
+    setBeneficiaryName("");
+    setIbanAccountNumber("");
+    setSwiftCode("");
+    setBankName("");
+    setBankAddress("");
   };
 
   useEffect(() => {
@@ -107,11 +121,35 @@ export default function PartyMaster() {
       setCreditLimit(editingParty.creditLimit || "");
       setPartyArea(editingParty.area || "");
       setCommissionRate(editingParty.commissionRate || "");
+      setPartyCountry(editingParty.country || "");
+      setPartyEmail(editingParty.email || "");
+      setBeneficiaryName(editingParty.beneficiaryName || "");
+      setIbanAccountNumber(editingParty.ibanAccountNumber || "");
+      setSwiftCode(editingParty.swiftCode || "");
+      setBankName(editingParty.bankName || "");
+      setBankAddress(editingParty.bankAddress || "");
     }
   }, [editingParty]);
 
+  interface PartyFormData {
+    name: string;
+    address: string | null;
+    phone: string | null;
+    partyType: PartyType;
+    creditLimit: string | null;
+    area: string | null;
+    commissionRate: string | null;
+    country: string | null;
+    email: string | null;
+    beneficiaryName: string | null;
+    ibanAccountNumber: string | null;
+    swiftCode: string | null;
+    bankName: string | null;
+    bankAddress: string | null;
+  }
+
   const createMutation = useMutation({
-    mutationFn: (data: { name: string; address: string | null; phone: string | null; partyType: PartyType; creditLimit: string | null; area: string | null; commissionRate: string | null }) => 
+    mutationFn: (data: PartyFormData) => 
       apiRequest("POST", "/api/suppliers", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
@@ -125,7 +163,7 @@ export default function PartyMaster() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: { name: string; address: string | null; phone: string | null; partyType: PartyType; creditLimit: string | null; area: string | null; commissionRate: string | null } }) =>
+    mutationFn: ({ id, data }: { id: number; data: PartyFormData }) =>
       apiRequest("PUT", `/api/suppliers/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
@@ -184,7 +222,7 @@ export default function PartyMaster() {
     e.preventDefault();
     if (!partyName.trim()) return;
 
-    const data = {
+    const data: PartyFormData = {
       name: partyName.trim(),
       address: partyAddress.trim() || null,
       phone: partyPhone.trim() || null,
@@ -192,6 +230,13 @@ export default function PartyMaster() {
       creditLimit: (partyType === "customer" || partyType === "salesman") && creditLimit.trim() ? creditLimit.trim() : null,
       area: (partyType === "customer" || partyType === "salesman") && partyArea.trim() ? partyArea.trim() : null,
       commissionRate: partyType === "salesman" && commissionRate.trim() ? commissionRate.trim() : null,
+      country: partyType === "supplier" && partyCountry.trim() ? partyCountry.trim() : null,
+      email: partyType === "supplier" && partyEmail.trim() ? partyEmail.trim() : null,
+      beneficiaryName: partyType === "supplier" && beneficiaryName.trim() ? beneficiaryName.trim() : null,
+      ibanAccountNumber: partyType === "supplier" && ibanAccountNumber.trim() ? ibanAccountNumber.trim() : null,
+      swiftCode: partyType === "supplier" && swiftCode.trim() ? swiftCode.trim() : null,
+      bankName: partyType === "supplier" && bankName.trim() ? bankName.trim() : null,
+      bankAddress: partyType === "supplier" && bankAddress.trim() ? bankAddress.trim() : null,
     };
 
     if (editingParty) {
@@ -389,6 +434,101 @@ export default function PartyMaster() {
                     />
                   </div>
                 </div>
+              )}
+
+              {partyType === "supplier" && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="partyCountry">Country</Label>
+                      <Input
+                        id="partyCountry"
+                        value={partyCountry}
+                        onChange={(e) => setPartyCountry(e.target.value)}
+                        placeholder="Enter country"
+                        data-testid="input-party-country"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="partyEmail">Email</Label>
+                      <Input
+                        id="partyEmail"
+                        type="email"
+                        value={partyEmail}
+                        onChange={(e) => setPartyEmail(e.target.value)}
+                        placeholder="Enter email address"
+                        data-testid="input-party-email"
+                      />
+                    </div>
+                  </div>
+
+                  <Card className="mt-2">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Building2 className="h-4 w-4" />
+                        Bank Details
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="beneficiaryName">Beneficiary Name</Label>
+                          <Input
+                            id="beneficiaryName"
+                            value={beneficiaryName}
+                            onChange={(e) => setBeneficiaryName(e.target.value)}
+                            placeholder="Enter beneficiary name"
+                            data-testid="input-beneficiary-name"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="ibanAccountNumber">IBAN/Account Number</Label>
+                          <Input
+                            id="ibanAccountNumber"
+                            value={ibanAccountNumber}
+                            onChange={(e) => setIbanAccountNumber(e.target.value)}
+                            placeholder="Enter IBAN or account number"
+                            data-testid="input-iban-account"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="swiftCode">Swift Code</Label>
+                          <Input
+                            id="swiftCode"
+                            value={swiftCode}
+                            onChange={(e) => setSwiftCode(e.target.value)}
+                            placeholder="Enter SWIFT/BIC code"
+                            data-testid="input-swift-code"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="bankName">Bank Name</Label>
+                          <Input
+                            id="bankName"
+                            value={bankName}
+                            onChange={(e) => setBankName(e.target.value)}
+                            placeholder="Enter bank name"
+                            data-testid="input-bank-name"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="bankAddress">Bank Address</Label>
+                        <Input
+                          id="bankAddress"
+                          value={bankAddress}
+                          onChange={(e) => setBankAddress(e.target.value)}
+                          placeholder="Enter bank address"
+                          data-testid="input-bank-address"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
               )}
 
               <div className="flex items-center justify-end">
