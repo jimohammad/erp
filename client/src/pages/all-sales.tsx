@@ -116,27 +116,20 @@ export default function AllSalesPage() {
 
   // Auto-select transaction when viewId is in URL
   useEffect(() => {
-    if (viewId && salesOrders.length > 0) {
+    if (viewId) {
       const id = parseInt(viewId);
-      const found = salesOrders.find(so => so.id === id);
-      if (found) {
-        setSelectedSO(found);
-        // Clear the viewId from URL
-        navigate("/sales", { replace: true });
-      } else {
-        // Fetch the specific order if not in current page
-        fetch(`/api/sales-orders/${id}`, { credentials: "include" })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (data) {
-              setSelectedSO(data);
-              navigate("/sales", { replace: true });
-            }
-          })
-          .catch(() => {});
-      }
+      // Fetch the specific order directly
+      fetch(`/api/sales-orders/${id}`, { credentials: "include" })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) {
+            setSelectedSO(data);
+            navigate("/sales", { replace: true });
+          }
+        })
+        .catch(() => {});
     }
-  }, [viewId, salesOrders, navigate]);
+  }, [viewId, navigate]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {

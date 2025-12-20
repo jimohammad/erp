@@ -172,26 +172,20 @@ export default function PaymentsPage() {
 
   // Auto-select payment when viewId is in URL
   useEffect(() => {
-    if (viewId && payments.length > 0) {
+    if (viewId) {
       const id = parseInt(viewId);
-      const found = payments.find(p => p.id === id);
-      if (found) {
-        setSelectedPayment(found);
-        navigate("/payments", { replace: true });
-      } else {
-        // Fetch the specific payment if not in current page
-        fetch(`/api/payments/${id}`, { credentials: "include" })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (data) {
-              setSelectedPayment(data);
-              navigate("/payments", { replace: true });
-            }
-          })
-          .catch(() => {});
-      }
+      // Fetch the specific payment directly
+      fetch(`/api/payments/${id}`, { credentials: "include" })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) {
+            setSelectedPayment(data);
+            navigate("/payments", { replace: true });
+          }
+        })
+        .catch(() => {});
     }
-  }, [viewId, payments, navigate]);
+  }, [viewId, navigate]);
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],

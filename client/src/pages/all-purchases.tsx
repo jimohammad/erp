@@ -86,26 +86,20 @@ export default function AllPurchasesPage() {
 
   // Auto-select transaction when viewId is in URL
   useEffect(() => {
-    if (viewId && purchaseOrders.length > 0) {
+    if (viewId) {
       const id = parseInt(viewId);
-      const found = purchaseOrders.find(po => po.id === id);
-      if (found) {
-        setSelectedPO(found);
-        navigate("/purchase-orders", { replace: true });
-      } else {
-        // Fetch the specific order if not in current page
-        fetch(`/api/purchase-orders/${id}`, { credentials: "include" })
-          .then(res => res.ok ? res.json() : null)
-          .then(data => {
-            if (data) {
-              setSelectedPO(data);
-              navigate("/purchase-orders", { replace: true });
-            }
-          })
-          .catch(() => {});
-      }
+      // Fetch the specific order directly
+      fetch(`/api/purchase-orders/${id}`, { credentials: "include" })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data) {
+            setSelectedPO(data);
+            navigate("/purchase-orders", { replace: true });
+          }
+        })
+        .catch(() => {});
     }
-  }, [viewId, purchaseOrders, navigate]);
+  }, [viewId, navigate]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
