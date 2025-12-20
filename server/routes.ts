@@ -2673,21 +2673,40 @@ export async function registerRoutes(
         return res.status(404).json({ error: "No invoices found" });
       }
 
-      // Transform to the format expected by PDF generator
-      const invoicesForPdf = selectedOrders.map(order => ({
-        id: order.id,
-        invoiceNumber: order.invoiceNumber,
-        saleDate: order.saleDate,
-        customerName: order.customer?.name || null,
-        customerPhone: order.customer?.phone || null,
-        totalKwd: order.totalKwd,
-        lineItems: (order.lineItems || []).map((item: any) => ({
-          itemName: item.itemName || "Item",
-          quantity: item.quantity,
-          priceKwd: item.priceKwd,
-          totalKwd: item.totalKwd,
-        })),
-        verificationCode: (order as any).verificationCode || undefined,
+      // Transform to the format expected by PDF generator with verification codes
+      const invoicesForPdf = await Promise.all(selectedOrders.map(async (order) => {
+        // Create or get verification code for this invoice
+        let verificationCode: string | undefined;
+        try {
+          const verification = await storage.createOrGetDocumentVerification({
+            documentType: 'SALE',
+            documentId: order.id,
+            documentNumber: order.invoiceNumber || `INV-${order.id}`,
+            amount: order.totalKwd || '0',
+            documentDate: order.saleDate || new Date().toISOString().split('T')[0],
+            partyName: order.customer?.name || null,
+            partyType: 'customer',
+          });
+          verificationCode = verification.verificationCode;
+        } catch (e) {
+          console.error('Failed to create verification for order', order.id, e);
+        }
+        
+        return {
+          id: order.id,
+          invoiceNumber: order.invoiceNumber,
+          saleDate: order.saleDate,
+          customerName: order.customer?.name || null,
+          customerPhone: order.customer?.phone || null,
+          totalKwd: order.totalKwd,
+          lineItems: (order.lineItems || []).map((item: any) => ({
+            itemName: item.itemName || "Item",
+            quantity: item.quantity,
+            priceKwd: item.priceKwd,
+            totalKwd: item.totalKwd,
+          })),
+          verificationCode,
+        };
       }));
 
       const buffer = await generateMergedInvoicesPDF(invoicesForPdf, date || new Date().toISOString().split('T')[0]);

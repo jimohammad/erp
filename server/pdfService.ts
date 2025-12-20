@@ -508,8 +508,12 @@ export async function generateMergedInvoicesPDF(invoices: MergedInvoice[], date:
         let qrDataUrl: string | null = null;
         if (invoice.verificationCode) {
           try {
+            // Use the proper published domain or fallback
+            const domain = process.env.REPLIT_DEPLOYMENT_URL || 
+                          process.env.REPL_SLUG ? `https://${process.env.REPL_SLUG}.replit.app` : 
+                          'https://iqbalelectronics.replit.app';
             qrDataUrl = await QRCode.toDataURL(
-              `https://${process.env.REPL_SLUG || 'app'}.replit.app/verify?code=${invoice.verificationCode}`,
+              `${domain}/verify/${invoice.verificationCode}`,
               { width: 60, margin: 1 }
             );
           } catch (e) {
