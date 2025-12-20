@@ -223,7 +223,19 @@ export default function ReturnsPage() {
       return response.json();
     },
     onSuccess: async (savedReturn: ReturnWithDetails) => {
+      // Invalidate all related queries for real-time updates
       queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/balances/all"] });
+      
+      // Invalidate customer-specific queries for sale returns
+      if (savedReturn.customerId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/invoices-for-customer/${savedReturn.customerId}`] });
+        queryClient.invalidateQueries({ queryKey: ["/api/customers", savedReturn.customerId.toString(), "balance"] });
+      }
       
       // Print if requested - respect user's printer preference
       if (shouldPrintAfterSave) {
@@ -257,7 +269,13 @@ export default function ReturnsPage() {
       return apiRequest("DELETE", `/api/returns/${id}`);
     },
     onSuccess: () => {
+      // Invalidate all related queries for real-time updates
       queryClient.invalidateQueries({ queryKey: ["/api/returns"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/balances/all"] });
       toast({ title: "Return deleted successfully" });
     },
     onError: (error: any) => {

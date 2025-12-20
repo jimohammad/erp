@@ -90,9 +90,13 @@ export default function SalesPage() {
       return apiRequest("POST", "/api/sales-orders", payload);
     },
     onSuccess: () => {
+      // Invalidate all related queries for real-time updates
       queryClient.invalidateQueries({ queryKey: ["/api/sales-orders"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sales-stats/monthly"] });
       queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).includes("/api/customers") });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/balances/all"] });
       toast({ title: "Sales invoice saved successfully" });
     },
     onError: (error: Error) => {

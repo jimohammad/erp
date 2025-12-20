@@ -239,8 +239,17 @@ export default function PaymentsPage() {
       return response.json();
     },
     onSuccess: async (savedPayment: PaymentWithDetails) => {
+      // Invalidate all related queries for real-time updates
       await queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
       await queryClient.refetchQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/balances/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
+      if (savedPayment.customerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/customers", savedPayment.customerId.toString(), "balance"] });
+      }
       setPage(1);
       toast({ title: "Payment recorded successfully" });
       if (shouldPrintAfterSave) {
@@ -264,7 +273,13 @@ export default function PaymentsPage() {
       return apiRequest("DELETE", `/api/payments/${id}`);
     },
     onSuccess: () => {
+      // Invalidate all related queries for real-time updates
       queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/balances/all"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
       toast({ title: "Payment deleted successfully" });
       setPaymentToDelete(null);
     },

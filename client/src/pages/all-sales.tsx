@@ -139,12 +139,17 @@ export default function AllSalesPage() {
       return await apiRequest("DELETE", `/api/sales-orders/${id}`);
     },
     onSuccess: () => {
+      // Invalidate all related queries for real-time updates
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey[0];
           return typeof key === 'string' && key.startsWith('/api/sales-orders');
         }
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/balances/all"] });
       toast({ title: "Sales invoice deleted successfully" });
       setDeleteId(null);
     },
@@ -169,12 +174,17 @@ export default function AllSalesPage() {
       return await apiRequest("PUT", `/api/sales-orders/${id}`, data);
     },
     onSuccess: () => {
+      // Invalidate all related queries for real-time updates
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey[0];
           return typeof key === 'string' && key.startsWith('/api/sales-orders');
         }
       });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/balances/all"] });
       toast({ title: "Sales invoice updated successfully" });
       setEditSO(null);
     },

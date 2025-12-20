@@ -68,10 +68,18 @@ export default function DiscountPage() {
       return response.json();
     },
     onSuccess: (discount: DiscountWithDetails) => {
+      // Invalidate all related queries for real-time updates
       queryClient.invalidateQueries({ queryKey: ["/api/discounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoice-balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices-for-customer"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customer-statement"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/balances/all"] });
+      if (discount.customerId) {
+        queryClient.invalidateQueries({ queryKey: ["/api/customers", discount.customerId.toString(), "balance"] });
+      }
       setSavedDiscount(discount);
       toast({
         title: "Discount Saved",
@@ -96,10 +104,15 @@ export default function DiscountPage() {
       await apiRequest("DELETE", `/api/discounts/${id}`);
     },
     onSuccess: () => {
+      // Invalidate all related queries for real-time updates
       queryClient.invalidateQueries({ queryKey: ["/api/discounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoice-balance"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoices-for-customer"] });
       queryClient.invalidateQueries({ queryKey: ["/api/customer-statement"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/customers/balances/all"] });
       toast({
         title: "Discount Deleted",
         description: "Discount has been deleted successfully.",
