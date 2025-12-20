@@ -2623,36 +2623,6 @@ export async function registerRoutes(
     }
   });
 
-  // AI Chat endpoint
-  const { processAIQuery, getAvailableQueries } = await import("./aiService");
-  
-  app.post("/api/ai/chat", isAuthenticated, async (req: any, res) => {
-    try {
-      const { message } = req.body;
-      if (!message || typeof message !== "string") {
-        return res.status(400).json({ error: "Message is required" });
-      }
-      
-      const userId = req.user.id;
-      const user = await storage.getUser(userId);
-      
-      const response = await processAIQuery(message, {
-        userId,
-        branchId: undefined,
-        userRole: user?.role || "user"
-      });
-      
-      res.json({ response });
-    } catch (error) {
-      console.error("AI chat error:", error);
-      res.status(500).json({ error: "Failed to process your question" });
-    }
-  });
-  
-  app.get("/api/ai/suggestions", isAuthenticated, (req, res) => {
-    res.json({ suggestions: getAvailableQueries() });
-  });
-
   // Recommendations PDF download
   const { generateRecommendationsPDF, generateBankPackPDF, generateMergedInvoicesPDF } = await import("./pdfService");
   

@@ -67,7 +67,6 @@ const SecuritySettingsPage = lazy(() => import("@/pages/security-settings"));
 const ImeiHistoryPage = lazy(() => import("@/pages/imei-history"));
 const BackupPage = lazy(() => import("@/pages/backup"));
 const UserManagementPage = lazy(() => import("@/pages/user-management"));
-const AIChatPage = lazy(() => import("@/pages/ai-chat"));
 const Landing = lazy(() => import("@/pages/landing"));
 const PublicStatementPage = lazy(() => import("@/pages/public-statement"));
 const VerifyPage = lazy(() => import("@/pages/verify"));
@@ -490,21 +489,6 @@ function AppSidebar() {
                 </SidebarMenuItem>
               )}
 
-              {/* AI Chat - ask business questions */}
-              {canAccess("dashboard") && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={location === "/ai-chat"}
-                  >
-                    <Link href="/ai-chat" data-testid="link-ai-chat">
-                      <MessageCircle className="h-4 w-4" />
-                      <span>AI Assistant</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-
               {/* Send Price List via WhatsApp */}
               {canAccess("sales") && (
                 <SidebarMenuItem>
@@ -688,8 +672,6 @@ function AuthenticatedLayout() {
         return "New Stock Transfer";
       case "/stock-lookup":
         return "Stock";
-      case "/ai-chat":
-        return "AI Assistant";
       case "/settings/backup":
         return "Database Backup";
       default:
@@ -756,7 +738,6 @@ function AuthenticatedLayout() {
                 <Route path="/settings/opening-balances" component={OpeningBalancesPage} />
                 <Route path="/settings/security" component={SecuritySettingsPage} />
                 <Route path="/settings/backup" component={BackupPage} />
-                <Route path="/ai-chat" component={AIChatPage} />
                 <Route path="/stock-transfers/new" component={StockTransferNewPage} />
                 <Route path="/stock-transfers" component={StockTransfersPage} />
                 <Route path="/stock-lookup" component={StockLookupPage} />

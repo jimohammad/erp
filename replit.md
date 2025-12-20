@@ -20,7 +20,6 @@ This is a **Purchase Order Register** system built for Iqbal Electronics Co. WLL
 - Reports module with Available Stock, Daily Cash Flow, Customer Reports, and Customer Aging Report (0-30, 31-60, 61-90, 90+ day buckets)
 - Expenses module with category management and expense tracking
 - Accounts module with 5 predefined accounts (Cash, NBK Bank, CBK Bank, Knet, Wamd), account statements, and inter-account transfer functionality
-- AI Assistant powered by OpenAI for querying business data (sales summaries, stock info, customer insights, etc.) with branch-aware filtering
 - Automatic daily database backups with 30-day retention and admin-only backup management
 
 The system is designed as an enterprise productivity tool with a focus on efficient data entry workflows and comprehensive purchase tracking.
