@@ -46,12 +46,12 @@ export default function DiscountPage() {
   });
 
   const { data: invoices = [] } = useQuery<Invoice[]>({
-    queryKey: ["/api/invoices-for-customer", customerId],
+    queryKey: [`/api/invoices-for-customer/${customerId}`],
     enabled: !!customerId,
   });
 
   const { data: invoiceBalance } = useQuery<InvoiceBalance>({
-    queryKey: ["/api/invoice-balance", salesOrderId],
+    queryKey: [`/api/invoice-balance/${salesOrderId}`],
     enabled: !!salesOrderId,
   });
 

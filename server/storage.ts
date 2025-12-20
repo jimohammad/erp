@@ -1839,7 +1839,7 @@ export class DatabaseStorage implements IStorage {
       LEFT JOIN invoice_discounts id ON id.sales_order_id = so.id
       LEFT JOIN invoice_returns ir ON ir.sales_order_id = so.id
       WHERE so.customer_id = ${customerId}
-      ORDER BY so.invoice_date DESC
+      ORDER BY so.sale_date DESC
     `);
     
     return (result.rows as any[]).map(o => ({
