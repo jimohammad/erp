@@ -13,7 +13,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Search, ChevronLeft, ChevronRight, List, Filter, X } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Loader2, Search, ChevronLeft, ChevronRight, List, Filter, X, ExternalLink } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -22,7 +28,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import { format } from "date-fns";
+import { useLocation } from "wouter";
 import type { AllTransaction, Branch, Supplier } from "@shared/schema";
 
 const PAGE_SIZE = 50;
@@ -49,6 +57,18 @@ const MODULE_COLORS: Record<string, string> = {
   discount: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-100",
 };
 
+// Map module types to their respective page routes
+const MODULE_ROUTES: Record<string, string> = {
+  sales: "/sales",
+  purchase: "/purchase-orders",
+  payment_in: "/payments",
+  payment_out: "/payments",
+  sale_return: "/returns",
+  purchase_return: "/returns",
+  expense: "/expenses",
+  discount: "/discount",
+};
+
 export default function AllTransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -58,6 +78,8 @@ export default function AllTransactionsPage() {
   const [selectedBranch, setSelectedBranch] = useState<string>("all");
   const [selectedParty, setSelectedParty] = useState<string>("all");
   const [showFilters, setShowFilters] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<AllTransaction | null>(null);
+  const [, navigate] = useLocation();
 
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
@@ -269,7 +291,12 @@ export default function AllTransactionsPage() {
                 </TableHeader>
                 <TableBody>
                   {transactions.map((tx) => (
-                    <TableRow key={tx.id} data-testid={`row-transaction-${tx.id}`}>
+                    <TableRow 
+                      key={tx.id} 
+                      data-testid={`row-transaction-${tx.id}`}
+                      className="cursor-pointer hover-elevate"
+                      onClick={() => setSelectedTransaction(tx)}
+                    >
                       <TableCell className="whitespace-nowrap">
                         {tx.transactionDate ? format(new Date(tx.transactionDate), "dd/MM/yyyy") : "-"}
                       </TableCell>
@@ -329,6 +356,105 @@ export default function AllTransactionsPage() {
           </div>
         )}
       </Card>
+
+      {/* Transaction Detail Dialog */}
+      <Dialog open={!!selectedTransaction} onOpenChange={(open) => !open && setSelectedTransaction(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              Transaction Details
+              {selectedTransaction && (
+                <Badge className={`${MODULE_COLORS[selectedTransaction.module] || "bg-gray-100 text-gray-800"} no-default-hover-elevate no-default-active-elevate`}>
+                  {MODULE_LABELS[selectedTransaction.module] || selectedTransaction.module}
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedTransaction && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm text-muted-foreground">Reference</Label>
+                  <p className="font-mono text-sm font-medium">{selectedTransaction.reference}</p>
+                </div>
+                <div>
+                  <Label className="text-sm text-muted-foreground">Date</Label>
+                  <p className="text-sm font-medium">
+                    {selectedTransaction.transactionDate 
+                      ? format(new Date(selectedTransaction.transactionDate), "dd/MM/yyyy") 
+                      : "-"}
+                  </p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm text-muted-foreground">Party</Label>
+                  <p className="text-sm font-medium">{selectedTransaction.partyName || "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-sm text-muted-foreground">Branch</Label>
+                  <p className="text-sm font-medium">{selectedTransaction.branchName || "-"}</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm text-muted-foreground">Amount (KWD)</Label>
+                  <p className="text-lg font-bold font-mono">{formatCurrency(selectedTransaction.amountKwd)}</p>
+                </div>
+                {selectedTransaction.amountFx && selectedTransaction.fxCurrency && (
+                  <div>
+                    <Label className="text-sm text-muted-foreground">FX Amount</Label>
+                    <p className="text-lg font-bold font-mono">
+                      {parseFloat(selectedTransaction.amountFx).toFixed(2)} {selectedTransaction.fxCurrency}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {selectedTransaction.notes && (
+                <>
+                  <Separator />
+                  <div>
+                    <Label className="text-sm text-muted-foreground">Notes</Label>
+                    <p className="text-sm">{selectedTransaction.notes}</p>
+                  </div>
+                </>
+              )}
+
+              <Separator />
+
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedTransaction(null)}
+                  data-testid="button-close-transaction"
+                >
+                  Close
+                </Button>
+                {MODULE_ROUTES[selectedTransaction.module] && (
+                  <Button
+                    onClick={() => {
+                      navigate(MODULE_ROUTES[selectedTransaction.module]);
+                      setSelectedTransaction(null);
+                    }}
+                    data-testid="button-go-to-module"
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Go to {MODULE_LABELS[selectedTransaction.module]}
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
