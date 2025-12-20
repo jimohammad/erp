@@ -1980,6 +1980,17 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/dashboard/top-selling-items", isAuthenticated, async (req, res) => {
+    try {
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const items = await storage.getTopSellingItems(limit);
+      res.json(items);
+    } catch (error) {
+      console.error("Error fetching top selling items:", error);
+      res.status(500).json({ error: "Failed to fetch top selling items" });
+    }
+  });
+
   app.get("/api/search", isAuthenticated, async (req, res) => {
     try {
       const query = req.query.q as string;

@@ -4,8 +4,9 @@ import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Package, DollarSign, TrendingUp, TrendingDown, ShoppingCart, Search, Loader2, ArrowRight, Wallet, Building2, Receipt, AlertTriangle, Users, ClipboardCheck } from "lucide-react";
+import { Package, DollarSign, TrendingUp, TrendingDown, ShoppingCart, Search, Loader2, ArrowRight, Wallet, Building2, Receipt, AlertTriangle, Users, ClipboardCheck, PieChart as PieChartIcon } from "lucide-react";
 import Sparkline from "@/components/Sparkline";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
 
 const LazySalesChart = lazy(() => import("@/components/SalesChart"));
 
@@ -44,6 +45,12 @@ interface CustomerDueForStockCheck {
   lastStockCheckDate: string | null;
 }
 
+interface TopSellingItem {
+  name: string;
+  totalSales: number;
+  quantity: number;
+}
+
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,6 +66,10 @@ export default function DashboardPage() {
 
   const { data: customersDueForStockCheck } = useQuery<CustomerDueForStockCheck[]>({
     queryKey: ["/api/customers/due-for-stock-check"],
+  });
+
+  const { data: topSellingItems } = useQuery<TopSellingItem[]>({
+    queryKey: ["/api/dashboard/top-selling-items"],
   });
 
   const { data: searchResults, isLoading: searchLoading } = useQuery<SearchResult[]>({
@@ -355,6 +366,68 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+
+          {topSellingItems && topSellingItems.length > 0 && (
+            <Card data-testid="card-top-selling-items">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/40">
+                    <PieChartIcon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-sm font-semibold">Top Selling Items</CardTitle>
+                    <p className="text-xs text-muted-foreground">By sales amount (KWD)</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={topSellingItems.slice(0, 8).map(item => ({
+                          name: item.name.length > 20 ? item.name.substring(0, 18) + '...' : item.name,
+                          value: item.totalSales,
+                          fullName: item.name,
+                          quantity: item.quantity
+                        }))}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="value"
+                        label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
+                        labelLine={false}
+                      >
+                        {topSellingItems.slice(0, 8).map((_, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={[
+                              'hsl(262, 83%, 58%)',  // violet
+                              'hsl(199, 89%, 48%)',  // sky
+                              'hsl(142, 76%, 36%)',  // green
+                              'hsl(24, 95%, 53%)',   // orange
+                              'hsl(350, 89%, 60%)',  // rose
+                              'hsl(47, 96%, 53%)',   // yellow
+                              'hsl(201, 96%, 32%)',  // blue
+                              'hsl(322, 81%, 43%)',  // pink
+                            ][index % 8]}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip 
+                        formatter={(value: number, name: string, props: any) => [
+                          `${formatCurrency(value)} KWD (${props.payload.quantity} units)`,
+                          props.payload.fullName
+                        ]}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {lowStockItems && lowStockItems.length > 0 && (
             <Card data-testid="card-low-stock-alerts" className="border-amber-200 dark:border-amber-800">

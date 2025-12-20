@@ -2489,6 +2489,21 @@ export class DatabaseStorage implements IStorage {
     return { stockAmount, totalCredit, totalDebit, cashBalance, bankAccountsBalance, monthlySales, lastMonthSales, monthlyPurchases, salesTrend, purchasesTrend, totalExpenses };
   }
 
+  async getTopSellingItems(limit: number = 10): Promise<{ name: string; totalSales: number; quantity: number }[]> {
+    const result = await db.execute(sql`
+      SELECT 
+        sli.item_name as name,
+        COALESCE(SUM(CAST(sli.total_kwd AS DECIMAL)), 0)::float as "totalSales",
+        COALESCE(SUM(sli.quantity), 0)::int as quantity
+      FROM sales_line_items sli
+      JOIN sales_orders so ON sli.sales_order_id = so.id
+      GROUP BY sli.item_name
+      ORDER BY "totalSales" DESC
+      LIMIT ${limit}
+    `);
+    return result.rows as { name: string; totalSales: number; quantity: number }[];
+  }
+
   async globalSearch(query: string): Promise<{ type: string; id: number; title: string; subtitle: string; url: string }[]> {
     if (!query || query.trim().length < 2) return [];
     
