@@ -319,81 +319,81 @@ export default function DashboardPage() {
             </Card>
           </div>
 
-          <Card data-testid="card-sales-comparison">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
-              <div>
-                <CardTitle className="text-sm font-semibold">Sales Comparison</CardTitle>
-                <p className="text-xs text-muted-foreground">
-                  {lastMonthName} vs {currentMonthName}
-                </p>
-              </div>
-              {salesChange !== null && (
-                <Badge 
-                  variant="secondary" 
-                  className={Number(salesChange) >= 0 ? "text-green-600" : "text-red-600"}
-                >
-                  {Number(salesChange) >= 0 ? "+" : ""}{salesChange}%
-                </Badge>
-              )}
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <div className="h-48">
-                <Suspense fallback={
-                  <div className="h-full flex items-center justify-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                }>
-                  <LazySalesChart data={salesComparisonData} formatCurrency={formatCurrency} />
-                </Suspense>
-              </div>
-              <div className="grid grid-cols-2 gap-3 mt-3 pt-3 border-t">
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground">{lastMonthName}</p>
-                  <p className="text-base font-bold">{formatCurrency(stats?.lastMonthSales || 0)} KWD</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-xs text-muted-foreground">{currentMonthName}</p>
-                  <p className="text-base font-bold text-primary">{formatCurrency(stats?.monthlySales || 0)} KWD</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
+            <Card data-testid="card-sales-comparison">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 p-3 pb-1">
+                <div>
+                  <CardTitle className="text-sm font-semibold">Sales Comparison</CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    {lastMonthName} vs {currentMonthName}
+                  </p>
+                </div>
+                {salesChange !== null && (
+                  <Badge 
+                    variant="secondary" 
+                    className={Number(salesChange) >= 0 ? "text-green-600" : "text-red-600"}
+                  >
+                    {Number(salesChange) >= 0 ? "+" : ""}{salesChange}%
+                  </Badge>
+                )}
+              </CardHeader>
+              <CardContent className="p-3 pt-0">
+                <div className="h-32">
+                  <Suspense fallback={
+                    <div className="h-full flex items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  }>
+                    <LazySalesChart data={salesComparisonData} formatCurrency={formatCurrency} />
+                  </Suspense>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t">
+                  <div className="text-center">
+                    <p className="text-[10px] text-muted-foreground">{lastMonthName}</p>
+                    <p className="text-sm font-bold">{formatCurrency(stats?.lastMonthSales || 0)} KWD</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-[10px] text-muted-foreground">{currentMonthName}</p>
+                    <p className="text-sm font-bold text-primary">{formatCurrency(stats?.monthlySales || 0)} KWD</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {topSellingItems && topSellingItems.length > 0 && (
-              <Card data-testid="card-top-selling-items" className="h-80">
-                <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
+              <Card data-testid="card-top-selling-items">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 p-3 pb-1">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 rounded-lg bg-violet-100 dark:bg-violet-900/40">
                       <PieChartIcon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
                     </div>
                     <div>
                       <CardTitle className="text-sm font-semibold">Top Selling Items</CardTitle>
-                      <p className="text-xs text-muted-foreground">By sales amount (KWD)</p>
+                      <p className="text-xs text-muted-foreground">By sales amount</p>
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-4 pt-0">
-                  <div className="h-56">
+                <CardContent className="p-3 pt-0">
+                  <div className="h-44">
                     <ResponsiveContainer width="100%" height="100%">
                       <PieChart>
                         <Pie
-                          data={topSellingItems.slice(0, 8).map(item => ({
-                            name: item.name.length > 15 ? item.name.substring(0, 13) + '...' : item.name,
+                          data={topSellingItems.slice(0, 6).map(item => ({
+                            name: item.name.length > 12 ? item.name.substring(0, 10) + '..' : item.name,
                             value: item.totalSales,
                             fullName: item.name,
                             quantity: item.quantity
                           }))}
-                          cx="50%"
+                          cx="35%"
                           cy="50%"
-                          innerRadius={40}
-                          outerRadius={70}
+                          innerRadius={30}
+                          outerRadius={55}
                           paddingAngle={2}
                           dataKey="value"
                           label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                           labelLine={false}
                         >
-                          {topSellingItems.slice(0, 8).map((_, index) => (
+                          {topSellingItems.slice(0, 6).map((_, index) => (
                             <Cell 
                               key={`cell-${index}`} 
                               fill={[
@@ -403,9 +403,7 @@ export default function DashboardPage() {
                                 'hsl(24, 95%, 53%)',
                                 'hsl(350, 89%, 60%)',
                                 'hsl(47, 96%, 53%)',
-                                'hsl(201, 96%, 32%)',
-                                'hsl(322, 81%, 43%)',
-                              ][index % 8]}
+                              ][index % 6]}
                             />
                           ))}
                         </Pie>
@@ -419,7 +417,7 @@ export default function DashboardPage() {
                           layout="vertical" 
                           align="right" 
                           verticalAlign="middle"
-                          formatter={(value: string) => <span className="text-xs">{value}</span>}
+                          formatter={(value: string) => <span className="text-[10px]">{value}</span>}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -427,8 +425,9 @@ export default function DashboardPage() {
                 </CardContent>
               </Card>
             )}
+          </div>
 
-            <Card data-testid="card-settlement-reminders" className="border-blue-200 dark:border-blue-800">
+          <Card data-testid="card-settlement-reminders" className="border-blue-200 dark:border-blue-800">
               <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
@@ -521,22 +520,26 @@ export default function DashboardPage() {
                       </div>
                       
                       {salesmenSettlements && salesmenSettlements.length > 0 && (
-                        <div className="border-t pt-2 mt-2">
-                          <div className="grid grid-cols-2 gap-2">
-                            {salesmenSettlements.slice(0, 4).map((salesman) => (
+                        <div className="border-t pt-3 mt-3">
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                            {salesmenSettlements.map((salesman) => (
                               <div 
                                 key={salesman.id}
-                                className="flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer hover-elevate"
+                                className="flex items-center gap-2 p-2 rounded-md text-xs cursor-pointer hover-elevate border"
                                 onClick={() => setLocation("/parties")}
                                 data-testid={`settlement-salesman-${salesman.id}`}
                               >
-                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
                                   salesman.status === 'overdue' ? 'bg-red-500' :
                                   salesman.status === 'due_soon' ? 'bg-amber-500' :
                                   'bg-green-500'
                                 }`} />
-                                <span className="font-medium truncate">{salesman.name}</span>
-                                <span className="text-muted-foreground ml-auto whitespace-nowrap">
+                                <span className="font-medium truncate flex-1">{salesman.name}</span>
+                                <span className={`whitespace-nowrap ${
+                                  salesman.status === 'overdue' ? 'text-red-600 dark:text-red-400 font-medium' :
+                                  salesman.status === 'due_soon' ? 'text-amber-600 dark:text-amber-400' :
+                                  'text-muted-foreground'
+                                }`}>
                                   {salesman.status === 'overdue' 
                                     ? salesman.daysRemaining === -999 ? 'Never' : `${Math.abs(salesman.daysRemaining)}d late`
                                     : `${salesman.daysRemaining}d`
@@ -545,14 +548,6 @@ export default function DashboardPage() {
                               </div>
                             ))}
                           </div>
-                          {salesmenSettlements.length > 4 && (
-                            <div 
-                              className="text-xs text-center text-muted-foreground mt-2 cursor-pointer hover:underline"
-                              onClick={() => setLocation("/parties")}
-                            >
-                              +{salesmenSettlements.length - 4} more salesmen
-                            </div>
-                          )}
                         </div>
                       )}
                       
@@ -563,8 +558,7 @@ export default function DashboardPage() {
                   );
                 })()}
               </CardContent>
-            </Card>
-          </div>
+          </Card>
         </div>
       )}
     </div>
