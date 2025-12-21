@@ -1675,6 +1675,7 @@ export class DatabaseStorage implements IStorage {
     
     const partyData = party[0];
     const isSupplier = partyData.partyType === "supplier";
+    const isSalesman = partyData.partyType === "salesman";
 
     let dateFilter = sql``;
     if (startDate && endDate) {
@@ -1687,7 +1688,71 @@ export class DatabaseStorage implements IStorage {
 
     let result;
     
-    if (isSupplier) {
+    if (isSalesman) {
+      // For salesmen: track sales they made and payments received from them
+      result = await db.execute(sql`
+        WITH all_transactions AS (
+          -- Sales made by this salesman (they owe us - debit)
+          SELECT 
+            so.id,
+            so.invoice_date as date,
+            'sale' as type,
+            so.invoice_number as reference,
+            'Sales Invoice - ' || COALESCE(c.name, 'Cash') as description,
+            COALESCE(CAST(so.total_kwd AS DECIMAL), 0)::float as debit,
+            0::float as credit,
+            so.created_at
+          FROM sales_orders so
+          LEFT JOIN customers c ON so.customer_id = c.id
+          WHERE so.salesman_id = ${partyId}
+          ${dateFilter}
+          
+          UNION ALL
+          
+          -- Payments from this salesman (they paid us - credit)
+          SELECT 
+            p.id,
+            p.payment_date as date,
+            'payment_in' as type,
+            p.receipt_number as reference,
+            'Payment Received' as description,
+            0::float as debit,
+            COALESCE(CAST(p.amount AS DECIMAL), 0)::float as credit,
+            p.created_at
+          FROM payments p
+          WHERE p.salesman_id = ${partyId} AND p.direction = 'IN'
+          ${dateFilter}
+          
+          UNION ALL
+          
+          -- Sale Returns for sales made by this salesman (reduces what they owe - credit)
+          SELECT 
+            r.id,
+            r.return_date as date,
+            'return' as type,
+            r.return_number as reference,
+            'Sale Return' as description,
+            0::float as debit,
+            COALESCE(CAST(r.total_amount AS DECIMAL), 0)::float as credit,
+            r.created_at
+          FROM returns r
+          JOIN sales_orders so ON r.sale_order_id = so.id
+          WHERE so.salesman_id = ${partyId} AND r.return_type = 'sale'
+          ${dateFilter}
+        )
+        SELECT 
+          id,
+          TO_CHAR(date, 'YYYY-MM-DD') as date,
+          type,
+          reference,
+          description,
+          debit::float,
+          credit::float,
+          SUM(debit - credit) OVER (ORDER BY date, created_at)::float as balance
+        FROM all_transactions
+        ORDER BY date, created_at
+      `);
+    } else if (isSupplier) {
       result = await db.execute(sql`
         WITH all_transactions AS (
           -- Purchases from this supplier (we owe them - credit)
