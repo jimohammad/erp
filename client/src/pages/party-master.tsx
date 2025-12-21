@@ -682,31 +682,65 @@ export default function PartyMaster() {
                       {isAdmin && (
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            {party.partyType === "salesman" && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => settlementMutation.mutate(party.id)}
-                                    disabled={settlementMutation.isPending}
-                                    data-testid={`button-settle-${party.id}`}
-                                  >
-                                    <ClipboardCheck className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Mark account settled</p>
-                                  {party.lastStockCheckDate ? (
-                                    <p className="text-xs text-muted-foreground">
-                                      Last settlement: {new Date(party.lastStockCheckDate).toLocaleDateString()}
+                            {party.partyType === "salesman" && (() => {
+                              const SETTLEMENT_CYCLE_DAYS = 90;
+                              const WARNING_THRESHOLD_DAYS = 14;
+                              const lastDate = party.lastStockCheckDate ? new Date(party.lastStockCheckDate) : null;
+                              const today = new Date();
+                              
+                              let status: 'overdue' | 'due-soon' | 'ok' = 'overdue';
+                              let daysRemaining = 0;
+                              let statusText = 'Never settled - Overdue';
+                              
+                              if (lastDate) {
+                                const nextDueDate = new Date(lastDate);
+                                nextDueDate.setDate(nextDueDate.getDate() + SETTLEMENT_CYCLE_DAYS);
+                                const diffTime = nextDueDate.getTime() - today.getTime();
+                                daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                                
+                                if (daysRemaining < 0) {
+                                  status = 'overdue';
+                                  statusText = `${Math.abs(daysRemaining)} days overdue`;
+                                } else if (daysRemaining <= WARNING_THRESHOLD_DAYS) {
+                                  status = 'due-soon';
+                                  statusText = `Due in ${daysRemaining} days`;
+                                } else {
+                                  status = 'ok';
+                                  statusText = `${daysRemaining} days remaining`;
+                                }
+                              }
+                              
+                              const iconColor = status === 'overdue' ? 'text-red-500' : 
+                                               status === 'due-soon' ? 'text-amber-500' : 
+                                               'text-green-500';
+                              
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => settlementMutation.mutate(party.id)}
+                                      disabled={settlementMutation.isPending}
+                                      data-testid={`button-settle-${party.id}`}
+                                    >
+                                      <ClipboardCheck className={`h-4 w-4 ${iconColor}`} />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p className="font-medium">Click to mark settled</p>
+                                    <p className={`text-xs ${status === 'overdue' ? 'text-red-400' : status === 'due-soon' ? 'text-amber-400' : 'text-green-400'}`}>
+                                      {statusText}
                                     </p>
-                                  ) : (
-                                    <p className="text-xs text-muted-foreground">Never settled</p>
-                                  )}
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
+                                    {lastDate && (
+                                      <p className="text-xs text-muted-foreground">
+                                        Last: {lastDate.toLocaleDateString()}
+                                      </p>
+                                    )}
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })()}
                             <Button
                               variant="ghost"
                               size="icon"
