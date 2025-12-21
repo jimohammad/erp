@@ -428,81 +428,140 @@ export default function DashboardPage() {
               </Card>
             )}
 
-            <Card data-testid="card-settlement-reminders" className="border-blue-200 dark:border-blue-800 h-80">
+            <Card data-testid="card-settlement-reminders" className="border-blue-200 dark:border-blue-800">
               <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
                     <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <CardTitle className="text-sm font-semibold">Salesman Account Settlement</CardTitle>
-                    <p className="text-xs text-muted-foreground">Settlement due every 90 days</p>
+                    <CardTitle className="text-sm font-semibold">Settlement Calendar</CardTitle>
+                    <p className="text-xs text-muted-foreground">90-day settlement cycle overview</p>
                   </div>
                 </div>
-                <Badge 
-                  variant="secondary" 
-                  className={
-                    salesmenSettlements?.some(s => s.status === 'overdue') 
-                      ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
-                      : salesmenSettlements?.some(s => s.status === 'due_soon')
-                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100"
-                        : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
-                  }
-                >
-                  {salesmenSettlements?.length || 0} salesman{(salesmenSettlements?.length || 0) !== 1 ? 'men' : ''}
-                </Badge>
-              </CardHeader>
-              <CardContent className="p-4 pt-0">
-                <div className="space-y-2 h-56 overflow-y-auto">
-                  {salesmenSettlements && salesmenSettlements.length > 0 ? (
-                    salesmenSettlements.map((salesman) => (
-                      <div 
-                        key={salesman.id}
-                        className={`flex items-center justify-between p-2 rounded-md cursor-pointer hover-elevate ${
-                          salesman.status === 'overdue' 
-                            ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
-                            : salesman.status === 'due_soon'
-                              ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'
-                              : 'bg-green-50 dark:bg-green-900/20'
-                        }`}
-                        data-testid={`settlement-salesman-${salesman.id}`}
-                        onClick={() => setLocation("/parties")}
-                      >
-                        <div className="flex flex-col">
-                          <span className="font-medium text-sm">{salesman.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {salesman.lastSettlementDate 
-                              ? `Last: ${new Date(salesman.lastSettlementDate).toLocaleDateString()}`
-                              : 'Never settled'}
-                          </span>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <Badge 
-                            variant="secondary" 
-                            className={`text-xs ${
-                              salesman.status === 'overdue'
-                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
-                                : salesman.status === 'due_soon'
-                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100'
-                                  : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
-                            }`}
-                          >
-                            {salesman.status === 'overdue' 
-                              ? salesman.daysRemaining === -999 
-                                ? 'Never settled'
-                                : `${Math.abs(salesman.daysRemaining)} days overdue`
-                              : salesman.status === 'due_soon'
-                                ? `${salesman.daysRemaining} days left`
-                                : `${salesman.daysRemaining} days left`
-                            }
-                          </Badge>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">No salesmen registered</p>
-                  )}
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full bg-red-500" />
+                    <span>Overdue</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span>Soon</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full bg-green-500" />
+                    <span>OK</span>
+                  </div>
                 </div>
+              </CardHeader>
+              <CardContent className="p-4 pt-2">
+                {(() => {
+                  const months = Array.from({ length: 12 }, (_, i) => {
+                    const date = new Date();
+                    date.setMonth(date.getMonth() + i);
+                    return {
+                      key: `${date.getFullYear()}-${date.getMonth()}`,
+                      label: date.toLocaleString('default', { month: 'short' }),
+                      year: date.getFullYear(),
+                      month: date.getMonth(),
+                      isCurrent: i === 0,
+                    };
+                  });
+
+                  const getSettlementMonth = (salesman: SalesmanSettlement) => {
+                    if (salesman.status === 'overdue') return months[0];
+                    const dueDate = new Date();
+                    dueDate.setDate(dueDate.getDate() + salesman.daysRemaining);
+                    return months.find(m => m.year === dueDate.getFullYear() && m.month === dueDate.getMonth()) || months[months.length - 1];
+                  };
+
+                  const salesmenByMonth = months.map(month => ({
+                    ...month,
+                    salesmen: (salesmenSettlements || []).filter(s => {
+                      const targetMonth = getSettlementMonth(s);
+                      return targetMonth.key === month.key;
+                    }),
+                  }));
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-12 gap-1">
+                        {salesmenByMonth.map((month) => (
+                          <div 
+                            key={month.key} 
+                            className={`flex flex-col items-center p-1 rounded-md ${month.isCurrent ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}
+                          >
+                            <span className={`text-[10px] font-medium ${month.isCurrent ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}`}>
+                              {month.label}
+                            </span>
+                            <div className="flex flex-col gap-0.5 mt-1 min-h-[40px] items-center">
+                              {month.salesmen.length > 0 ? (
+                                month.salesmen.slice(0, 4).map((s) => (
+                                  <div
+                                    key={s.id}
+                                    className={`w-2.5 h-2.5 rounded-full cursor-pointer transition-opacity hover:ring-2 hover:ring-offset-1 ${
+                                      s.status === 'overdue' ? 'bg-red-500 hover:ring-red-300' :
+                                      s.status === 'due_soon' ? 'bg-amber-500 hover:ring-amber-300' :
+                                      'bg-green-500 hover:ring-green-300'
+                                    }`}
+                                    title={`${s.name}: ${s.status === 'overdue' ? 'Overdue' : `${s.daysRemaining} days`}`}
+                                    onClick={() => setLocation("/parties")}
+                                    data-testid={`dot-salesman-${s.id}`}
+                                  />
+                                ))
+                              ) : (
+                                <div className="w-2 h-2 rounded-full bg-muted-foreground/20" />
+                              )}
+                              {month.salesmen.length > 4 && (
+                                <span className="text-[8px] text-muted-foreground">+{month.salesmen.length - 4}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      {salesmenSettlements && salesmenSettlements.length > 0 && (
+                        <div className="border-t pt-2 mt-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            {salesmenSettlements.slice(0, 4).map((salesman) => (
+                              <div 
+                                key={salesman.id}
+                                className="flex items-center gap-2 p-1.5 rounded text-xs cursor-pointer hover-elevate"
+                                onClick={() => setLocation("/parties")}
+                                data-testid={`settlement-salesman-${salesman.id}`}
+                              >
+                                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                  salesman.status === 'overdue' ? 'bg-red-500' :
+                                  salesman.status === 'due_soon' ? 'bg-amber-500' :
+                                  'bg-green-500'
+                                }`} />
+                                <span className="font-medium truncate">{salesman.name}</span>
+                                <span className="text-muted-foreground ml-auto whitespace-nowrap">
+                                  {salesman.status === 'overdue' 
+                                    ? salesman.daysRemaining === -999 ? 'Never' : `${Math.abs(salesman.daysRemaining)}d late`
+                                    : `${salesman.daysRemaining}d`
+                                  }
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          {salesmenSettlements.length > 4 && (
+                            <div 
+                              className="text-xs text-center text-muted-foreground mt-2 cursor-pointer hover:underline"
+                              onClick={() => setLocation("/parties")}
+                            >
+                              +{salesmenSettlements.length - 4} more salesmen
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {(!salesmenSettlements || salesmenSettlements.length === 0) && (
+                        <p className="text-sm text-muted-foreground text-center py-2">No salesmen registered</p>
+                      )}
+                    </div>
+                  );
+                })()}
               </CardContent>
             </Card>
           </div>
