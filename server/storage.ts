@@ -824,14 +824,12 @@ export class DatabaseStorage implements IStorage {
   async getSalesmanAnalytics(startDate?: string, endDate?: string): Promise<{
     id: number;
     name: string;
-    commissionRate: string | null;
     totalSales: number;
     invoiceCount: number;
     avgInvoiceValue: number;
     outstandingCredit: number;
     paymentsCollected: number;
     collectionEfficiency: number;
-    commissionEarned: number;
     lastSettlementDate: string | null;
     settlementStatus: 'overdue' | 'due_soon' | 'ok';
   }[]> {
@@ -887,10 +885,6 @@ export class DatabaseStorage implements IStorage {
       // Calculate collection efficiency
       const collectionEfficiency = totalSales > 0 ? (paymentsCollected / totalSales) * 100 : 0;
       
-      // Calculate commission earned
-      const commissionRate = parseFloat(salesman.commissionRate || '0');
-      const commissionEarned = (totalSales * commissionRate) / 100;
-      
       // Calculate settlement status
       let settlementStatus: 'overdue' | 'due_soon' | 'ok' = 'overdue';
       if (salesman.lastStockCheckDate) {
@@ -907,14 +901,12 @@ export class DatabaseStorage implements IStorage {
       return {
         id: salesman.id,
         name: salesman.name,
-        commissionRate: salesman.commissionRate,
         totalSales,
         invoiceCount: salesData?.invoiceCount || 0,
         avgInvoiceValue: salesData?.invoiceCount > 0 ? totalSales / salesData.invoiceCount : 0,
         outstandingCredit,
         paymentsCollected,
         collectionEfficiency,
-        commissionEarned,
         lastSettlementDate: salesman.lastStockCheckDate,
         settlementStatus,
       };

@@ -2,19 +2,17 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, TrendingUp, CreditCard, Banknote, BarChart3, Users } from "lucide-react";
+import { Loader2, TrendingUp, CreditCard, Banknote, BarChart3 } from "lucide-react";
 
 interface SalesmanAnalytics {
   id: number;
   name: string;
-  commissionRate: string | null;
   totalSales: number;
   invoiceCount: number;
   avgInvoiceValue: number;
   outstandingCredit: number;
   paymentsCollected: number;
   collectionEfficiency: number;
-  commissionEarned: number;
   lastSettlementDate: string | null;
   settlementStatus: 'overdue' | 'due_soon' | 'ok';
 }
@@ -33,8 +31,7 @@ export default function SalesmanAnalysisPage() {
     totalInvoices: acc.totalInvoices + s.invoiceCount,
     totalOutstanding: acc.totalOutstanding + s.outstandingCredit,
     totalCollected: acc.totalCollected + s.paymentsCollected,
-    totalCommission: acc.totalCommission + s.commissionEarned,
-  }), { totalSales: 0, totalInvoices: 0, totalOutstanding: 0, totalCollected: 0, totalCommission: 0 });
+  }), { totalSales: 0, totalInvoices: 0, totalOutstanding: 0, totalCollected: 0 });
 
   const overallEfficiency = totals && totals.totalSales > 0 
     ? (totals.totalCollected / totals.totalSales) * 100 
@@ -57,7 +54,7 @@ export default function SalesmanAnalysisPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Sales</CardTitle>
@@ -118,20 +115,6 @@ export default function SalesmanAnalysisPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Commission Due</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" data-testid="text-total-commission">
-              {formatCurrency(totals?.totalCommission || 0)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Based on sales
-            </p>
-          </CardContent>
-        </Card>
       </div>
 
       <Card>
@@ -149,14 +132,12 @@ export default function SalesmanAnalysisPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead className="text-right">Commission %</TableHead>
                     <TableHead className="text-right">Total Sales</TableHead>
                     <TableHead className="text-right">Invoices</TableHead>
                     <TableHead className="text-right">Avg Invoice</TableHead>
                     <TableHead className="text-right">Outstanding</TableHead>
                     <TableHead className="text-right">Collected</TableHead>
                     <TableHead className="text-right">Efficiency</TableHead>
-                    <TableHead className="text-right">Commission Earned</TableHead>
                     <TableHead className="text-center">Settlement</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -164,9 +145,6 @@ export default function SalesmanAnalysisPage() {
                   {analytics.map((salesman) => (
                     <TableRow key={salesman.id} data-testid={`row-salesman-${salesman.id}`}>
                       <TableCell className="font-medium">{salesman.name}</TableCell>
-                      <TableCell className="text-right">
-                        {salesman.commissionRate ? `${salesman.commissionRate}%` : '-'}
-                      </TableCell>
                       <TableCell className="text-right">{formatCurrency(salesman.totalSales)}</TableCell>
                       <TableCell className="text-right">{salesman.invoiceCount}</TableCell>
                       <TableCell className="text-right">{formatCurrency(salesman.avgInvoiceValue)}</TableCell>
@@ -185,7 +163,6 @@ export default function SalesmanAnalysisPage() {
                           {salesman.collectionEfficiency.toFixed(1)}%
                         </span>
                       </TableCell>
-                      <TableCell className="text-right">{formatCurrency(salesman.commissionEarned)}</TableCell>
                       <TableCell className="text-center">
                         <Badge
                           variant={

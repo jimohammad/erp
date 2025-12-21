@@ -47,7 +47,6 @@ export default function PartyMaster() {
   const [partyType, setPartyType] = useState<PartyType>("salesman");
   const [partyArea, setPartyArea] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
-  const [commissionRate, setCommissionRate] = useState("");
   const [partyCountry, setPartyCountry] = useState("");
   const [partyEmail, setPartyEmail] = useState("");
   const [beneficiaryName, setBeneficiaryName] = useState("");
@@ -102,7 +101,6 @@ export default function PartyMaster() {
     setPartyType("salesman");
     setCreditLimit("");
     setPartyArea("");
-    setCommissionRate("");
     setPartyCountry("");
     setPartyEmail("");
     setBeneficiaryName("");
@@ -120,7 +118,6 @@ export default function PartyMaster() {
       setPartyType((editingParty.partyType as PartyType) || "supplier");
       setCreditLimit(editingParty.creditLimit || "");
       setPartyArea(editingParty.area || "");
-      setCommissionRate(editingParty.commissionRate || "");
       setPartyCountry(editingParty.country || "");
       setPartyEmail(editingParty.email || "");
       setBeneficiaryName(editingParty.beneficiaryName || "");
@@ -138,7 +135,6 @@ export default function PartyMaster() {
     partyType: PartyType;
     creditLimit: string | null;
     area: string | null;
-    commissionRate: string | null;
     country: string | null;
     email: string | null;
     beneficiaryName: string | null;
@@ -229,7 +225,6 @@ export default function PartyMaster() {
       partyType,
       creditLimit: (partyType === "customer" || partyType === "salesman") && creditLimit.trim() ? creditLimit.trim() : null,
       area: (partyType === "customer" || partyType === "salesman") && partyArea.trim() ? partyArea.trim() : null,
-      commissionRate: partyType === "salesman" && commissionRate.trim() ? commissionRate.trim() : null,
       country: partyType === "supplier" && partyCountry.trim() ? partyCountry.trim() : null,
       email: partyType === "supplier" && partyEmail.trim() ? partyEmail.trim() : null,
       beneficiaryName: partyType === "supplier" && beneficiaryName.trim() ? beneficiaryName.trim() : null,
@@ -417,20 +412,6 @@ export default function PartyMaster() {
                       onChange={(e) => setCreditLimit(e.target.value)}
                       placeholder="Enter credit limit (optional)"
                       data-testid="input-salesman-credit-limit"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="commissionRate">Commission Rate (%)</Label>
-                    <Input
-                      id="commissionRate"
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={commissionRate}
-                      onChange={(e) => setCommissionRate(e.target.value)}
-                      placeholder="Enter commission percentage (optional)"
-                      data-testid="input-commission-rate"
                     />
                   </div>
                 </div>
@@ -677,7 +658,7 @@ export default function PartyMaster() {
                             })()}
                             <span>{formatCurrency(party.creditLimit)}</span>
                           </div>
-                        ) : party.partyType === "salesman" && party.commissionRate ? `${party.commissionRate}%` : "-"}
+                        ) : party.partyType === "salesman" ? formatCurrency(party.creditLimit) : "-"}
                       </TableCell>
                       {isAdmin && (
                         <TableCell className="text-right">

@@ -56,7 +56,6 @@ export const suppliers = pgTable("suppliers", {
   creditLimit: numeric("credit_limit", { precision: 12, scale: 3 }),
   area: text("area"),
   lastStockCheckDate: text("last_stock_check_date"),
-  commissionRate: numeric("commission_rate", { precision: 5, scale: 2 }),
   country: text("country"),
   email: text("email"),
   beneficiaryName: text("beneficiary_name"),
