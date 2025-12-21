@@ -535,6 +535,19 @@ export async function registerRoutes(
     }
   });
 
+  // Salesman analytics/performance data
+  app.get("/api/salesmen/analytics", isAuthenticated, async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const analytics = await storage.getSalesmanAnalytics(startDate, endDate);
+      res.json(analytics);
+    } catch (error) {
+      console.error("Error fetching salesman analytics:", error);
+      res.status(500).json({ error: "Failed to fetch analytics" });
+    }
+  });
+
   app.get("/api/sales-orders/next-invoice-number", isAuthenticated, async (req, res) => {
     try {
       const result = await storage.getSalesOrders();

@@ -31,8 +31,15 @@ export interface SalesFormData {
   saleDate: string;
   invoiceNumber: string;
   customerId: number | null;
+  salesmanId: number | null;
   totalKwd: string;
   lineItems: SalesLineItemData[];
+}
+
+interface Salesman {
+  id: number;
+  name: string;
+  partyType: string;
 }
 
 function generateItemId() {
@@ -49,7 +56,14 @@ export function SalesOrderForm({
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split("T")[0]);
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [customerId, setCustomerId] = useState<string>("");
+  const [salesmanId, setSalesmanId] = useState<string>("");
   const [logoBase64, setLogoBase64] = useState<string>("");
+
+  // Fetch salesmen for the dropdown
+  const { data: salesmen = [] } = useQuery<Salesman[]>({
+    queryKey: ["/api/suppliers"],
+    select: (data) => data.filter((s: Salesman) => s.partyType === 'salesman'),
+  });
 
   useEffect(() => {
     fetch(companyLogoUrl)
@@ -496,6 +510,7 @@ export function SalesOrderForm({
       saleDate,
       invoiceNumber,
       customerId: customerId ? parseInt(customerId) : null,
+      salesmanId: salesmanId ? parseInt(salesmanId) : null,
       totalKwd,
       lineItems,
     });
@@ -513,6 +528,7 @@ export function SalesOrderForm({
       saleDate,
       invoiceNumber,
       customerId: customerId ? parseInt(customerId) : null,
+      salesmanId: salesmanId ? parseInt(salesmanId) : null,
       totalKwd,
       lineItems,
     });
@@ -531,6 +547,7 @@ export function SalesOrderForm({
       saleDate,
       invoiceNumber,
       customerId: customerId ? parseInt(customerId) : null,
+      salesmanId: salesmanId ? parseInt(salesmanId) : null,
       totalKwd,
       lineItems,
     });
@@ -558,7 +575,7 @@ export function SalesOrderForm({
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div className="space-y-2 md:col-span-2">
               <Label htmlFor="customer">Customer</Label>
               <Select value={customerId} onValueChange={setCustomerId}>
@@ -591,6 +608,22 @@ export function SalesOrderForm({
                   )}
                 </div>
               )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="salesman">Salesman</Label>
+              <Select value={salesmanId} onValueChange={setSalesmanId}>
+                <SelectTrigger data-testid="select-salesman">
+                  <SelectValue placeholder="Select salesman" />
+                </SelectTrigger>
+                <SelectContent>
+                  {salesmen.map((salesman) => (
+                    <SelectItem key={salesman.id} value={salesman.id.toString()}>
+                      {salesman.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

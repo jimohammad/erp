@@ -291,6 +291,7 @@ export const salesOrders = pgTable("sales_orders", {
   saleDate: date("sale_date").notNull(),
   invoiceNumber: text("invoice_number"),
   customerId: integer("customer_id").references(() => customers.id),
+  salesmanId: integer("salesman_id").references(() => suppliers.id),
   totalKwd: numeric("total_kwd", { precision: 12, scale: 3 }),
   fxCurrency: text("fx_currency").default("AED"),
   fxRate: numeric("fx_rate", { precision: 10, scale: 4 }),
@@ -307,12 +308,17 @@ export const salesOrders = pgTable("sales_orders", {
   index("idx_so_branch").on(table.branchId),
   index("idx_so_date").on(table.saleDate),
   index("idx_so_customer").on(table.customerId),
+  index("idx_so_salesman").on(table.salesmanId),
 ]);
 
 export const salesOrdersRelations = relations(salesOrders, ({ one, many }) => ({
   customer: one(customers, {
     fields: [salesOrders.customerId],
     references: [customers.id],
+  }),
+  salesman: one(suppliers, {
+    fields: [salesOrders.salesmanId],
+    references: [suppliers.id],
   }),
   lineItems: many(salesOrderLineItems),
 }));

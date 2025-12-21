@@ -821,6 +821,108 @@ export class DatabaseStorage implements IStorage {
     }).sort((a, b) => a.daysRemaining - b.daysRemaining); // Most urgent first
   }
 
+  async getSalesmanAnalytics(startDate?: string, endDate?: string): Promise<{
+    id: number;
+    name: string;
+    commissionRate: string | null;
+    totalSales: number;
+    invoiceCount: number;
+    avgInvoiceValue: number;
+    outstandingCredit: number;
+    paymentsCollected: number;
+    collectionEfficiency: number;
+    commissionEarned: number;
+    lastSettlementDate: string | null;
+    settlementStatus: 'overdue' | 'due_soon' | 'ok';
+  }[]> {
+    // Get all salesmen
+    const salesmen = await db.select().from(suppliers)
+      .where(eq(suppliers.partyType, 'salesman'));
+    
+    const today = new Date();
+    const SETTLEMENT_PERIOD_DAYS = 90;
+    
+    const results = await Promise.all(salesmen.map(async (salesman) => {
+      // Get sales data for this salesman
+      let salesConditions = [eq(salesOrders.salesmanId, salesman.id)];
+      if (startDate && endDate) {
+        salesConditions.push(gte(salesOrders.saleDate, startDate));
+        salesConditions.push(lte(salesOrders.saleDate, endDate));
+      }
+      
+      const [salesData] = await db.select({
+        totalSales: sql<number>`COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float`,
+        invoiceCount: sql<number>`COUNT(*)::int`,
+      }).from(salesOrders).where(and(...salesConditions));
+      
+      const totalSales = salesData?.totalSales || 0;
+      
+      // Get unique customer IDs from this salesman's sales orders for outstanding calculation
+      const customerOrders = await db.select({
+        customerId: salesOrders.customerId,
+      }).from(salesOrders)
+        .where(and(
+          eq(salesOrders.salesmanId, salesman.id),
+          sql`customer_id IS NOT NULL`
+        ));
+      
+      // Calculate outstanding credit by summing customer balances
+      // This gets the actual current balance of customers served by this salesman
+      let outstandingCredit = 0;
+      const uniqueCustomerIds = [...new Set(customerOrders.map(o => o.customerId).filter(Boolean))];
+      
+      if (uniqueCustomerIds.length > 0) {
+        for (const custId of uniqueCustomerIds) {
+          // Use the existing customer balance calculation  
+          const balance = await this.getCustomerBalance(custId as number);
+          if (balance && balance.balance > 0) {
+            outstandingCredit += balance.balance;
+          }
+        }
+      }
+      
+      // Payments collected is total sales minus outstanding
+      const paymentsCollected = Math.max(0, totalSales - outstandingCredit);
+      
+      // Calculate collection efficiency
+      const collectionEfficiency = totalSales > 0 ? (paymentsCollected / totalSales) * 100 : 0;
+      
+      // Calculate commission earned
+      const commissionRate = parseFloat(salesman.commissionRate || '0');
+      const commissionEarned = (totalSales * commissionRate) / 100;
+      
+      // Calculate settlement status
+      let settlementStatus: 'overdue' | 'due_soon' | 'ok' = 'overdue';
+      if (salesman.lastStockCheckDate) {
+        const lastDate = new Date(salesman.lastStockCheckDate);
+        const nextDueDate = new Date(lastDate);
+        nextDueDate.setDate(nextDueDate.getDate() + SETTLEMENT_PERIOD_DAYS);
+        const daysRemaining = Math.ceil((nextDueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysRemaining < 0) settlementStatus = 'overdue';
+        else if (daysRemaining <= 14) settlementStatus = 'due_soon';
+        else settlementStatus = 'ok';
+      }
+      
+      return {
+        id: salesman.id,
+        name: salesman.name,
+        commissionRate: salesman.commissionRate,
+        totalSales,
+        invoiceCount: salesData?.invoiceCount || 0,
+        avgInvoiceValue: salesData?.invoiceCount > 0 ? totalSales / salesData.invoiceCount : 0,
+        outstandingCredit,
+        paymentsCollected,
+        collectionEfficiency,
+        commissionEarned,
+        lastSettlementDate: salesman.lastStockCheckDate,
+        settlementStatus,
+      };
+    }));
+    
+    return results.sort((a, b) => b.totalSales - a.totalSales); // Sort by total sales descending
+  }
+
   async deleteCustomer(id: number): Promise<{ deleted: boolean; error?: string }> {
     const linkedOrders = await db
       .select({ count: sql<number>`count(*)::int` })

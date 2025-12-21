@@ -75,6 +75,7 @@ export default function SalesPage() {
         saleDate: formData.saleDate,
         invoiceNumber: formData.invoiceNumber || null,
         customerId: formData.customerId && formData.customerId > 0 ? formData.customerId : null,
+        salesmanId: formData.salesmanId && formData.salesmanId > 0 ? formData.salesmanId : null,
         totalKwd: formData.totalKwd,
         lineItems: formData.lineItems
           .filter(item => item.itemName)
