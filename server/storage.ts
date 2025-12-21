@@ -1691,19 +1691,19 @@ export class DatabaseStorage implements IStorage {
     if (isSalesman) {
       // For salesmen: track sales they made and payments received from them
       // Build date filters for each table's date column
-      let invoiceDateFilter = sql``;
+      let saleDateFilter = sql``;
       let paymentDateFilter = sql``;
       let returnDateFilter = sql``;
       if (startDate && endDate) {
-        invoiceDateFilter = sql`AND so.invoice_date >= ${startDate} AND so.invoice_date <= ${endDate}`;
+        saleDateFilter = sql`AND so.sale_date >= ${startDate} AND so.sale_date <= ${endDate}`;
         paymentDateFilter = sql`AND p.payment_date >= ${startDate} AND p.payment_date <= ${endDate}`;
         returnDateFilter = sql`AND r.return_date >= ${startDate} AND r.return_date <= ${endDate}`;
       } else if (startDate) {
-        invoiceDateFilter = sql`AND so.invoice_date >= ${startDate}`;
+        saleDateFilter = sql`AND so.sale_date >= ${startDate}`;
         paymentDateFilter = sql`AND p.payment_date >= ${startDate}`;
         returnDateFilter = sql`AND r.return_date >= ${startDate}`;
       } else if (endDate) {
-        invoiceDateFilter = sql`AND so.invoice_date <= ${endDate}`;
+        saleDateFilter = sql`AND so.sale_date <= ${endDate}`;
         paymentDateFilter = sql`AND p.payment_date <= ${endDate}`;
         returnDateFilter = sql`AND r.return_date <= ${endDate}`;
       }
@@ -1713,7 +1713,7 @@ export class DatabaseStorage implements IStorage {
           -- Sales made by this salesman (they owe us - debit)
           SELECT 
             so.id,
-            so.invoice_date as date,
+            so.sale_date as date,
             'sale' as type,
             so.invoice_number as reference,
             'Sales Invoice - ' || COALESCE(c.name, 'Cash') as description,
@@ -1723,40 +1723,24 @@ export class DatabaseStorage implements IStorage {
           FROM sales_orders so
           LEFT JOIN customers c ON so.customer_id = c.id
           WHERE so.salesman_id = ${partyId}
-          ${invoiceDateFilter}
+          ${saleDateFilter}
           
           UNION ALL
           
           -- Payments from this salesman (they paid us - credit)
+          -- Salesmen are stored in suppliers table, so use supplier_id
           SELECT 
             p.id,
             p.payment_date as date,
             'payment_in' as type,
-            p.receipt_number as reference,
+            COALESCE(p.reference, 'Payment') as reference,
             'Payment Received' as description,
             0::float as debit,
             COALESCE(CAST(p.amount AS DECIMAL), 0)::float as credit,
             p.created_at
           FROM payments p
-          WHERE p.salesman_id = ${partyId} AND p.direction = 'IN'
+          WHERE p.supplier_id = ${partyId} AND p.direction = 'IN'
           ${paymentDateFilter}
-          
-          UNION ALL
-          
-          -- Sale Returns for sales made by this salesman (reduces what they owe - credit)
-          SELECT 
-            r.id,
-            r.return_date as date,
-            'return' as type,
-            r.return_number as reference,
-            'Sale Return' as description,
-            0::float as debit,
-            COALESCE(CAST(r.total_amount AS DECIMAL), 0)::float as credit,
-            r.created_at
-          FROM returns r
-          JOIN sales_orders so ON r.sale_order_id = so.id
-          WHERE so.salesman_id = ${partyId} AND r.return_type = 'sale'
-          ${returnDateFilter}
         )
         SELECT 
           id,
