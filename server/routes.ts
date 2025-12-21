@@ -1433,8 +1433,10 @@ export async function registerRoutes(
 
   app.get("/api/returns", isAuthenticated, async (req, res) => {
     try {
-      const returns = await storage.getReturns();
-      res.json(returns);
+      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
+      const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
+      const result = await storage.getReturns({ limit, offset });
+      res.json(result);
     } catch (error) {
       console.error("Error fetching returns:", error);
       res.status(500).json({ error: "Failed to fetch returns" });

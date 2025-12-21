@@ -1648,7 +1648,14 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== RETURNS MODULE ====================
 
-  async getReturns(): Promise<ReturnWithDetails[]> {
+  async getReturns(options?: { limit?: number; offset?: number }): Promise<{ data: ReturnWithDetails[]; total: number }> {
+    const { limit, offset } = options || {};
+    
+    // Get total count
+    const countResult = await db.select({ count: sql<number>`count(*)` }).from(returns);
+    const total = Number(countResult[0]?.count || 0);
+    
+    // Get paginated data
     const returnList = await db.query.returns.findMany({
       with: {
         customer: true,
@@ -1656,8 +1663,10 @@ export class DatabaseStorage implements IStorage {
         lineItems: true,
       },
       orderBy: [desc(returns.returnDate), desc(returns.id)],
+      limit: limit || 100,
+      offset: offset || 0,
     });
-    return returnList as ReturnWithDetails[];
+    return { data: returnList as ReturnWithDetails[], total };
   }
 
   async getReturn(id: number): Promise<ReturnWithDetails | undefined> {

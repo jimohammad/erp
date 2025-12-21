@@ -123,9 +123,10 @@ export default function ReturnsPage() {
   const [imeiError, setImeiError] = useState("");
   const [shouldPrintAfterSave, setShouldPrintAfterSave] = useState(false);
 
-  const { data: returns = [], isLoading } = useQuery<ReturnWithDetails[]>({
+  const { data: returnsResponse, isLoading } = useQuery<{ data: ReturnWithDetails[]; total: number }>({
     queryKey: ["/api/returns"],
   });
+  const returns = returnsResponse?.data || [];
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ["/api/customers"],
