@@ -1798,7 +1798,7 @@ export class DatabaseStorage implements IStorage {
 
   async getInvoicesForCustomer(customerId: number): Promise<{ id: number; invoiceNumber: string; totalKwd: string; outstandingBalance: string }[]> {
     // Get invoices with outstanding balance calculated
-    // Note: Payments are at customer level, not invoice level, so we calculate discounts and returns only
+    // Note: Payments and returns are at customer level, not invoice level, so we only calculate discounts per invoice
     const result = await db.execute(sql`
       WITH invoice_discounts AS (
         SELECT 
@@ -1807,27 +1807,15 @@ export class DatabaseStorage implements IStorage {
         FROM discounts d
         WHERE d.sales_order_id IN (SELECT id FROM sales_orders WHERE customer_id = ${customerId})
         GROUP BY d.sales_order_id
-      ),
-      invoice_returns AS (
-        SELECT 
-          r.sales_order_id,
-          COALESCE(SUM(CAST(r.total_kwd AS DECIMAL)), 0) as returned
-        FROM returns r
-        WHERE r.sales_order_id IN (SELECT id FROM sales_orders WHERE customer_id = ${customerId}) 
-          AND r.return_type = 'sale_return' 
-          AND r.sales_order_id IS NOT NULL
-        GROUP BY r.sales_order_id
       )
       SELECT 
         so.id,
         so.invoice_number as "invoiceNumber",
         so.total_kwd as "totalKwd",
         (COALESCE(CAST(so.total_kwd AS DECIMAL), 0) - 
-         COALESCE(id.discounted, 0) - 
-         COALESCE(ir.returned, 0))::text as "outstandingBalance"
+         COALESCE(id.discounted, 0))::text as "outstandingBalance"
       FROM sales_orders so
       LEFT JOIN invoice_discounts id ON id.sales_order_id = so.id
-      LEFT JOIN invoice_returns ir ON ir.sales_order_id = so.id
       WHERE so.customer_id = ${customerId}
       ORDER BY so.sale_date DESC
     `);
@@ -1841,8 +1829,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getInvoiceOutstandingBalance(salesOrderId: number): Promise<{ invoiceTotal: number; paidAmount: number; discountAmount: number; returnAmount: number; outstandingBalance: number }> {
-    // Note: Payments are tracked at customer level, not invoice level
-    // paidAmount will be 0 until invoice-level payment allocations are implemented
+    // Note: Payments and returns are tracked at customer level, not invoice level
+    // paidAmount and returnAmount will be 0 until invoice-level tracking is implemented
     const result = await db.execute(sql`
       WITH invoice_data AS (
         SELECT 
@@ -1854,20 +1842,14 @@ export class DatabaseStorage implements IStorage {
         SELECT COALESCE(SUM(CAST(discount_amount AS DECIMAL)), 0)::float as total
         FROM discounts
         WHERE sales_order_id = ${salesOrderId}
-      ),
-      return_amount AS (
-        SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
-        FROM returns
-        WHERE sales_order_id = ${salesOrderId} AND return_type = 'sale_return'
       )
       SELECT 
         COALESCE((SELECT invoice_total FROM invoice_data), 0)::float as "invoiceTotal",
         0::float as "paidAmount",
         COALESCE((SELECT total FROM discount_amount), 0)::float as "discountAmount",
-        COALESCE((SELECT total FROM return_amount), 0)::float as "returnAmount",
+        0::float as "returnAmount",
         (COALESCE((SELECT invoice_total FROM invoice_data), 0) - 
-         COALESCE((SELECT total FROM discount_amount), 0) - 
-         COALESCE((SELECT total FROM return_amount), 0))::float as "outstandingBalance"
+         COALESCE((SELECT total FROM discount_amount), 0))::float as "outstandingBalance"
     `);
     
     const row = result.rows[0] as any;
