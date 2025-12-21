@@ -548,6 +548,17 @@ export async function registerRoutes(
     }
   });
 
+  // Salesman efficiency analytics (advanced comparison)
+  app.get("/api/salesmen/efficiency", isAuthenticated, async (req, res) => {
+    try {
+      const efficiency = await storage.getSalesmanEfficiencyAnalytics();
+      res.json(efficiency);
+    } catch (error) {
+      console.error("Error fetching salesman efficiency:", error);
+      res.status(500).json({ error: "Failed to fetch efficiency data" });
+    }
+  });
+
   app.get("/api/sales-orders/next-invoice-number", isAuthenticated, async (req, res) => {
     try {
       const result = await storage.getSalesOrders();

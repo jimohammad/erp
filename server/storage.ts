@@ -145,7 +145,7 @@ import {
   type AuditTrailWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, lte, sql, or, isNull, asc } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, or, isNull, asc, inArray } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -913,6 +913,229 @@ export class DatabaseStorage implements IStorage {
     }));
     
     return results.sort((a, b) => b.totalSales - a.totalSales); // Sort by total sales descending
+  }
+
+  async getSalesmanEfficiencyAnalytics(): Promise<{
+    id: number;
+    name: string;
+    // Goods intake metrics
+    totalGoodsIssued: number;
+    rolling90DayGoods: number;
+    creditLimit: number;
+    creditUtilization: number;
+    avgDaysGoodsHeld: number;
+    goodsTurnoverRate: number;
+    // Payment velocity metrics
+    avgPaymentLagDays: number;
+    collection30Days: number;
+    collection60Days: number;
+    collection90Days: number;
+    cashReturnRate: number;
+    // Composite score
+    efficiencyScore: number;
+    rank: number;
+    percentile: number;
+  }[]> {
+    const salesmen = await db.select().from(suppliers)
+      .where(eq(suppliers.partyType, 'salesman'));
+    
+    const today = new Date();
+    const ninety_days_ago = new Date(today);
+    ninety_days_ago.setDate(ninety_days_ago.getDate() - 90);
+    const sixty_days_ago = new Date(today);
+    sixty_days_ago.setDate(sixty_days_ago.getDate() - 60);
+    const thirty_days_ago = new Date(today);
+    thirty_days_ago.setDate(thirty_days_ago.getDate() - 30);
+    
+    const efficiencyData = await Promise.all(salesmen.map(async (salesman) => {
+      // Get all sales orders for this salesman
+      const allSalesData = await db.select({
+        id: salesOrders.id,
+        saleDate: salesOrders.saleDate,
+        totalKwd: salesOrders.totalKwd,
+        customerId: salesOrders.customerId,
+      }).from(salesOrders)
+        .where(eq(salesOrders.salesmanId, salesman.id));
+      
+      // Total goods issued (all time)
+      const totalGoodsIssued = allSalesData.reduce((sum, s) => 
+        sum + parseFloat(s.totalKwd || '0'), 0);
+      
+      // Rolling 90-day goods
+      const rolling90DayGoods = allSalesData
+        .filter(s => new Date(s.saleDate) >= ninety_days_ago)
+        .reduce((sum, s) => sum + parseFloat(s.totalKwd || '0'), 0);
+      
+      // Credit limit and utilization
+      const creditLimit = parseFloat(salesman.creditLimit || '0');
+      
+      // Get outstanding credit (current balance of customers served by this salesman)
+      const uniqueCustomerIds = [...new Set(allSalesData.map(o => o.customerId).filter(Boolean))];
+      let outstandingCredit = 0;
+      for (const custId of uniqueCustomerIds) {
+        const balance = await this.getCustomerBalance(custId as number);
+        if (balance && balance.balance > 0) {
+          outstandingCredit += balance.balance;
+        }
+      }
+      
+      const creditUtilization = creditLimit > 0 ? (outstandingCredit / creditLimit) * 100 : 0;
+      
+      // Calculate avg days goods are held (from sale to payment)
+      // Get payments received from customers of this salesman
+      const customerPayments = await db.select({
+        paymentDate: payments.paymentDate,
+        amount: payments.amount,
+        customerId: payments.customerId,
+      }).from(payments)
+        .where(and(
+          eq(payments.direction, 'IN'),
+          inArray(payments.customerId, uniqueCustomerIds.length > 0 ? uniqueCustomerIds as number[] : [0])
+        ));
+      
+      // Calculate average payment lag (days between sale and payment)
+      let totalLagDays = 0;
+      let lagCount = 0;
+      
+      for (const sale of allSalesData) {
+        if (!sale.customerId) continue;
+        
+        // Find payments from this customer after this sale
+        const customerPaymentsAfterSale = customerPayments.filter(p => 
+          p.customerId === sale.customerId && 
+          new Date(p.paymentDate) >= new Date(sale.saleDate)
+        );
+        
+        if (customerPaymentsAfterSale.length > 0) {
+          // Use first payment as the settlement
+          const firstPayment = customerPaymentsAfterSale.sort((a, b) => 
+            new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
+          )[0];
+          
+          const lagDays = Math.ceil(
+            (new Date(firstPayment.paymentDate).getTime() - new Date(sale.saleDate).getTime()) 
+            / (1000 * 60 * 60 * 24)
+          );
+          totalLagDays += lagDays;
+          lagCount++;
+        }
+      }
+      
+      const avgPaymentLagDays = lagCount > 0 ? totalLagDays / lagCount : 999; // 999 if no payments
+      const avgDaysGoodsHeld = avgPaymentLagDays < 999 ? avgPaymentLagDays : 0;
+      
+      // Goods turnover rate (goods issued / avg days held)
+      const goodsTurnoverRate = avgDaysGoodsHeld > 0 
+        ? totalGoodsIssued / avgDaysGoodsHeld 
+        : 0;
+      
+      // Collection rates at different intervals
+      const paymentsCollected = Math.max(0, totalGoodsIssued - outstandingCredit);
+      
+      // For collection curves, calculate what % of goods issued in last N days have been paid
+      const goods30Day = allSalesData
+        .filter(s => new Date(s.saleDate) >= thirty_days_ago)
+        .reduce((sum, s) => sum + parseFloat(s.totalKwd || '0'), 0);
+      const goods60Day = allSalesData
+        .filter(s => new Date(s.saleDate) >= sixty_days_ago)
+        .reduce((sum, s) => sum + parseFloat(s.totalKwd || '0'), 0);
+      
+      // Calculate payments received within different windows
+      const payments30Day = customerPayments
+        .filter(p => new Date(p.paymentDate) >= thirty_days_ago)
+        .reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+      const payments60Day = customerPayments
+        .filter(p => new Date(p.paymentDate) >= sixty_days_ago)
+        .reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+      const payments90Day = customerPayments
+        .filter(p => new Date(p.paymentDate) >= ninety_days_ago)
+        .reduce((sum, p) => sum + parseFloat(p.amount || '0'), 0);
+      
+      const collection30Days = goods30Day > 0 ? Math.min(100, (payments30Day / goods30Day) * 100) : 0;
+      const collection60Days = goods60Day > 0 ? Math.min(100, (payments60Day / goods60Day) * 100) : 0;
+      const collection90Days = rolling90DayGoods > 0 ? Math.min(100, (payments90Day / rolling90DayGoods) * 100) : 0;
+      
+      // Cash return rate (payments collected / goods issued in last 90 days)
+      const cashReturnRate = rolling90DayGoods > 0 
+        ? Math.min(100, (payments90Day / rolling90DayGoods) * 100) 
+        : 0;
+      
+      return {
+        id: salesman.id,
+        name: salesman.name,
+        totalGoodsIssued,
+        rolling90DayGoods,
+        creditLimit,
+        creditUtilization,
+        avgDaysGoodsHeld,
+        goodsTurnoverRate,
+        avgPaymentLagDays: avgPaymentLagDays < 999 ? avgPaymentLagDays : 0,
+        collection30Days,
+        collection60Days,
+        collection90Days,
+        cashReturnRate,
+        efficiencyScore: 0, // Will be calculated after all data is collected
+        rank: 0,
+        percentile: 0,
+      };
+    }));
+    
+    // Calculate composite efficiency score
+    // Normalize metrics and weight them:
+    // 40% payment velocity (lower lag = better)
+    // 30% goods turnover rate (higher = better)
+    // 20% credit utilization (balanced - not too high, not too low)
+    // 10% cash return rate (higher = better)
+    
+    // Find max values for normalization
+    const maxTurnover = Math.max(...efficiencyData.map(d => d.goodsTurnoverRate), 1);
+    const maxLag = Math.max(...efficiencyData.map(d => d.avgPaymentLagDays), 1);
+    
+    const scoredData = efficiencyData.map(d => {
+      // Payment velocity score (lower lag = higher score)
+      const paymentVelocityScore = d.avgPaymentLagDays > 0 
+        ? Math.max(0, 100 - (d.avgPaymentLagDays / maxLag) * 100)
+        : 50; // Neutral if no data
+      
+      // Turnover score (higher = better)
+      const turnoverScore = maxTurnover > 0 
+        ? (d.goodsTurnoverRate / maxTurnover) * 100 
+        : 0;
+      
+      // Credit utilization score (optimal is 40-70%)
+      let utilizationScore = 0;
+      if (d.creditLimit > 0) {
+        if (d.creditUtilization >= 40 && d.creditUtilization <= 70) {
+          utilizationScore = 100;
+        } else if (d.creditUtilization < 40) {
+          utilizationScore = (d.creditUtilization / 40) * 100;
+        } else {
+          utilizationScore = Math.max(0, 100 - ((d.creditUtilization - 70) / 30) * 100);
+        }
+      }
+      
+      // Cash return rate directly usable (0-100)
+      const cashReturnScore = d.cashReturnRate;
+      
+      // Composite score
+      const efficiencyScore = 
+        (paymentVelocityScore * 0.4) +
+        (turnoverScore * 0.3) +
+        (utilizationScore * 0.2) +
+        (cashReturnScore * 0.1);
+      
+      return { ...d, efficiencyScore };
+    });
+    
+    // Sort by efficiency score and assign ranks
+    const sorted = scoredData.sort((a, b) => b.efficiencyScore - a.efficiencyScore);
+    const totalCount = sorted.length;
+    
+    return sorted.map((d, index) => ({
+      ...d,
+      rank: index + 1,
+      percentile: totalCount > 1 ? ((totalCount - index - 1) / (totalCount - 1)) * 100 : 100,
+    }));
   }
 
   async deleteCustomer(id: number): Promise<{ deleted: boolean; error?: string }> {
