@@ -31,7 +31,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Pencil, Trash2, Loader2, Users, RotateCcw, Save, ClipboardCheck, AlertTriangle, Building2 } from "lucide-react";
+import { Pencil, Trash2, Loader2, Users, RotateCcw, Save, ClipboardCheck, AlertTriangle, Building2, Link, Copy, Check } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Supplier, PartyType } from "@shared/schema";
 
@@ -56,6 +56,12 @@ export default function PartyMaster() {
   const [bankAddress, setBankAddress] = useState("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [partyToDelete, setPartyToDelete] = useState<Supplier | null>(null);
+  
+  const [statementDialogOpen, setStatementDialogOpen] = useState(false);
+  const [statementSalesman, setStatementSalesman] = useState<Supplier | null>(null);
+  const [statementPin, setStatementPin] = useState("");
+  const [generatedUrl, setGeneratedUrl] = useState("");
+  const [urlCopied, setUrlCopied] = useState(false);
   
   const [filterType, setFilterType] = useState<"all" | PartyType>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -207,6 +213,47 @@ export default function PartyMaster() {
       toast({ title: "Failed to record settlement", description: error.message, variant: "destructive" });
     },
   });
+
+  const statementAccessMutation = useMutation({
+    mutationFn: async ({ id, pin }: { id: number; pin: string }) => {
+      const response = await apiRequest("POST", `/api/salesmen/${id}/generate-statement-access`, { pin });
+      return response.json();
+    },
+    onSuccess: (data: { success: boolean; token: string; statementUrl: string }) => {
+      const fullUrl = `${window.location.origin}/salesman-statement/${data.token}`;
+      setGeneratedUrl(fullUrl);
+      toast({ title: "Statement access created", description: "Link generated successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to generate statement access", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleOpenStatementDialog = (party: Supplier) => {
+    setStatementSalesman(party);
+    setStatementPin("");
+    setGeneratedUrl("");
+    setUrlCopied(false);
+    setStatementDialogOpen(true);
+  };
+
+  const handleGenerateStatementAccess = () => {
+    if (!statementSalesman || !statementPin || statementPin.length < 4) {
+      toast({ title: "PIN must be at least 4 digits", variant: "destructive" });
+      return;
+    }
+    statementAccessMutation.mutate({ id: statementSalesman.id, pin: statementPin });
+  };
+
+  const handleCopyUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(generatedUrl);
+      setUrlCopied(true);
+      setTimeout(() => setUrlCopied(false), 2000);
+    } catch {
+      toast({ title: "Failed to copy URL", variant: "destructive" });
+    }
+  };
 
   const handleOpenEdit = (party: Supplier) => {
     setEditingParty(party);
@@ -722,6 +769,23 @@ export default function PartyMaster() {
                                 </Tooltip>
                               );
                             })()}
+                            {party.partyType === "salesman" && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => handleOpenStatementDialog(party)}
+                                    data-testid={`button-statement-${party.id}`}
+                                  >
+                                    <Link className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Generate statement link</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
@@ -771,6 +835,78 @@ export default function PartyMaster() {
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Delete
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={statementDialogOpen} onOpenChange={setStatementDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Generate Statement Link</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Create a secure link for <span className="font-medium">{statementSalesman?.name}</span> to view their account statement.
+            </p>
+            
+            {!generatedUrl ? (
+              <div className="space-y-2">
+                <Label htmlFor="statement-pin">Set PIN (4-6 digits)</Label>
+                <Input
+                  id="statement-pin"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  placeholder="Enter 4-6 digit PIN"
+                  value={statementPin}
+                  onChange={(e) => setStatementPin(e.target.value.replace(/\D/g, ""))}
+                  className="text-center text-xl tracking-widest"
+                  data-testid="input-statement-pin"
+                />
+                <p className="text-xs text-muted-foreground">
+                  The salesman will need this PIN to access their statement.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Statement Link</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    readOnly
+                    value={generatedUrl}
+                    className="text-xs"
+                    data-testid="input-generated-url"
+                  />
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    onClick={handleCopyUrl}
+                    data-testid="button-copy-url"
+                  >
+                    {urlCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Share this link with the salesman. PIN: <span className="font-mono font-medium">{statementPin}</span>
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatementDialogOpen(false)}>
+              {generatedUrl ? "Close" : "Cancel"}
+            </Button>
+            {!generatedUrl && (
+              <Button
+                onClick={handleGenerateStatementAccess}
+                disabled={statementAccessMutation.isPending || statementPin.length < 4}
+                data-testid="button-generate-access"
+              >
+                {statementAccessMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                Generate Link
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

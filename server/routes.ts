@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import crypto from "crypto";
 import { storage } from "./storage";
 import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, insertLineItemSchema, insertCustomerSchema, insertSalesOrderSchema, insertSalesLineItemSchema, insertPaymentSchema, PAYMENT_TYPES, PAYMENT_DIRECTIONS, insertExpenseCategorySchema, insertExpenseSchema, insertAccountTransferSchema, insertReturnSchema, insertReturnLineItemSchema, insertUserRoleAssignmentSchema, insertDiscountSchema, insertBranchSchema, insertStockTransferSchema, insertStockTransferLineItemSchema, insertInventoryAdjustmentSchema, insertOpeningBalanceSchema, ROLE_TYPES, MODULE_NAMES, type InsertAuditTrail } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
@@ -1981,6 +1982,113 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching public customer statement:", error);
       res.status(500).json({ error: "Failed to fetch customer statement" });
+    }
+  });
+
+  // ==================== SALESMAN PUBLIC STATEMENT ROUTES ====================
+
+  // Verify salesman token exists (no PIN required)
+  app.get("/api/public/salesman-statement/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token) {
+        return res.status(400).json({ error: "Token is required" });
+      }
+
+      const salesman = await storage.getSalesmanByToken(token);
+      if (!salesman) {
+        return res.status(404).json({ error: "Invalid statement link" });
+      }
+
+      // Return limited info without PIN verification
+      res.json({
+        name: salesman.name,
+        requiresPin: true,
+      });
+    } catch (error) {
+      console.error("Error verifying salesman token:", error);
+      res.status(500).json({ error: "Failed to verify token" });
+    }
+  });
+
+  // Verify PIN and get salesman statement
+  app.post("/api/public/salesman-statement/:token/verify", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { pin } = req.body;
+
+      if (!token || !pin) {
+        return res.status(400).json({ error: "Token and PIN are required" });
+      }
+
+      const salesman = await storage.getSalesmanByToken(token);
+      if (!salesman) {
+        return res.status(404).json({ error: "Invalid statement link" });
+      }
+
+      // Verify PIN
+      if (salesman.statementPin !== pin) {
+        return res.status(401).json({ error: "Invalid PIN" });
+      }
+
+      // Get statement data
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const transactions = await storage.getPartyStatement(salesman.id, startDate, endDate);
+      
+      // Calculate balance
+      const balance = await storage.getCustomerCurrentBalance(salesman.id);
+
+      res.json({
+        salesman: {
+          id: salesman.id,
+          name: salesman.name,
+          phone: salesman.phone,
+          area: salesman.area,
+        },
+        transactions,
+        currentBalance: balance,
+      });
+    } catch (error) {
+      console.error("Error fetching salesman statement:", error);
+      res.status(500).json({ error: "Failed to fetch statement" });
+    }
+  });
+
+  // Generate/regenerate statement token and PIN for a salesman (admin only)
+  app.post("/api/salesmen/:id/generate-statement-access", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const salesmanId = parseInt(req.params.id);
+      if (isNaN(salesmanId)) {
+        return res.status(400).json({ error: "Invalid salesman ID" });
+      }
+
+      const salesman = await storage.getSupplier(salesmanId);
+      if (!salesman || salesman.partyType !== 'salesman') {
+        return res.status(404).json({ error: "Salesman not found" });
+      }
+
+      const { pin } = req.body;
+      if (!pin || pin.length < 4 || pin.length > 6) {
+        return res.status(400).json({ error: "PIN must be 4-6 digits" });
+      }
+
+      // Generate unique token
+      const token = crypto.randomBytes(16).toString('hex');
+      
+      await storage.updateSupplier(salesmanId, {
+        statementToken: token,
+        statementPin: pin,
+      });
+
+      res.json({
+        success: true,
+        token,
+        statementUrl: `/statement/${token}`,
+      });
+    } catch (error) {
+      console.error("Error generating statement access:", error);
+      res.status(500).json({ error: "Failed to generate statement access" });
     }
   });
 

@@ -348,6 +348,9 @@ export interface IStorage {
     partyId?: number;
     search?: string;
   }): Promise<{ data: AllTransaction[]; total: number }>;
+
+  // Salesman statement access
+  getSalesmanByToken(token: string): Promise<Supplier | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -432,6 +435,16 @@ export class DatabaseStorage implements IStorage {
   async getSupplier(id: number): Promise<Supplier | undefined> {
     const [supplier] = await db.select().from(suppliers).where(eq(suppliers.id, id));
     return supplier || undefined;
+  }
+
+  async getSalesmanByToken(token: string): Promise<Supplier | undefined> {
+    const [salesman] = await db.select().from(suppliers).where(
+      and(
+        eq(suppliers.statementToken, token),
+        eq(suppliers.partyType, 'salesman')
+      )
+    );
+    return salesman || undefined;
   }
 
   async createSupplier(supplier: InsertSupplier): Promise<Supplier> {

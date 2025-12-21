@@ -69,6 +69,7 @@ const BackupPage = lazy(() => import("@/pages/backup"));
 const UserManagementPage = lazy(() => import("@/pages/user-management"));
 const Landing = lazy(() => import("@/pages/landing"));
 const PublicStatementPage = lazy(() => import("@/pages/public-statement"));
+const SalesmanStatementPage = lazy(() => import("@/pages/salesman-statement"));
 const VerifyPage = lazy(() => import("@/pages/verify"));
 const AllTransactionsPage = lazy(() => import("@/pages/all-transactions"));
 const CustomerAgingPage = lazy(() => import("@/pages/customer-aging"));
@@ -792,6 +793,7 @@ function App() {
         <Suspense fallback={<PageLoader />}>
           <Switch>
             <Route path="/statement/:customerId" component={PublicStatementPage} />
+            <Route path="/salesman-statement/:token" component={SalesmanStatementPage} />
             <Route path="/verify/:code" component={VerifyPage} />
             <Route component={Router} />
           </Switch>
