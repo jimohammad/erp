@@ -7,6 +7,22 @@ import { setupAuth, isAuthenticated, isAdmin } from "./localAuth";
 import { listBackups, getBackupDownloadUrl, createBackup } from "./backupScheduler";
 import { sendSaleNotification } from "./whatsapp";
 
+// Simple in-memory cache for dashboard statistics
+const dashboardCache: {
+  stats: { data: any; timestamp: number } | null;
+  topSelling: { data: any; timestamp: number; limit?: number } | null;
+} = { stats: null, topSelling: null };
+const CACHE_TTL = 60 * 1000; // 1 minute - short TTL for operational dashboards
+
+function isCacheValid(cache: { data: any; timestamp: number } | null): boolean {
+  return cache !== null && (Date.now() - cache.timestamp) < CACHE_TTL;
+}
+
+export function invalidateDashboardCache(): void {
+  dashboardCache.stats = null;
+  dashboardCache.topSelling = null;
+}
+
 // Helper function to create audit log entries
 async function createAuditLog(
   req: any,
@@ -333,6 +349,7 @@ export async function registerRoutes(
         }
       }
       
+      invalidateDashboardCache();
       res.status(201).json(order);
     } catch (error) {
       console.error("Error creating purchase order:", error);
@@ -350,6 +367,7 @@ export async function registerRoutes(
       if (!deleted) {
         return res.status(404).json({ error: "Purchase order not found" });
       }
+      invalidateDashboardCache();
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting purchase order:", error);
@@ -758,6 +776,7 @@ export async function registerRoutes(
         null
       );
       
+      invalidateDashboardCache();
       res.status(201).json(order);
     } catch (error: any) {
       console.error("Error creating sales order:", error);
@@ -819,6 +838,7 @@ export async function registerRoutes(
         null
       );
       
+      invalidateDashboardCache();
       res.json(updatedOrder);
     } catch (error) {
       console.error("Error updating sales order:", error);
@@ -853,6 +873,7 @@ export async function registerRoutes(
         null
       );
       
+      invalidateDashboardCache();
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting sales order:", error);
@@ -977,6 +998,7 @@ export async function registerRoutes(
         null
       );
       
+      invalidateDashboardCache();
       res.status(201).json(payment);
     } catch (error) {
       console.error("[Payment] Error creating payment:", error);
@@ -1011,6 +1033,7 @@ export async function registerRoutes(
         null
       );
       
+      invalidateDashboardCache();
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting payment:", error);
@@ -1290,6 +1313,7 @@ export async function registerRoutes(
       }
       
       const transfer = await storage.createAccountTransfer(parsed.data);
+      invalidateDashboardCache();
       res.status(201).json(transfer);
     } catch (error) {
       console.error("Error creating account transfer:", error);
@@ -1405,6 +1429,7 @@ export async function registerRoutes(
       }
       
       const expense = await storage.createExpense(parsed.data);
+      invalidateDashboardCache();
       res.status(201).json(expense);
     } catch (error) {
       console.error("Error creating expense:", error);
@@ -1422,6 +1447,7 @@ export async function registerRoutes(
       if (!deleted) {
         return res.status(404).json({ error: "Expense not found" });
       }
+      invalidateDashboardCache();
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting expense:", error);
@@ -1506,6 +1532,7 @@ export async function registerRoutes(
         }
       }
 
+      invalidateDashboardCache();
       res.status(201).json(newReturn);
     } catch (error) {
       console.error("Error creating return:", error);
@@ -1523,6 +1550,7 @@ export async function registerRoutes(
       if (!deleted) {
         return res.status(404).json({ error: "Return not found" });
       }
+      invalidateDashboardCache();
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting return:", error);
@@ -1757,6 +1785,7 @@ export async function registerRoutes(
         }),
       });
       
+      invalidateDashboardCache();
       res.status(201).json(discount);
     } catch (error) {
       console.error("Error creating discount:", error);
@@ -1812,6 +1841,7 @@ export async function registerRoutes(
         }),
       });
       
+      invalidateDashboardCache();
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting discount:", error);
@@ -1974,7 +2004,13 @@ export async function registerRoutes(
 
   app.get("/api/dashboard/stats", isAuthenticated, async (req, res) => {
     try {
+      // Use cached stats if available and not expired
+      if (isCacheValid(dashboardCache.stats)) {
+        return res.json(dashboardCache.stats!.data);
+      }
+      
       const stats = await storage.getDashboardStats();
+      dashboardCache.stats = { data: stats, timestamp: Date.now() };
       res.json(stats);
     } catch (error) {
       console.error("Error fetching dashboard stats:", error);
@@ -1985,7 +2021,15 @@ export async function registerRoutes(
   app.get("/api/dashboard/top-selling-items", isAuthenticated, async (req, res) => {
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+      const cacheKey = `topSelling_${limit}`;
+      
+      // Use cached data if available and not expired
+      if (isCacheValid(dashboardCache.topSelling) && (dashboardCache.topSelling as any).limit === limit) {
+        return res.json(dashboardCache.topSelling!.data);
+      }
+      
       const items = await storage.getTopSellingItems(limit);
+      dashboardCache.topSelling = { data: items, timestamp: Date.now(), limit } as any;
       res.json(items);
     } catch (error) {
       console.error("Error fetching top selling items:", error);
@@ -2296,6 +2340,7 @@ export async function registerRoutes(
 
       console.log("[Stock Transfer] Parsed data:", JSON.stringify(parsed.data, null, 2));
       const transfer = await storage.createStockTransfer(parsed.data, lineItems);
+      invalidateDashboardCache();
       res.status(201).json(transfer);
     } catch (error: any) {
       console.error("[Stock Transfer] Error creating stock transfer:", error?.message || error);
@@ -2314,6 +2359,7 @@ export async function registerRoutes(
       if (!deleted) {
         return res.status(404).json({ error: "Stock transfer not found" });
       }
+      invalidateDashboardCache();
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting stock transfer:", error);
@@ -2362,6 +2408,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: parsed.error.message });
       }
       const adjustment = await storage.createInventoryAdjustment(parsed.data);
+      invalidateDashboardCache();
       res.status(201).json(adjustment);
     } catch (error) {
       console.error("Error creating inventory adjustment:", error);
@@ -2379,6 +2426,7 @@ export async function registerRoutes(
       if (!adjustment) {
         return res.status(404).json({ error: "Inventory adjustment not found" });
       }
+      invalidateDashboardCache();
       res.json(adjustment);
     } catch (error) {
       console.error("Error updating inventory adjustment:", error);
@@ -2396,6 +2444,7 @@ export async function registerRoutes(
       if (!deleted) {
         return res.status(404).json({ error: "Inventory adjustment not found" });
       }
+      invalidateDashboardCache();
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting inventory adjustment:", error);
@@ -2442,6 +2491,7 @@ export async function registerRoutes(
         return res.status(400).json({ error: parsed.error.message });
       }
       const balance = await storage.createOpeningBalance(parsed.data);
+      invalidateDashboardCache();
       res.status(201).json(balance);
     } catch (error) {
       console.error("Error creating opening balance:", error);
@@ -2459,6 +2509,7 @@ export async function registerRoutes(
       if (!balance) {
         return res.status(404).json({ error: "Opening balance not found" });
       }
+      invalidateDashboardCache();
       res.json(balance);
     } catch (error) {
       console.error("Error updating opening balance:", error);
@@ -2476,6 +2527,7 @@ export async function registerRoutes(
       if (!deleted) {
         return res.status(404).json({ error: "Opening balance not found" });
       }
+      invalidateDashboardCache();
       res.status(204).send();
     } catch (error) {
       console.error("Error deleting opening balance:", error);
