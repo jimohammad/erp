@@ -2031,13 +2031,13 @@ export async function registerRoutes(
         return res.status(401).json({ error: "Invalid PIN" });
       }
 
-      // Get statement data
-      const startDate = req.query.startDate as string | undefined;
-      const endDate = req.query.endDate as string | undefined;
-      const transactions = await storage.getPartyStatement(salesman.id, startDate, endDate);
+      // Get statement data (without date filter to get all transactions for full balance)
+      const transactions = await storage.getPartyStatement(salesman.id);
       
-      // Calculate balance
-      const balance = await storage.getCustomerCurrentBalance(salesman.id);
+      // Calculate current balance from the last transaction's running balance
+      const currentBalance = transactions.length > 0 
+        ? transactions[transactions.length - 1].balance 
+        : 0;
 
       res.json({
         salesman: {
@@ -2047,7 +2047,7 @@ export async function registerRoutes(
           area: salesman.area,
         },
         transactions,
-        currentBalance: balance,
+        currentBalance,
       });
     } catch (error) {
       console.error("Error fetching salesman statement:", error);

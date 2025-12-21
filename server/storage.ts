@@ -1690,6 +1690,24 @@ export class DatabaseStorage implements IStorage {
     
     if (isSalesman) {
       // For salesmen: track sales they made and payments received from them
+      // Build date filters for each table's date column
+      let invoiceDateFilter = sql``;
+      let paymentDateFilter = sql``;
+      let returnDateFilter = sql``;
+      if (startDate && endDate) {
+        invoiceDateFilter = sql`AND so.invoice_date >= ${startDate} AND so.invoice_date <= ${endDate}`;
+        paymentDateFilter = sql`AND p.payment_date >= ${startDate} AND p.payment_date <= ${endDate}`;
+        returnDateFilter = sql`AND r.return_date >= ${startDate} AND r.return_date <= ${endDate}`;
+      } else if (startDate) {
+        invoiceDateFilter = sql`AND so.invoice_date >= ${startDate}`;
+        paymentDateFilter = sql`AND p.payment_date >= ${startDate}`;
+        returnDateFilter = sql`AND r.return_date >= ${startDate}`;
+      } else if (endDate) {
+        invoiceDateFilter = sql`AND so.invoice_date <= ${endDate}`;
+        paymentDateFilter = sql`AND p.payment_date <= ${endDate}`;
+        returnDateFilter = sql`AND r.return_date <= ${endDate}`;
+      }
+      
       result = await db.execute(sql`
         WITH all_transactions AS (
           -- Sales made by this salesman (they owe us - debit)
@@ -1705,7 +1723,7 @@ export class DatabaseStorage implements IStorage {
           FROM sales_orders so
           LEFT JOIN customers c ON so.customer_id = c.id
           WHERE so.salesman_id = ${partyId}
-          ${dateFilter}
+          ${invoiceDateFilter}
           
           UNION ALL
           
@@ -1721,7 +1739,7 @@ export class DatabaseStorage implements IStorage {
             p.created_at
           FROM payments p
           WHERE p.salesman_id = ${partyId} AND p.direction = 'IN'
-          ${dateFilter}
+          ${paymentDateFilter}
           
           UNION ALL
           
@@ -1738,7 +1756,7 @@ export class DatabaseStorage implements IStorage {
           FROM returns r
           JOIN sales_orders so ON r.sale_order_id = so.id
           WHERE so.salesman_id = ${partyId} AND r.return_type = 'sale'
-          ${dateFilter}
+          ${returnDateFilter}
         )
         SELECT 
           id,
