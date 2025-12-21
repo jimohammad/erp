@@ -702,7 +702,7 @@ export class DatabaseStorage implements IStorage {
 
   async markCustomerStockChecked(id: number): Promise<Customer | undefined> {
     const today = new Date().toISOString().split('T')[0];
-    // Update in suppliers table (parties with partyType='customer')
+    // Update in suppliers table (for customers)
     const [updated] = await db.update(suppliers)
       .set({ lastStockCheckDate: today })
       .where(and(eq(suppliers.id, id), eq(suppliers.partyType, 'customer')))
@@ -720,6 +720,23 @@ export class DatabaseStorage implements IStorage {
       branchId: null,
       lastStockCheckDate: updated.lastStockCheckDate,
     } as Customer;
+  }
+
+  async markSalesmanSettled(id: number): Promise<{ id: number; name: string; lastSettlementDate: string } | undefined> {
+    const today = new Date().toISOString().split('T')[0];
+    // Update in suppliers table - only for salesmen
+    const [updated] = await db.update(suppliers)
+      .set({ lastStockCheckDate: today })
+      .where(and(eq(suppliers.id, id), eq(suppliers.partyType, 'salesman')))
+      .returning();
+    
+    if (!updated) return undefined;
+    
+    return {
+      id: updated.id,
+      name: updated.name,
+      lastSettlementDate: updated.lastStockCheckDate || today,
+    };
   }
 
   async getCustomersDueForStockCheck(): Promise<Customer[]> {
@@ -750,6 +767,58 @@ export class DatabaseStorage implements IStorage {
       branchId: null,
       lastStockCheckDate: s.lastStockCheckDate,
     })) as Customer[];
+  }
+
+  async getSalesmenSettlementStatus(): Promise<{
+    id: number;
+    name: string;
+    phone: string | null;
+    lastSettlementDate: string | null;
+    daysRemaining: number;
+    status: 'overdue' | 'due_soon' | 'ok';
+  }[]> {
+    // Get ALL salesmen for settlement tracking
+    const results = await db.select().from(suppliers)
+      .where(eq(suppliers.partyType, 'salesman'))
+      .orderBy(asc(suppliers.lastStockCheckDate));
+    
+    const today = new Date();
+    const SETTLEMENT_PERIOD_DAYS = 90; // 3 months
+    
+    return results.map(s => {
+      let daysRemaining = SETTLEMENT_PERIOD_DAYS;
+      let status: 'overdue' | 'due_soon' | 'ok' = 'ok';
+      
+      if (s.lastStockCheckDate) {
+        const lastDate = new Date(s.lastStockCheckDate);
+        const nextDueDate = new Date(lastDate);
+        nextDueDate.setDate(nextDueDate.getDate() + SETTLEMENT_PERIOD_DAYS);
+        
+        const diffTime = nextDueDate.getTime() - today.getTime();
+        daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (daysRemaining < 0) {
+          status = 'overdue';
+        } else if (daysRemaining <= 14) {
+          status = 'due_soon';
+        } else {
+          status = 'ok';
+        }
+      } else {
+        // Never settled - treat as overdue
+        daysRemaining = -999;
+        status = 'overdue';
+      }
+      
+      return {
+        id: s.id,
+        name: s.name,
+        phone: s.phone,
+        lastSettlementDate: s.lastStockCheckDate,
+        daysRemaining,
+        status,
+      };
+    }).sort((a, b) => a.daysRemaining - b.daysRemaining); // Most urgent first
   }
 
   async deleteCustomer(id: number): Promise<{ deleted: boolean; error?: string }> {

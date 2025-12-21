@@ -197,18 +197,18 @@ export default function PartyMaster() {
     },
   });
 
-  const stockCheckMutation = useMutation({
+  const settlementMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("POST", `/api/customers/${id}/stock-check`);
+      const response = await apiRequest("POST", `/api/salesmen/${id}/settle`);
       return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/customers/due-for-stock-check"] });
-      toast({ title: "Stock check recorded", description: "Customer marked as checked today" });
+      queryClient.invalidateQueries({ queryKey: ["/api/salesmen/settlement-status"] });
+      toast({ title: "Settlement recorded", description: "Salesman account marked as settled today" });
     },
     onError: (error: Error) => {
-      toast({ title: "Failed to record stock check", description: error.message, variant: "destructive" });
+      toast({ title: "Failed to record settlement", description: error.message, variant: "destructive" });
     },
   });
 
@@ -682,25 +682,27 @@ export default function PartyMaster() {
                       {isAdmin && (
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
-                            {party.partyType === "customer" && (
+                            {party.partyType === "salesman" && (
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => stockCheckMutation.mutate(party.id)}
-                                    disabled={stockCheckMutation.isPending}
-                                    data-testid={`button-stock-check-${party.id}`}
+                                    onClick={() => settlementMutation.mutate(party.id)}
+                                    disabled={settlementMutation.isPending}
+                                    data-testid={`button-settle-${party.id}`}
                                   >
                                     <ClipboardCheck className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                  <p>Mark stock checked</p>
-                                  {party.lastStockCheckDate && (
+                                  <p>Mark account settled</p>
+                                  {party.lastStockCheckDate ? (
                                     <p className="text-xs text-muted-foreground">
-                                      Last: {new Date(party.lastStockCheckDate).toLocaleDateString()}
+                                      Last settlement: {new Date(party.lastStockCheckDate).toLocaleDateString()}
                                     </p>
+                                  ) : (
+                                    <p className="text-xs text-muted-foreground">Never settled</p>
                                   )}
                                 </TooltipContent>
                               </Tooltip>

@@ -506,6 +506,35 @@ export async function registerRoutes(
     }
   });
 
+  // Salesman settlement status - shows all salesmen with days remaining until settlement
+  app.get("/api/salesmen/settlement-status", isAuthenticated, async (req, res) => {
+    try {
+      const settlements = await storage.getSalesmenSettlementStatus();
+      res.json(settlements);
+    } catch (error) {
+      console.error("Error fetching salesman settlement status:", error);
+      res.status(500).json({ error: "Failed to fetch settlement status" });
+    }
+  });
+
+  // Mark salesman as settled (resets their settlement timer)
+  app.post("/api/salesmen/:id/settle", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid salesman ID" });
+      }
+      const result = await storage.markSalesmanSettled(id);
+      if (!result) {
+        return res.status(404).json({ error: "Salesman not found" });
+      }
+      res.json(result);
+    } catch (error) {
+      console.error("Error marking salesman settled:", error);
+      res.status(500).json({ error: "Failed to mark settled" });
+    }
+  });
+
   app.get("/api/sales-orders/next-invoice-number", isAuthenticated, async (req, res) => {
     try {
       const result = await storage.getSalesOrders();

@@ -32,11 +32,13 @@ interface SearchResult {
   url: string;
 }
 
-interface CustomerDueForStockCheck {
+interface SalesmanSettlement {
   id: number;
   name: string;
   phone: string | null;
-  lastStockCheckDate: string | null;
+  lastSettlementDate: string | null;
+  daysRemaining: number;
+  status: 'overdue' | 'due_soon' | 'ok';
 }
 
 interface TopSellingItem {
@@ -54,8 +56,8 @@ export default function DashboardPage() {
     queryKey: ["/api/dashboard/stats"],
   });
 
-  const { data: customersDueForStockCheck } = useQuery<CustomerDueForStockCheck[]>({
-    queryKey: ["/api/customers/due-for-stock-check"],
+  const { data: salesmenSettlements } = useQuery<SalesmanSettlement[]>({
+    queryKey: ["/api/salesmen/settlement-status"],
   });
 
   const { data: topSellingItems } = useQuery<TopSellingItem[]>({
@@ -426,48 +428,79 @@ export default function DashboardPage() {
               </Card>
             )}
 
-            <Card data-testid="card-stock-check-reminders" className="border-blue-200 dark:border-blue-800 h-80">
+            <Card data-testid="card-settlement-reminders" className="border-blue-200 dark:border-blue-800 h-80">
               <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/40">
-                    <ClipboardCheck className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <Wallet className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   </div>
                   <div>
-                    <CardTitle className="text-sm font-semibold">Stock Check Reminders</CardTitle>
-                    <p className="text-xs text-muted-foreground">Salesmen due for field visit (3+ months)</p>
+                    <CardTitle className="text-sm font-semibold">Salesman Account Settlement</CardTitle>
+                    <p className="text-xs text-muted-foreground">Settlement due every 90 days</p>
                   </div>
                 </div>
-                <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
-                  {customersDueForStockCheck?.length || 0} salesman{(customersDueForStockCheck?.length || 0) !== 1 ? 'men' : ''}
+                <Badge 
+                  variant="secondary" 
+                  className={
+                    salesmenSettlements?.some(s => s.status === 'overdue') 
+                      ? "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"
+                      : salesmenSettlements?.some(s => s.status === 'due_soon')
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100"
+                        : "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100"
+                  }
+                >
+                  {salesmenSettlements?.length || 0} salesman{(salesmenSettlements?.length || 0) !== 1 ? 'men' : ''}
                 </Badge>
               </CardHeader>
               <CardContent className="p-4 pt-0">
                 <div className="space-y-2 h-56 overflow-y-auto">
-                  {customersDueForStockCheck && customersDueForStockCheck.length > 0 ? (
-                    customersDueForStockCheck.map((customer) => (
+                  {salesmenSettlements && salesmenSettlements.length > 0 ? (
+                    salesmenSettlements.map((salesman) => (
                       <div 
-                        key={customer.id}
-                        className="flex items-center justify-between p-2 rounded-md bg-blue-50 dark:bg-blue-900/20 cursor-pointer hover-elevate"
-                        data-testid={`stock-check-customer-${customer.id}`}
+                        key={salesman.id}
+                        className={`flex items-center justify-between p-2 rounded-md cursor-pointer hover-elevate ${
+                          salesman.status === 'overdue' 
+                            ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+                            : salesman.status === 'due_soon'
+                              ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800'
+                              : 'bg-green-50 dark:bg-green-900/20'
+                        }`}
+                        data-testid={`settlement-salesman-${salesman.id}`}
                         onClick={() => setLocation("/parties")}
                       >
                         <div className="flex flex-col">
-                          <span className="font-medium text-sm">{customer.name}</span>
-                          {customer.phone && (
-                            <span className="text-xs text-muted-foreground">{customer.phone}</span>
-                          )}
+                          <span className="font-medium text-sm">{salesman.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {salesman.lastSettlementDate 
+                              ? `Last: ${new Date(salesman.lastSettlementDate).toLocaleDateString()}`
+                              : 'Never settled'}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="text-xs">
-                            {customer.lastStockCheckDate 
-                              ? `Last: ${new Date(customer.lastStockCheckDate).toLocaleDateString()}`
-                              : 'Never checked'}
+                        <div className="flex flex-col items-end gap-1">
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-xs ${
+                              salesman.status === 'overdue'
+                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
+                                : salesman.status === 'due_soon'
+                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100'
+                                  : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100'
+                            }`}
+                          >
+                            {salesman.status === 'overdue' 
+                              ? salesman.daysRemaining === -999 
+                                ? 'Never settled'
+                                : `${Math.abs(salesman.daysRemaining)} days overdue`
+                              : salesman.status === 'due_soon'
+                                ? `${salesman.daysRemaining} days left`
+                                : `${salesman.daysRemaining} days left`
+                            }
                           </Badge>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">No salesmen due for stock check</p>
+                    <p className="text-sm text-muted-foreground text-center py-4">No salesmen registered</p>
                   )}
                 </div>
               </CardContent>
