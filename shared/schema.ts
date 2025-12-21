@@ -63,9 +63,12 @@ export const suppliers = pgTable("suppliers", {
   swiftCode: text("swift_code"),
   bankName: text("bank_name"),
   bankAddress: text("bank_address"),
+  statementToken: text("statement_token"),
+  statementPin: text("statement_pin"),
 }, (table) => [
   index("idx_supplier_party_type").on(table.partyType),
   index("idx_supplier_area").on(table.area),
+  index("idx_supplier_statement_token").on(table.statementToken),
 ]);
 
 export const suppliersRelations = relations(suppliers, ({ many }) => ({
