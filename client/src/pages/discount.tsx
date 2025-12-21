@@ -45,9 +45,16 @@ export default function DiscountPage() {
     queryKey: ["/api/discounts"],
   });
 
-  const { data: invoices = [] } = useQuery<Invoice[]>({
-    queryKey: [`/api/invoices-for-customer/${customerId}`],
+  const { data: invoices = [], isLoading: invoicesLoading, error: invoicesError } = useQuery<Invoice[]>({
+    queryKey: ["/api/invoices-for-customer", customerId],
     enabled: !!customerId,
+    queryFn: async () => {
+      const response = await fetch(`/api/invoices-for-customer/${customerId}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) throw new Error('Failed to fetch invoices');
+      return response.json();
+    },
   });
 
   const { data: invoiceBalance } = useQuery<InvoiceBalance>({
@@ -71,7 +78,7 @@ export default function DiscountPage() {
       // Invalidate all related queries for real-time updates
       queryClient.invalidateQueries({ queryKey: ["/api/discounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoice-balance"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices-for-customer"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices-for-customer", customerId] });
       queryClient.invalidateQueries({ queryKey: ["/api/customer-statement"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -107,7 +114,7 @@ export default function DiscountPage() {
       // Invalidate all related queries for real-time updates
       queryClient.invalidateQueries({ queryKey: ["/api/discounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/invoice-balance"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/invoices-for-customer"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/invoices-for-customer", customerId] });
       queryClient.invalidateQueries({ queryKey: ["/api/customer-statement"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard/stats"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -315,10 +322,18 @@ export default function DiscountPage() {
                 <Select 
                   value={salesOrderId} 
                   onValueChange={setSalesOrderId}
-                  disabled={!customerId || invoices.length === 0}
+                  disabled={!customerId || invoicesLoading || invoices.length === 0}
                 >
                   <SelectTrigger data-testid="select-invoice">
-                    <SelectValue placeholder={!customerId ? "Select customer first" : invoices.length === 0 ? "No invoices found" : "Select invoice"} />
+                    <SelectValue placeholder={
+                      !customerId 
+                        ? "Select customer first" 
+                        : invoicesLoading 
+                          ? "Loading invoices..." 
+                          : invoices.length === 0 
+                            ? "No invoices found for this customer" 
+                            : "Select invoice"
+                    } />
                   </SelectTrigger>
                   <SelectContent>
                     {invoices.map((invoice) => (
@@ -328,6 +343,9 @@ export default function DiscountPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {invoicesError && (
+                  <p className="text-sm text-destructive">Failed to load invoices. Please try again.</p>
+                )}
               </div>
             </div>
 
