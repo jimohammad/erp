@@ -1237,16 +1237,34 @@ export class DatabaseStorage implements IStorage {
         FROM payments
         WHERE customer_id IS NOT NULL AND direction = 'IN'
         GROUP BY customer_id
+      ),
+      customer_returns AS (
+        SELECT 
+          customer_id,
+          COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total_returns
+        FROM returns
+        WHERE customer_id IS NOT NULL AND return_type = 'sale_return'
+        GROUP BY customer_id
+      ),
+      customer_discounts AS (
+        SELECT 
+          customer_id,
+          COALESCE(SUM(CAST(discount_amount AS DECIMAL)), 0)::float as total_discounts
+        FROM discounts
+        WHERE customer_id IS NOT NULL
+        GROUP BY customer_id
       )
       SELECT 
         c.id as "customerId",
         c.name as "customerName",
         COALESCE(cs.total_sales, 0)::float as "totalSales",
         COALESCE(cp.total_payments, 0)::float as "totalPayments",
-        (COALESCE(cs.total_sales, 0) - COALESCE(cp.total_payments, 0))::float as balance
+        (COALESCE(cs.total_sales, 0) - COALESCE(cp.total_payments, 0) - COALESCE(cr.total_returns, 0) - COALESCE(cd.total_discounts, 0))::float as balance
       FROM customers c
       LEFT JOIN customer_sales cs ON c.id = cs.customer_id
       LEFT JOIN customer_payments cp ON c.id = cp.customer_id
+      LEFT JOIN customer_returns cr ON c.id = cr.customer_id
+      LEFT JOIN customer_discounts cd ON c.id = cd.customer_id
       ORDER BY c.name
     `);
     return result.rows as { customerId: number; customerName: string; totalSales: number; totalPayments: number; balance: number }[];
@@ -2062,17 +2080,25 @@ export class DatabaseStorage implements IStorage {
         WHERE customer_id = ${customerId} AND return_type = 'sale_return'
           AND (return_date < (SELECT sale_date FROM target_sale)
                OR (return_date = (SELECT sale_date FROM target_sale) AND created_at < (SELECT created_at FROM target_sale)))
+      ),
+      discounts_before AS (
+        SELECT COALESCE(SUM(CAST(discount_amount AS DECIMAL)), 0)::float as total
+        FROM discounts
+        WHERE customer_id = ${customerId}
+          AND created_at < (SELECT created_at FROM target_sale)
       )
       SELECT 
         (COALESCE((SELECT balance FROM opening_balance), 0) + 
          COALESCE((SELECT total FROM sales_before), 0) - 
          COALESCE((SELECT total FROM payments_before), 0) - 
-         COALESCE((SELECT total FROM returns_before), 0))::float as "previousBalance",
+         COALESCE((SELECT total FROM returns_before), 0) -
+         COALESCE((SELECT total FROM discounts_before), 0))::float as "previousBalance",
         (COALESCE((SELECT balance FROM opening_balance), 0) + 
          COALESCE((SELECT total FROM sales_before), 0) + 
          COALESCE((SELECT amount FROM target_sale), 0) - 
          COALESCE((SELECT total FROM payments_before), 0) - 
-         COALESCE((SELECT total FROM returns_before), 0))::float as "currentBalance"
+         COALESCE((SELECT total FROM returns_before), 0) -
+         COALESCE((SELECT total FROM discounts_before), 0))::float as "currentBalance"
     `);
     
     const row = result.rows[0] as { previousBalance: number; currentBalance: number } | undefined;
@@ -2117,17 +2143,25 @@ export class DatabaseStorage implements IStorage {
           AND id != ${returnId}
           AND (return_date < (SELECT return_date FROM target_return)
                OR (return_date = (SELECT return_date FROM target_return) AND created_at < (SELECT created_at FROM target_return)))
+      ),
+      discounts_before AS (
+        SELECT COALESCE(SUM(CAST(discount_amount AS DECIMAL)), 0)::float as total
+        FROM discounts
+        WHERE customer_id = ${customerId}
+          AND created_at < (SELECT created_at FROM target_return)
       )
       SELECT 
         (COALESCE((SELECT balance FROM opening_balance), 0) + 
          COALESCE((SELECT total FROM sales_before), 0) - 
          COALESCE((SELECT total FROM payments_before), 0) - 
-         COALESCE((SELECT total FROM returns_before), 0))::float as "previousBalance",
+         COALESCE((SELECT total FROM returns_before), 0) -
+         COALESCE((SELECT total FROM discounts_before), 0))::float as "previousBalance",
         COALESCE((SELECT amount FROM target_return), 0)::float as "returnAmount",
         (COALESCE((SELECT balance FROM opening_balance), 0) + 
          COALESCE((SELECT total FROM sales_before), 0) - 
          COALESCE((SELECT total FROM payments_before), 0) - 
          COALESCE((SELECT total FROM returns_before), 0) -
+         COALESCE((SELECT total FROM discounts_before), 0) -
          COALESCE((SELECT amount FROM target_return), 0))::float as "currentBalance"
     `);
     
@@ -2158,12 +2192,17 @@ export class DatabaseStorage implements IStorage {
       all_returns AS (
         SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
         FROM returns WHERE customer_id = ${customerId} AND return_type = 'sale_return'
+      ),
+      all_discounts AS (
+        SELECT COALESCE(SUM(CAST(discount_amount AS DECIMAL)), 0)::float as total
+        FROM discounts WHERE customer_id = ${customerId}
       )
       SELECT (
         COALESCE((SELECT balance FROM opening_balance), 0) +
         COALESCE((SELECT total FROM all_sales), 0) -
         COALESCE((SELECT total FROM all_payments), 0) -
-        COALESCE((SELECT total FROM all_returns), 0)
+        COALESCE((SELECT total FROM all_returns), 0) -
+        COALESCE((SELECT total FROM all_discounts), 0)
       )::float as balance
     `);
     const row = result.rows[0] as { balance: number } | undefined;
@@ -2178,7 +2217,8 @@ export class DatabaseStorage implements IStorage {
           COALESCE((SELECT CAST(balance_amount AS DECIMAL) FROM opening_balances WHERE party_type = 'customer' AND party_id = c.id LIMIT 1), 0) +
           COALESCE((SELECT SUM(CAST(total_kwd AS DECIMAL)) FROM sales_orders WHERE customer_id = c.id), 0) -
           COALESCE((SELECT SUM(CAST(amount AS DECIMAL)) FROM payments WHERE customer_id = c.id AND direction = 'IN'), 0) -
-          COALESCE((SELECT SUM(CAST(total_kwd AS DECIMAL)) FROM returns WHERE customer_id = c.id AND return_type = 'sale_return'), 0)
+          COALESCE((SELECT SUM(CAST(total_kwd AS DECIMAL)) FROM returns WHERE customer_id = c.id AND return_type = 'sale_return'), 0) -
+          COALESCE((SELECT SUM(CAST(discount_amount AS DECIMAL)) FROM discounts WHERE customer_id = c.id), 0)
         )::float as balance
       FROM customers c
       WHERE c.party_type = 'customer'
