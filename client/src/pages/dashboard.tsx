@@ -276,33 +276,6 @@ export default function DashboardPage() {
             </div>
 
           <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
-            <Card data-testid="card-monthly-sales" className="p-0 overflow-visible">
-              <CardHeader className="flex flex-row items-center justify-between gap-2 p-3 pb-1">
-                <div>
-                  <CardTitle className="text-xs font-medium text-muted-foreground">This Month Sales</CardTitle>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Last 7 days trend</p>
-                </div>
-                <div className="p-2 rounded-lg bg-gradient-to-br from-coral-100 to-sky-100 dark:from-coral-900/40 dark:to-sky-900/40" style={{ background: 'linear-gradient(135deg, hsl(16 85% 95%), hsl(200 80% 95%))' }}>
-                  <DollarSign className="h-5 w-5 text-sky-600 dark:text-sky-400" />
-                </div>
-              </CardHeader>
-              <CardContent className="p-3 pt-0">
-                <div className="flex items-end justify-between gap-4">
-                  <div>
-                    <div className="text-xl font-semibold" data-testid="text-monthly-sales">
-                      {formatCurrency(stats?.monthlySales || 0)}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">KWD in {currentMonthName}</p>
-                  </div>
-                  {stats?.salesTrend && stats.salesTrend.length > 0 && (
-                    <div className="flex-1 max-w-32">
-                      <Sparkline data={stats.salesTrend} color="hsl(var(--primary))" height={32} />
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
             <Card data-testid="card-total-expenses" className="p-0 overflow-visible">
               <CardHeader className="flex flex-row items-center justify-between gap-2 p-3 pb-1">
                 <CardTitle className="text-xs font-medium text-muted-foreground">Total Expenses</CardTitle>
