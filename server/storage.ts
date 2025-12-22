@@ -355,8 +355,8 @@ export interface IStorage {
   // Stock list with prices (for public URL)
   getStockListWithPrices(): Promise<{ itemCode: string | null; itemName: string; category: string | null; currentStock: number; sellingPriceKwd: string | null; minStockLevel: number }[]>;
   
-  // Price list without stock (for salesman)
-  getPriceListOnly(): Promise<{ itemCode: string | null; itemName: string; category: string | null; sellingPriceKwd: string | null }[]>;
+  // Price list with stock for low stock indicator (for salesman)
+  getPriceListOnly(): Promise<{ itemCode: string | null; itemName: string; category: string | null; sellingPriceKwd: string | null; currentStock: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -512,18 +512,63 @@ export class DatabaseStorage implements IStorage {
     }));
   }
 
-  async getPriceListOnly(): Promise<{ itemCode: string | null; itemName: string; category: string | null; sellingPriceKwd: string | null }[]> {
-    const result = await db
-      .select({
-        itemCode: items.code,
-        itemName: items.name,
-        category: items.category,
-        sellingPriceKwd: items.sellingPriceKwd,
-      })
-      .from(items)
-      .orderBy(items.category, items.name);
+  async getPriceListOnly(): Promise<{ itemCode: string | null; itemName: string; category: string | null; sellingPriceKwd: string | null; currentStock: number }[]> {
+    // Use raw SQL to calculate current stock for low stock indicator
+    const result = await db.execute(sql`
+      WITH purchased AS (
+        SELECT li.item_name, SUM(li.quantity) as qty
+        FROM line_items li
+        JOIN purchase_orders po ON li.purchase_order_id = po.id
+        GROUP BY li.item_name
+      ),
+      sold AS (
+        SELECT sli.item_name, SUM(sli.quantity) as qty
+        FROM sales_line_items sli
+        JOIN sales_orders so ON sli.sales_order_id = so.id
+        GROUP BY sli.item_name
+      ),
+      opening_stock AS (
+        SELECT item_name, SUM(opening_qty) as qty
+        FROM items
+        WHERE opening_qty > 0
+        GROUP BY item_name
+      ),
+      sale_returns AS (
+        SELECT rl.item_name, SUM(rl.quantity) as qty
+        FROM return_line_items rl
+        JOIN returns r ON rl.return_id = r.id
+        WHERE r.return_type = 'sale'
+        GROUP BY rl.item_name
+      ),
+      purchase_returns AS (
+        SELECT rl.item_name, SUM(rl.quantity) as qty
+        FROM return_line_items rl
+        JOIN returns r ON rl.return_id = r.id
+        WHERE r.return_type = 'purchase'
+        GROUP BY rl.item_name
+      )
+      SELECT 
+        i.code as "itemCode",
+        i.name as "itemName",
+        i.category as "category",
+        i.selling_price_kwd as "sellingPriceKwd",
+        (COALESCE(o.qty, 0) + COALESCE(p.qty, 0) + COALESCE(sr.qty, 0) - COALESCE(s.qty, 0) - COALESCE(pr.qty, 0))::integer as "currentStock"
+      FROM items i
+      LEFT JOIN purchased p ON i.name = p.item_name
+      LEFT JOIN sold s ON i.name = s.item_name
+      LEFT JOIN opening_stock o ON i.name = o.item_name
+      LEFT JOIN sale_returns sr ON i.name = sr.item_name
+      LEFT JOIN purchase_returns pr ON i.name = pr.item_name
+      ORDER BY i.category, i.name
+    `);
     
-    return result;
+    return (result.rows as any[]).map(row => ({
+      itemCode: row.itemCode,
+      itemName: row.itemName,
+      category: row.category,
+      sellingPriceKwd: row.sellingPriceKwd,
+      currentStock: row.currentStock || 0,
+    }));
   }
 
   async createSupplier(supplier: InsertSupplier): Promise<Supplier> {

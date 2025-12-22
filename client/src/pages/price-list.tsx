@@ -19,6 +19,7 @@ interface PriceItem {
   itemName: string;
   category: string | null;
   sellingPriceKwd: string | null;
+  currentStock: number;
 }
 
 interface PriceListData {
@@ -323,25 +324,37 @@ export default function PriceListPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredPrices.map((item, index) => (
-                      <tr 
-                        key={item.itemName} 
-                        className={`border-t ${index % 2 === 0 ? "" : "bg-muted/20"}`}
-                        data-testid={`row-price-${index}`}
-                      >
-                          <td className="p-3 font-medium">{item.itemName}</td>
-                        <td className="p-3">
-                          {item.category && (
-                            <Badge variant="outline" className="text-xs">
-                              {item.category}
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="p-3 text-right font-medium">
-                          {item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "-"}
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredPrices.map((item, index) => {
+                      const isLowStock = item.currentStock < 20;
+                      return (
+                        <tr 
+                          key={item.itemName} 
+                          className={`border-t ${index % 2 === 0 ? "" : "bg-muted/20"}`}
+                          data-testid={`row-price-${index}`}
+                        >
+                          <td className="p-3 font-medium">
+                            <div className="flex items-center gap-2">
+                              {item.itemName}
+                              {isLowStock && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Low Stock
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td className="p-3">
+                            {item.category && (
+                              <Badge variant="outline" className="text-xs">
+                                {item.category}
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="p-3 text-right font-medium">
+                            {item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "-"}
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {filteredPrices.length === 0 && (
                       <tr>
                         <td colSpan={3} className="p-8 text-center text-muted-foreground">
