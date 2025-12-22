@@ -775,13 +775,6 @@ export default function PaymentInPage() {
 
   return (
     <div className="p-4 space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-page-title">
-          <ArrowDownLeft className="h-6 w-6 text-emerald-600" />
-          Payment IN (Receive)
-        </h1>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Receive Payment from Customer</CardTitle>
