@@ -80,12 +80,8 @@ export default function StockTransfersPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h2 className="text-2xl font-bold" data-testid="heading-stock-transfers">Stock Transfers</h2>
-          <p className="text-muted-foreground">Transfer inventory between branches</p>
-        </div>
+    <div className="space-y-6 p-4">
+      <div className="flex justify-end">
         <Button onClick={() => setLocation("/stock-transfers/new")} data-testid="button-new-transfer">
           <Plus className="h-4 w-4 mr-2" />
           New Transfer
