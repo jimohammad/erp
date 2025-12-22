@@ -755,12 +755,12 @@ export class DatabaseStorage implements IStorage {
   async getCustomers(): Promise<Customer[]> {
     // Get customers from both sources:
     // 1. Original customers table
-    // 2. Parties with partyType='customer' from suppliers table
+    // 2. Parties with partyType='customer' or 'salesman' from suppliers table
     
     const existingCustomers = await db.select().from(customers).orderBy(customers.name);
     
     const customerParties = await db.select().from(suppliers)
-      .where(eq(suppliers.partyType, 'customer'))
+      .where(or(eq(suppliers.partyType, 'customer'), eq(suppliers.partyType, 'salesman')))
       .orderBy(suppliers.name);
     
     const mappedParties = customerParties.map(party => ({
@@ -783,7 +783,7 @@ export class DatabaseStorage implements IStorage {
     if (id >= 100000) {
       const actualId = id - 100000;
       const [party] = await db.select().from(suppliers)
-        .where(and(eq(suppliers.id, actualId), eq(suppliers.partyType, 'customer')));
+        .where(and(eq(suppliers.id, actualId), or(eq(suppliers.partyType, 'customer'), eq(suppliers.partyType, 'salesman'))));
       
       if (!party) return undefined;
       
