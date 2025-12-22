@@ -4,6 +4,8 @@ import session from "express-session";
 import type { Express, RequestHandler, Request, Response, NextFunction } from "express";
 import connectPg from "connect-pg-simple";
 import bcrypt from "bcryptjs";
+import { authenticator } from "otplib";
+import QRCode from "qrcode";
 import { storage } from "./storage";
 import { db } from "./db";
 import { users } from "@shared/schema";
@@ -173,11 +175,12 @@ export async function setupAuth(app: Express) {
     }
   });
 
-  // Login endpoint with rate limiting
-  app.post("/api/login", checkRateLimit, (req, res, next) => {
+  // Login endpoint with rate limiting and TOTP support
+  app.post("/api/login", checkRateLimit, async (req, res, next) => {
     const ip = getClientIP(req);
+    const { totpCode } = req.body;
     
-    passport.authenticate("local", (err: any, user: any, info: any) => {
+    passport.authenticate("local", async (err: any, user: any, info: any) => {
       if (err) {
         recordLoginAttempt(ip, false);
         return res.status(500).json({ message: "Authentication error" });
@@ -186,6 +189,29 @@ export async function setupAuth(app: Express) {
         recordLoginAttempt(ip, false);
         return res.status(401).json({ message: info?.message || "Invalid credentials" });
       }
+      
+      // Check if user has TOTP enabled
+      const dbUser = await storage.getUser(user.id);
+      if (dbUser?.totpEnabled && dbUser.totpSecret) {
+        // TOTP is enabled - verify the code
+        if (!totpCode) {
+          return res.status(200).json({ 
+            requiresTOTP: true, 
+            message: "Two-factor authentication code required" 
+          });
+        }
+        
+        const isValidTOTP = authenticator.verify({ 
+          token: totpCode, 
+          secret: dbUser.totpSecret 
+        });
+        
+        if (!isValidTOTP) {
+          recordLoginAttempt(ip, false);
+          return res.status(401).json({ message: "Invalid authentication code" });
+        }
+      }
+      
       // Regenerate session to prevent session fixation attacks
       req.session.regenerate((regenerateErr) => {
         if (regenerateErr) {
@@ -223,6 +249,121 @@ export async function setupAuth(app: Express) {
         res.json({ success: true });
       });
     });
+  });
+
+  // TOTP (Google Authenticator) Setup Endpoints
+  
+  // Get TOTP status for current user
+  app.get("/api/totp/status", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const dbUser = await storage.getUser(user.id);
+      res.json({ enabled: !!dbUser?.totpEnabled });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to get TOTP status" });
+    }
+  });
+
+  // Generate TOTP secret and QR code for setup
+  app.get("/api/totp/setup", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const secret = authenticator.generateSecret();
+      
+      // Store the secret temporarily (not enabled yet)
+      await db.update(users)
+        .set({ totpSecret: secret, totpEnabled: 0 })
+        .where(eq(users.id, user.id));
+      
+      const appName = "Iqbal Electronics";
+      const accountName = user.username || user.email || "User";
+      const otpauthUrl = authenticator.keyuri(accountName, appName, secret);
+      
+      // Generate QR code as data URL
+      const qrCodeUrl = await QRCode.toDataURL(otpauthUrl);
+      
+      res.json({ 
+        secret, 
+        qrCode: qrCodeUrl,
+        manualEntry: secret
+      });
+    } catch (error) {
+      console.error("TOTP setup error:", error);
+      res.status(500).json({ message: "Failed to setup TOTP" });
+    }
+  });
+
+  // Enable TOTP after verifying a code
+  app.post("/api/totp/enable", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { code } = req.body;
+      
+      if (!code) {
+        return res.status(400).json({ message: "Verification code required" });
+      }
+      
+      const dbUser = await storage.getUser(user.id);
+      if (!dbUser?.totpSecret) {
+        return res.status(400).json({ message: "TOTP not set up. Please generate a new QR code first." });
+      }
+      
+      const isValid = authenticator.verify({ 
+        token: code, 
+        secret: dbUser.totpSecret 
+      });
+      
+      if (!isValid) {
+        return res.status(400).json({ message: "Invalid verification code. Please try again." });
+      }
+      
+      // Enable TOTP
+      await db.update(users)
+        .set({ totpEnabled: 1 })
+        .where(eq(users.id, user.id));
+      
+      res.json({ success: true, message: "Two-factor authentication enabled" });
+    } catch (error) {
+      console.error("TOTP enable error:", error);
+      res.status(500).json({ message: "Failed to enable TOTP" });
+    }
+  });
+
+  // Disable TOTP
+  app.post("/api/totp/disable", isAuthenticated, async (req, res) => {
+    try {
+      const user = req.user as any;
+      const { code } = req.body;
+      
+      const dbUser = await storage.getUser(user.id);
+      if (!dbUser?.totpEnabled || !dbUser.totpSecret) {
+        return res.status(400).json({ message: "TOTP is not enabled" });
+      }
+      
+      // Verify current code before disabling
+      if (!code) {
+        return res.status(400).json({ message: "Current authentication code required to disable TOTP" });
+      }
+      
+      const isValid = authenticator.verify({ 
+        token: code, 
+        secret: dbUser.totpSecret 
+      });
+      
+      if (!isValid) {
+        return res.status(400).json({ message: "Invalid verification code" });
+      }
+      
+      // Disable TOTP
+      await db.update(users)
+        .set({ totpSecret: null, totpEnabled: 0 })
+        .where(eq(users.id, user.id));
+      
+      res.json({ success: true, message: "Two-factor authentication disabled" });
+    } catch (error) {
+      console.error("TOTP disable error:", error);
+      res.status(500).json({ message: "Failed to disable TOTP" });
+    }
   });
 }
 
