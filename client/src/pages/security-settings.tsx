@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Lock, Shield, Trash2 } from "lucide-react";
+import { Loader2, Lock, Shield, Trash2, Package, Copy, ExternalLink, RefreshCw } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,14 +19,26 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+interface StockListSettings {
+  token: string | null;
+  pin: string | null;
+  hasAccess: boolean;
+}
+
 export default function SecuritySettingsPage() {
   const { toast } = useToast();
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [stockListPin, setStockListPin] = useState("");
+  const [showRevokeStockListDialog, setShowRevokeStockListDialog] = useState(false);
 
   const { data: passwordStatus, isLoading } = useQuery<{ isSet: boolean }>({
     queryKey: ["/api/settings/transaction-password-status"],
+  });
+
+  const { data: stockListSettings, isLoading: stockListLoading } = useQuery<StockListSettings>({
+    queryKey: ["/api/settings/stock-list"],
   });
 
   const setPasswordMutation = useMutation({
@@ -72,6 +84,73 @@ export default function SecuritySettingsPage() {
       });
     },
   });
+
+  const generateStockListMutation = useMutation({
+    mutationFn: async (pin: string) => {
+      const res = await apiRequest("POST", "/api/settings/stock-list/generate", { pin });
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/stock-list"] });
+      setStockListPin("");
+      toast({
+        title: "Stock List Link Generated",
+        description: "Share this link with authorized users.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate stock list link.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const revokeStockListMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/settings/stock-list");
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/stock-list"] });
+      setShowRevokeStockListDialog(false);
+      toast({
+        title: "Access Revoked",
+        description: "Stock list link has been disabled.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to revoke stock list access.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGenerateStockList = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stockListPin || stockListPin.length < 4 || stockListPin.length > 6) {
+      toast({
+        title: "Error",
+        description: "PIN must be 4-6 digits.",
+        variant: "destructive",
+      });
+      return;
+    }
+    generateStockListMutation.mutate(stockListPin);
+  };
+
+  const copyStockListLink = () => {
+    if (!stockListSettings?.token) return;
+    const url = `${window.location.origin}/stock-list/${stockListSettings.token}`;
+    navigator.clipboard.writeText(url);
+    toast({
+      title: "Link Copied",
+      description: "Stock list URL copied to clipboard.",
+    });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,6 +285,150 @@ export default function SecuritySettingsPage() {
           </form>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5" />
+              <CardTitle>Stock List URL</CardTitle>
+            </div>
+            <Badge variant={stockListSettings?.hasAccess ? "default" : "secondary"}>
+              {stockListSettings?.hasAccess ? "Active" : "Not Set"}
+            </Badge>
+          </div>
+          <CardDescription>
+            Generate a PIN-protected link to share your current stock and prices with authorized users.
+            Anyone with the link and PIN can view real-time inventory levels and selling prices.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {stockListLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : stockListSettings?.hasAccess ? (
+            <div className="space-y-4">
+              <div className="p-3 rounded-md bg-muted/50 border">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">URL: </span>
+                    <code className="bg-background px-1 rounded text-xs">
+                      {window.location.origin}/stock-list/{stockListSettings.token?.substring(0, 8)}...
+                    </code>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={copyStockListLink} data-testid="button-copy-stock-link">
+                      <Copy className="h-4 w-4 mr-1" />
+                      Copy
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`/stock-list/${stockListSettings.token}`, "_blank")}
+                      data-testid="button-open-stock-link"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      Open
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-2 text-sm">
+                  <span className="text-muted-foreground">PIN: </span>
+                  <code className="bg-background px-1 rounded">{stockListSettings.pin}</code>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowRevokeStockListDialog(true)}
+                  disabled={revokeStockListMutation.isPending}
+                  data-testid="button-revoke-stock-list"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Revoke Access
+                </Button>
+                <form onSubmit={handleGenerateStockList} className="flex gap-2 items-end">
+                  <div>
+                    <Label htmlFor="newStockPin" className="text-xs">New PIN</Label>
+                    <Input
+                      id="newStockPin"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      placeholder="4-6 digits"
+                      value={stockListPin}
+                      onChange={(e) => setStockListPin(e.target.value.replace(/\D/g, ""))}
+                      className="w-24"
+                      data-testid="input-new-stock-pin"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    disabled={generateStockListMutation.isPending || stockListPin.length < 4}
+                    data-testid="button-regenerate-stock-link"
+                  >
+                    {generateStockListMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Regenerate
+                  </Button>
+                </form>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleGenerateStockList} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="stockListPin">Set PIN Code (4-6 digits)</Label>
+                <Input
+                  id="stockListPin"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  placeholder="Enter 4-6 digit PIN"
+                  value={stockListPin}
+                  onChange={(e) => setStockListPin(e.target.value.replace(/\D/g, ""))}
+                  className="max-w-xs"
+                  data-testid="input-stock-list-pin"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={generateStockListMutation.isPending || stockListPin.length < 4}
+                data-testid="button-generate-stock-link"
+              >
+                {generateStockListMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Generate Stock List Link
+              </Button>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={showRevokeStockListDialog} onOpenChange={setShowRevokeStockListDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke Stock List Access?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will disable the current stock list link. Anyone with the old link will no longer be able to access it.
+              You can generate a new link anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => revokeStockListMutation.mutate()}>
+              Revoke Access
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
         <AlertDialogContent>

@@ -39,6 +39,13 @@ export default function StockListPage() {
 
   const { data: tokenInfo, isLoading: tokenLoading, error: tokenError } = useQuery<TokenVerification>({
     queryKey: ["/api/public/stock-list", token],
+    queryFn: async () => {
+      const response = await fetch(`/api/public/stock-list/${token}`);
+      if (!response.ok) {
+        throw new Error("Invalid link");
+      }
+      return response.json();
+    },
     enabled: !!token,
   });
 
