@@ -90,7 +90,6 @@ export default function StockListPage() {
     if (pdfWindow) {
       const rows = filteredStock.map(item => 
         `<tr>
-          <td>${item.itemCode || "-"}</td>
           <td>${item.itemName}</td>
           <td>${item.category || "-"}</td>
           <td class="amount">${item.currentStock}</td>
@@ -131,7 +130,6 @@ export default function StockListPage() {
           <table>
             <thead>
               <tr>
-                <th>Code</th>
                 <th>Item Name</th>
                 <th>Category</th>
                 <th class="amount">Stock</th>
@@ -153,11 +151,10 @@ export default function StockListPage() {
 
   const handleDownloadCSV = () => {
     if (!stockData) return;
-    const headers = ["Code", "Item Name", "Category", "Stock", "Price (KWD)"];
+    const headers = ["Item Name", "Category", "Stock", "Price (KWD)"];
     const csvRows = [
       headers.join(","),
       ...filteredStock.map(item => [
-        item.itemCode || "",
         `"${item.itemName.replace(/"/g, '""')}"`,
         item.category || "",
         item.currentStock,
@@ -287,7 +284,7 @@ export default function StockListPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name or code..."
+                  placeholder="Search by name..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -326,7 +323,6 @@ export default function StockListPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-sky-100 dark:bg-sky-900/30">
                     <tr>
-                      <th className="text-left p-3 font-medium">Code</th>
                       <th className="text-left p-3 font-medium">Item Name</th>
                       <th className="text-left p-3 font-medium">Category</th>
                       <th className="text-right p-3 font-medium">Stock</th>
@@ -342,7 +338,6 @@ export default function StockListPage() {
                           className={`border-t ${index % 2 === 0 ? "" : "bg-muted/20"}`}
                           data-testid={`row-stock-${index}`}
                         >
-                          <td className="p-3">{item.itemCode || "-"}</td>
                           <td className="p-3 font-medium">{item.itemName}</td>
                           <td className="p-3">
                             {item.category && (
@@ -363,7 +358,7 @@ export default function StockListPage() {
                     })}
                     {filteredStock.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="p-8 text-center text-muted-foreground">
+                        <td colSpan={4} className="p-8 text-center text-muted-foreground">
                           No items found matching your search.
                         </td>
                       </tr>
