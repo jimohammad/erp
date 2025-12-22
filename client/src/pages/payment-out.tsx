@@ -436,7 +436,7 @@ export default function PaymentOutPage() {
                   <SelectContent>
                     {parties.map((party) => (
                       <SelectItem key={party.id} value={party.id.toString()}>
-                        {party.name} {party.partyType ? `(${party.partyType})` : ''}
+                        {party.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
