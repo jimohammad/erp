@@ -324,7 +324,7 @@ export default function StockListPage() {
             <div className="border rounded-md overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
+                  <thead className="bg-sky-100 dark:bg-sky-900/30">
                     <tr>
                       <th className="text-left p-3 font-medium">Code</th>
                       <th className="text-left p-3 font-medium">Item Name</th>
