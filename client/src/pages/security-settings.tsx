@@ -144,7 +144,7 @@ export default function SecuritySettingsPage() {
 
   const copyStockListLink = () => {
     if (!stockListSettings?.token) return;
-    const url = `${window.location.origin}/stock-list/${stockListSettings.token}`;
+    const url = `${window.location.origin}/s/${stockListSettings.token}`;
     navigator.clipboard.writeText(url);
     toast({
       title: "Link Copied",
@@ -314,7 +314,7 @@ export default function SecuritySettingsPage() {
                   <div className="text-sm">
                     <span className="text-muted-foreground">URL: </span>
                     <code className="bg-background px-1 rounded text-xs">
-                      {window.location.origin}/stock-list/{stockListSettings.token?.substring(0, 8)}...
+                      {window.location.origin}/s/{stockListSettings.token?.substring(0, 8)}...
                     </code>
                   </div>
                   <div className="flex gap-2">
@@ -325,7 +325,7 @@ export default function SecuritySettingsPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => window.open(`/stock-list/${stockListSettings.token}`, "_blank")}
+                      onClick={() => window.open(`/s/${stockListSettings.token}`, "_blank")}
                       data-testid="button-open-stock-link"
                     >
                       <ExternalLink className="h-4 w-4 mr-1" />
