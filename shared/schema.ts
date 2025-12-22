@@ -1131,3 +1131,17 @@ export type AuditTrailWithDetails = AuditTrail & {
   user?: User | null;
   branch?: Branch | null;
 };
+
+// ==================== SYSTEM SETTINGS ====================
+// Global settings including stock list URL token/PIN
+
+export const systemSettings = pgTable("system_settings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  key: text("key").notNull().unique(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true });
+export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
+export type SystemSetting = typeof systemSettings.$inferSelect;

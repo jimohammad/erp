@@ -351,6 +351,9 @@ export interface IStorage {
 
   // Salesman statement access
   getSalesmanByToken(token: string): Promise<Supplier | undefined>;
+  
+  // Stock list with prices (for public URL)
+  getStockListWithPrices(): Promise<{ itemCode: string | null; itemName: string; category: string | null; currentStock: number; sellingPriceKwd: string | null; minStockLevel: number }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -445,6 +448,65 @@ export class DatabaseStorage implements IStorage {
       )
     );
     return salesman || undefined;
+  }
+
+  async getStockListWithPrices(): Promise<{ itemCode: string | null; itemName: string; category: string | null; currentStock: number; sellingPriceKwd: string | null; minStockLevel: number }[]> {
+    // Get stock balances and join with items for prices
+    const result = await db.execute(sql`
+      WITH purchased AS (
+        SELECT item_name, COALESCE(SUM(quantity), 0) as qty
+        FROM purchase_order_line_items
+        GROUP BY item_name
+      ),
+      sold AS (
+        SELECT item_name, COALESCE(SUM(quantity), 0) as qty
+        FROM sales_order_line_items
+        GROUP BY item_name
+      ),
+      opening_stock AS (
+        SELECT i.name as item_name, COALESCE(SUM(ia.quantity), 0) as qty
+        FROM inventory_adjustments ia
+        JOIN items i ON ia.item_id = i.id
+        GROUP BY i.name
+      ),
+      sale_returns AS (
+        SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
+        FROM return_line_items rl
+        JOIN returns r ON rl.return_id = r.id
+        WHERE r.return_type = 'sale'
+        GROUP BY rl.item_name
+      ),
+      purchase_returns AS (
+        SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
+        FROM return_line_items rl
+        JOIN returns r ON rl.return_id = r.id
+        WHERE r.return_type = 'purchase'
+        GROUP BY rl.item_name
+      )
+      SELECT 
+        i.code as "itemCode",
+        i.name as "itemName",
+        i.category as "category",
+        (COALESCE(o.qty, 0) + COALESCE(p.qty, 0) + COALESCE(sr.qty, 0) - COALESCE(s.qty, 0) - COALESCE(pr.qty, 0))::integer as "currentStock",
+        i.selling_price_kwd as "sellingPriceKwd",
+        COALESCE(i.min_stock_level, 0)::integer as "minStockLevel"
+      FROM items i
+      LEFT JOIN purchased p ON i.name = p.item_name
+      LEFT JOIN sold s ON i.name = s.item_name
+      LEFT JOIN opening_stock o ON i.name = o.item_name
+      LEFT JOIN sale_returns sr ON i.name = sr.item_name
+      LEFT JOIN purchase_returns pr ON i.name = pr.item_name
+      ORDER BY i.category, i.name
+    `);
+    
+    return (result.rows as any[]).map(row => ({
+      itemCode: row.itemCode,
+      itemName: row.itemName,
+      category: row.category,
+      currentStock: row.currentStock || 0,
+      sellingPriceKwd: row.sellingPriceKwd,
+      minStockLevel: row.minStockLevel || 0,
+    }));
   }
 
   async createSupplier(supplier: InsertSupplier): Promise<Supplier> {

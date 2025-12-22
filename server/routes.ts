@@ -2092,6 +2092,118 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== STOCK LIST PUBLIC URL ====================
+  
+  // Get stock list settings (admin only)
+  app.get("/api/settings/stock-list", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const token = await storage.getSetting('stock_list_token');
+      const pin = await storage.getSetting('stock_list_pin');
+      res.json({
+        token,
+        pin,
+        hasAccess: !!token && !!pin,
+      });
+    } catch (error) {
+      console.error("Error getting stock list settings:", error);
+      res.status(500).json({ error: "Failed to get settings" });
+    }
+  });
+
+  // Generate/regenerate stock list token and PIN (admin only)
+  app.post("/api/settings/stock-list/generate", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { pin } = req.body;
+      if (!pin || pin.length < 4 || pin.length > 6) {
+        return res.status(400).json({ error: "PIN must be 4-6 digits" });
+      }
+
+      // Generate unique token
+      const token = crypto.randomBytes(16).toString('hex');
+      
+      await storage.setSetting('stock_list_token', token);
+      await storage.setSetting('stock_list_pin', pin);
+
+      res.json({
+        success: true,
+        token,
+        stockListUrl: `/stock-list/${token}`,
+      });
+    } catch (error) {
+      console.error("Error generating stock list access:", error);
+      res.status(500).json({ error: "Failed to generate stock list access" });
+    }
+  });
+
+  // Revoke stock list access (admin only)
+  app.delete("/api/settings/stock-list", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.setSetting('stock_list_token', '');
+      await storage.setSetting('stock_list_pin', '');
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error revoking stock list access:", error);
+      res.status(500).json({ error: "Failed to revoke access" });
+    }
+  });
+
+  // Verify stock list token exists (no PIN required) - PUBLIC
+  app.get("/api/public/stock-list/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token) {
+        return res.status(400).json({ error: "Token is required" });
+      }
+
+      const savedToken = await storage.getSetting('stock_list_token');
+      if (!savedToken || savedToken !== token) {
+        return res.status(404).json({ error: "Invalid stock list link" });
+      }
+
+      res.json({
+        valid: true,
+        requiresPin: true,
+      });
+    } catch (error) {
+      console.error("Error verifying stock list token:", error);
+      res.status(500).json({ error: "Failed to verify token" });
+    }
+  });
+
+  // Verify PIN and get stock list - PUBLIC
+  app.post("/api/public/stock-list/:token/verify", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { pin } = req.body;
+
+      if (!token || !pin) {
+        return res.status(400).json({ error: "Token and PIN are required" });
+      }
+
+      const savedToken = await storage.getSetting('stock_list_token');
+      const savedPin = await storage.getSetting('stock_list_pin');
+
+      if (!savedToken || savedToken !== token) {
+        return res.status(404).json({ error: "Invalid stock list link" });
+      }
+
+      if (savedPin !== pin) {
+        return res.status(401).json({ error: "Invalid PIN" });
+      }
+
+      // Get stock list with prices
+      const stockList = await storage.getStockListWithPrices();
+      
+      res.json({
+        stockList,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error fetching stock list:", error);
+      res.status(500).json({ error: "Failed to fetch stock list" });
+    }
+  });
+
   // Get customer balance for a specific sale order (for invoice printing)
   app.get("/api/customer-balance-for-sale/:saleOrderId", isAuthenticated, async (req, res) => {
     try {
