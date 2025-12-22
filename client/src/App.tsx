@@ -795,7 +795,7 @@ function App() {
           <Switch>
             <Route path="/statement/:customerId" component={PublicStatementPage} />
             <Route path="/salesman-statement/:token" component={SalesmanStatementPage} />
-            <Route path="/stock-list/:token" component={StockListPage} />
+            <Route path="/s/:token" component={StockListPage} />
             <Route path="/verify/:code" component={VerifyPage} />
             <Route component={Router} />
           </Switch>

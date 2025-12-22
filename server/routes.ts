@@ -2127,7 +2127,7 @@ export async function registerRoutes(
       res.json({
         success: true,
         token,
-        stockListUrl: `/stock-list/${token}`,
+        stockListUrl: `/s/${token}`,
       });
     } catch (error) {
       console.error("Error generating stock list access:", error);
