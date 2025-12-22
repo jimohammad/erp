@@ -528,10 +528,10 @@ export class DatabaseStorage implements IStorage {
         GROUP BY sli.item_name
       ),
       opening_stock AS (
-        SELECT item_name, SUM(opening_qty) as qty
+        SELECT name as item_name, SUM(opening_qty) as qty
         FROM items
         WHERE opening_qty > 0
-        GROUP BY item_name
+        GROUP BY name
       ),
       sale_returns AS (
         SELECT rl.item_name, SUM(rl.quantity) as qty
