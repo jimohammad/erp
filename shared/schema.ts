@@ -40,6 +40,8 @@ export const users = pgTable("users", {
   profileImageUrl: varchar("profile_image_url"),
   role: varchar("role").default("viewer").notNull(),
   printerType: varchar("printer_type").default("a5"),
+  totpSecret: varchar("totp_secret"),
+  totpEnabled: integer("totp_enabled").default(0),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
