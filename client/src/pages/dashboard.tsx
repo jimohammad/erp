@@ -273,9 +273,6 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            </div>
-
-          <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
             <Card data-testid="card-total-expenses" className="p-0 overflow-visible">
               <CardHeader className="flex flex-row items-center justify-between gap-2 p-3 pb-1">
                 <CardTitle className="text-xs font-medium text-muted-foreground">Total Expenses</CardTitle>
@@ -284,13 +281,14 @@ export default function DashboardPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-3 pt-0">
-                <div className="text-xl font-semibold text-orange-600 dark:text-orange-400" data-testid="text-total-expenses">
+                <div className="text-lg font-semibold text-orange-600 dark:text-orange-400" data-testid="text-total-expenses">
                   {formatCurrency(stats?.totalExpenses || 0)}
                 </div>
                 <p className="text-[10px] text-muted-foreground">KWD</p>
               </CardContent>
             </Card>
-          </div>
+
+            </div>
 
           <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
             <Card data-testid="card-sales-comparison">
