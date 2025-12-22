@@ -47,6 +47,7 @@ export default function PartyMaster() {
   const [partyType, setPartyType] = useState<PartyType>("salesman");
   const [partyArea, setPartyArea] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
+  const [openingBalance, setOpeningBalance] = useState("");
   const [partyCountry, setPartyCountry] = useState("");
   const [partyEmail, setPartyEmail] = useState("");
   const [beneficiaryName, setBeneficiaryName] = useState("");
@@ -106,6 +107,7 @@ export default function PartyMaster() {
     setPartyPhone("");
     setPartyType("salesman");
     setCreditLimit("");
+    setOpeningBalance("");
     setPartyArea("");
     setPartyCountry("");
     setPartyEmail("");
@@ -123,6 +125,7 @@ export default function PartyMaster() {
       setPartyPhone(editingParty.phone || "");
       setPartyType((editingParty.partyType as PartyType) || "supplier");
       setCreditLimit(editingParty.creditLimit || "");
+      setOpeningBalance(editingParty.openingBalance || "");
       setPartyArea(editingParty.area || "");
       setPartyCountry(editingParty.country || "");
       setPartyEmail(editingParty.email || "");
@@ -140,6 +143,7 @@ export default function PartyMaster() {
     phone: string | null;
     partyType: PartyType;
     creditLimit: string | null;
+    openingBalance: string | null;
     area: string | null;
     country: string | null;
     email: string | null;
@@ -271,6 +275,7 @@ export default function PartyMaster() {
       phone: partyPhone.trim() || null,
       partyType,
       creditLimit: (partyType === "customer" || partyType === "salesman") && creditLimit.trim() ? creditLimit.trim() : null,
+      openingBalance: partyType === "salesman" && openingBalance.trim() ? openingBalance.trim() : null,
       area: (partyType === "customer" || partyType === "salesman") && partyArea.trim() ? partyArea.trim() : null,
       country: partyType === "supplier" && partyCountry.trim() ? partyCountry.trim() : null,
       email: partyType === "supplier" && partyEmail.trim() ? partyEmail.trim() : null,
@@ -459,6 +464,18 @@ export default function PartyMaster() {
                       onChange={(e) => setCreditLimit(e.target.value)}
                       placeholder="Enter credit limit (optional)"
                       data-testid="input-salesman-credit-limit"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="openingBalance">Opening Balance (KWD)</Label>
+                    <Input
+                      id="openingBalance"
+                      type="number"
+                      step="0.001"
+                      value={openingBalance}
+                      onChange={(e) => setOpeningBalance(e.target.value)}
+                      placeholder="Enter opening balance (if any)"
+                      data-testid="input-salesman-opening-balance"
                     />
                   </div>
                 </div>

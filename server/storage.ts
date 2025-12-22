@@ -1752,6 +1752,9 @@ export class DatabaseStorage implements IStorage {
     
     if (isSalesman) {
       // For salesmen: track sales they made and payments received from them
+      // Get opening balance
+      const openingBalance = parseFloat(partyData.openingBalance || "0");
+      
       // Build date filters for each table's date column
       let saleDateFilter = sql``;
       let paymentDateFilter = sql``;
@@ -1772,6 +1775,20 @@ export class DatabaseStorage implements IStorage {
       
       result = await db.execute(sql`
         WITH all_transactions AS (
+          -- Opening Balance (starting point)
+          SELECT 
+            0 as id,
+            '1900-01-01'::date as date,
+            'opening' as type,
+            'Opening Balance' as reference,
+            'Opening Balance' as description,
+            ${openingBalance}::float as debit,
+            0::float as credit,
+            '1900-01-01 00:00:00'::timestamp as created_at
+          WHERE ${openingBalance} != 0
+          
+          UNION ALL
+          
           -- Sales made by this salesman (they owe us - debit)
           SELECT 
             so.id,

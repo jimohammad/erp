@@ -65,6 +65,7 @@ export const suppliers = pgTable("suppliers", {
   bankAddress: text("bank_address"),
   statementToken: text("statement_token"),
   statementPin: text("statement_pin"),
+  openingBalance: numeric("opening_balance", { precision: 12, scale: 3 }).default("0"),
 }, (table) => [
   index("idx_supplier_party_type").on(table.partyType),
   index("idx_supplier_area").on(table.area),
