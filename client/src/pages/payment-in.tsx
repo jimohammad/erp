@@ -785,7 +785,7 @@ export default function PaymentInPage() {
               <div className="space-y-2">
                 <Label htmlFor="customer">Customer</Label>
                 <Select value={customerId} onValueChange={setCustomerId}>
-                  <SelectTrigger data-testid="select-customer">
+                  <SelectTrigger data-testid="select-customer" autoFocus>
                     <SelectValue placeholder="Select customer" />
                   </SelectTrigger>
                   <SelectContent>
