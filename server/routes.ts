@@ -2204,6 +2204,118 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== SALESMAN PRICE LIST PUBLIC URL ====================
+  
+  // Get salesman price list settings (admin only)
+  app.get("/api/settings/price-list", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const token = await storage.getSetting('price_list_token');
+      const pin = await storage.getSetting('price_list_pin');
+      res.json({
+        token,
+        pin,
+        hasAccess: !!token && !!pin,
+      });
+    } catch (error) {
+      console.error("Error getting price list settings:", error);
+      res.status(500).json({ error: "Failed to get settings" });
+    }
+  });
+
+  // Generate/regenerate price list token and PIN (admin only)
+  app.post("/api/settings/price-list/generate", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { pin } = req.body;
+      if (!pin || pin.length < 4 || pin.length > 6) {
+        return res.status(400).json({ error: "PIN must be 4-6 digits" });
+      }
+
+      // Generate unique token
+      const token = crypto.randomBytes(16).toString('hex');
+      
+      await storage.setSetting('price_list_token', token);
+      await storage.setSetting('price_list_pin', pin);
+
+      res.json({
+        success: true,
+        token,
+        priceListUrl: `/p/${token}`,
+      });
+    } catch (error) {
+      console.error("Error generating price list access:", error);
+      res.status(500).json({ error: "Failed to generate price list access" });
+    }
+  });
+
+  // Revoke price list access (admin only)
+  app.delete("/api/settings/price-list", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      await storage.setSetting('price_list_token', '');
+      await storage.setSetting('price_list_pin', '');
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error revoking price list access:", error);
+      res.status(500).json({ error: "Failed to revoke access" });
+    }
+  });
+
+  // Verify price list token exists (no PIN required) - PUBLIC
+  app.get("/api/public/price-list/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      if (!token) {
+        return res.status(400).json({ error: "Token is required" });
+      }
+
+      const savedToken = await storage.getSetting('price_list_token');
+      if (!savedToken || savedToken !== token) {
+        return res.status(404).json({ error: "Invalid price list link" });
+      }
+
+      res.json({
+        valid: true,
+        requiresPin: true,
+      });
+    } catch (error) {
+      console.error("Error verifying price list token:", error);
+      res.status(500).json({ error: "Failed to verify token" });
+    }
+  });
+
+  // Verify PIN and get price list - PUBLIC
+  app.post("/api/public/price-list/:token/verify", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { pin } = req.body;
+
+      if (!token || !pin) {
+        return res.status(400).json({ error: "Token and PIN are required" });
+      }
+
+      const savedToken = await storage.getSetting('price_list_token');
+      const savedPin = await storage.getSetting('price_list_pin');
+
+      if (!savedToken || savedToken !== token) {
+        return res.status(404).json({ error: "Invalid price list link" });
+      }
+
+      if (savedPin !== pin) {
+        return res.status(401).json({ error: "Invalid PIN" });
+      }
+
+      // Get price list without stock quantities
+      const priceList = await storage.getPriceListOnly();
+      
+      res.json({
+        priceList,
+        generatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("Error fetching price list:", error);
+      res.status(500).json({ error: "Failed to fetch price list" });
+    }
+  });
+
   // Get customer balance for a specific sale order (for invoice printing)
   app.get("/api/customer-balance-for-sale/:saleOrderId", isAuthenticated, async (req, res) => {
     try {

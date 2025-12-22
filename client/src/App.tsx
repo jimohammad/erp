@@ -71,6 +71,7 @@ const Landing = lazy(() => import("@/pages/landing"));
 const PublicStatementPage = lazy(() => import("@/pages/public-statement"));
 const SalesmanStatementPage = lazy(() => import("@/pages/salesman-statement"));
 const StockListPage = lazy(() => import("@/pages/stock-list"));
+const PriceListPage = lazy(() => import("@/pages/price-list"));
 const VerifyPage = lazy(() => import("@/pages/verify"));
 const AllTransactionsPage = lazy(() => import("@/pages/all-transactions"));
 const CustomerAgingPage = lazy(() => import("@/pages/customer-aging"));
@@ -796,6 +797,7 @@ function App() {
             <Route path="/statement/:customerId" component={PublicStatementPage} />
             <Route path="/salesman-statement/:token" component={SalesmanStatementPage} />
             <Route path="/s/:token" component={StockListPage} />
+            <Route path="/p/:token" component={PriceListPage} />
             <Route path="/verify/:code" component={VerifyPage} />
             <Route component={Router} />
           </Switch>

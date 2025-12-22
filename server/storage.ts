@@ -354,6 +354,9 @@ export interface IStorage {
   
   // Stock list with prices (for public URL)
   getStockListWithPrices(): Promise<{ itemCode: string | null; itemName: string; category: string | null; currentStock: number; sellingPriceKwd: string | null; minStockLevel: number }[]>;
+  
+  // Price list without stock (for salesman)
+  getPriceListOnly(): Promise<{ itemCode: string | null; itemName: string; category: string | null; sellingPriceKwd: string | null }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -507,6 +510,20 @@ export class DatabaseStorage implements IStorage {
       sellingPriceKwd: row.sellingPriceKwd,
       minStockLevel: row.minStockLevel || 0,
     }));
+  }
+
+  async getPriceListOnly(): Promise<{ itemCode: string | null; itemName: string; category: string | null; sellingPriceKwd: string | null }[]> {
+    const result = await db
+      .select({
+        itemCode: items.code,
+        itemName: items.name,
+        category: items.category,
+        sellingPriceKwd: items.sellingPriceKwd,
+      })
+      .from(items)
+      .orderBy(items.category, items.name);
+    
+    return result;
   }
 
   async createSupplier(supplier: InsertSupplier): Promise<Supplier> {

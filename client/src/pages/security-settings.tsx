@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Lock, Shield, Trash2, Package, Copy, ExternalLink, RefreshCw } from "lucide-react";
+import { Loader2, Lock, Shield, Trash2, Package, Copy, ExternalLink, RefreshCw, DollarSign } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +25,12 @@ interface StockListSettings {
   hasAccess: boolean;
 }
 
+interface PriceListSettings {
+  token: string | null;
+  pin: string | null;
+  hasAccess: boolean;
+}
+
 export default function SecuritySettingsPage() {
   const { toast } = useToast();
   const [newPassword, setNewPassword] = useState("");
@@ -32,6 +38,8 @@ export default function SecuritySettingsPage() {
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
   const [stockListPin, setStockListPin] = useState("");
   const [showRevokeStockListDialog, setShowRevokeStockListDialog] = useState(false);
+  const [priceListPin, setPriceListPin] = useState("");
+  const [showRevokePriceListDialog, setShowRevokePriceListDialog] = useState(false);
 
   const { data: passwordStatus, isLoading } = useQuery<{ isSet: boolean }>({
     queryKey: ["/api/settings/transaction-password-status"],
@@ -39,6 +47,10 @@ export default function SecuritySettingsPage() {
 
   const { data: stockListSettings, isLoading: stockListLoading } = useQuery<StockListSettings>({
     queryKey: ["/api/settings/stock-list"],
+  });
+
+  const { data: priceListSettings, isLoading: priceListLoading } = useQuery<PriceListSettings>({
+    queryKey: ["/api/settings/price-list"],
   });
 
   const setPasswordMutation = useMutation({
@@ -149,6 +161,73 @@ export default function SecuritySettingsPage() {
     toast({
       title: "Link Copied",
       description: "Stock list URL copied to clipboard.",
+    });
+  };
+
+  const generatePriceListMutation = useMutation({
+    mutationFn: async (pin: string) => {
+      const res = await apiRequest("POST", "/api/settings/price-list/generate", { pin });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/price-list"] });
+      setPriceListPin("");
+      toast({
+        title: "Price List Link Generated",
+        description: "Share this link with salesmen.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate price list link.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const revokePriceListMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/settings/price-list");
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/price-list"] });
+      setShowRevokePriceListDialog(false);
+      toast({
+        title: "Access Revoked",
+        description: "Price list link has been disabled.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to revoke price list access.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGeneratePriceList = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!priceListPin || priceListPin.length < 4 || priceListPin.length > 6) {
+      toast({
+        title: "Error",
+        description: "PIN must be 4-6 digits.",
+        variant: "destructive",
+      });
+      return;
+    }
+    generatePriceListMutation.mutate(priceListPin);
+  };
+
+  const copyPriceListLink = () => {
+    if (!priceListSettings?.token) return;
+    const url = `${window.location.origin}/p/${priceListSettings.token}`;
+    navigator.clipboard.writeText(url);
+    toast({
+      title: "Link Copied",
+      description: "Price list URL copied to clipboard.",
     });
   };
 
@@ -411,6 +490,150 @@ export default function SecuritySettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              <CardTitle>Price List URL (For Salesmen)</CardTitle>
+            </div>
+            <Badge variant={priceListSettings?.hasAccess ? "default" : "secondary"}>
+              {priceListSettings?.hasAccess ? "Active" : "Not Set"}
+            </Badge>
+          </div>
+          <CardDescription>
+            Generate a PIN-protected link to share product prices with salesmen.
+            This list shows items and prices only (no stock quantities).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {priceListLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : priceListSettings?.hasAccess ? (
+            <div className="space-y-4">
+              <div className="p-3 rounded-md bg-muted/50 border">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">URL: </span>
+                    <code className="bg-background px-1 rounded text-xs">
+                      {window.location.origin}/p/{priceListSettings.token?.substring(0, 8)}...
+                    </code>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={copyPriceListLink} data-testid="button-copy-price-link">
+                      <Copy className="h-4 w-4 mr-1" />
+                      Copy
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(`/p/${priceListSettings.token}`, "_blank")}
+                      data-testid="button-open-price-link"
+                    >
+                      <ExternalLink className="h-4 w-4 mr-1" />
+                      Open
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-2 text-sm">
+                  <span className="text-muted-foreground">PIN: </span>
+                  <code className="bg-background px-1 rounded">{priceListSettings.pin}</code>
+                </div>
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowRevokePriceListDialog(true)}
+                  disabled={revokePriceListMutation.isPending}
+                  data-testid="button-revoke-price-list"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Revoke Access
+                </Button>
+                <form onSubmit={handleGeneratePriceList} className="flex gap-2 items-end">
+                  <div>
+                    <Label htmlFor="newPricePin" className="text-xs">New PIN</Label>
+                    <Input
+                      id="newPricePin"
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      placeholder="4-6 digits"
+                      value={priceListPin}
+                      onChange={(e) => setPriceListPin(e.target.value.replace(/\D/g, ""))}
+                      className="w-24"
+                      data-testid="input-new-price-pin"
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    disabled={generatePriceListMutation.isPending || priceListPin.length < 4}
+                    data-testid="button-regenerate-price-link"
+                  >
+                    {generatePriceListMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Regenerate
+                  </Button>
+                </form>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleGeneratePriceList} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="priceListPin">Set PIN Code (4-6 digits)</Label>
+                <Input
+                  id="priceListPin"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  placeholder="Enter 4-6 digit PIN"
+                  value={priceListPin}
+                  onChange={(e) => setPriceListPin(e.target.value.replace(/\D/g, ""))}
+                  className="max-w-xs"
+                  data-testid="input-price-list-pin"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={generatePriceListMutation.isPending || priceListPin.length < 4}
+                data-testid="button-generate-price-link"
+              >
+                {generatePriceListMutation.isPending && (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                )}
+                Generate Price List Link
+              </Button>
+            </form>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={showRevokePriceListDialog} onOpenChange={setShowRevokePriceListDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke Price List Access?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will disable the current price list link. Anyone with the old link will no longer be able to access it.
+              You can generate a new link anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => revokePriceListMutation.mutate()}>
+              Revoke Access
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={showRevokeStockListDialog} onOpenChange={setShowRevokeStockListDialog}>
         <AlertDialogContent>
