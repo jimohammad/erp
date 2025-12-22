@@ -115,8 +115,8 @@ export default function PaymentOutPage() {
     queryKey: ["/api/suppliers"],
   });
   
-  // Filter to only show suppliers (not customers or salesmen)
-  const suppliers = allSuppliers.filter(s => s.partyType === "supplier" || !s.partyType);
+  // Show all parties (suppliers, customers, salesmen) for payment out
+  const parties = allSuppliers;
 
   const { data: purchaseOrdersData } = useQuery<{ data: PurchaseOrderWithDetails[]; total: number }>({
     queryKey: ["/api/purchase-orders", "all"],
@@ -227,7 +227,7 @@ export default function PaymentOutPage() {
     }
 
     if (!supplierId) {
-      toast({ title: "Please select a supplier", variant: "destructive" });
+      toast({ title: "Please select a party", variant: "destructive" });
       return;
     }
 
@@ -329,7 +329,7 @@ export default function PaymentOutPage() {
   };
 
   const handlePrintPayment = async (payment: PaymentWithDetails) => {
-    const supplierName = payment.supplier?.name || "Supplier";
+    const partyName = payment.supplier?.name || "Party";
     const amountNum = parseFloat(payment.amount);
     const amountWords = numberToWords(amountNum);
 
@@ -340,7 +340,7 @@ export default function PaymentOutPage() {
       number: `PV-${payment.id}`,
       amount: amountNum.toFixed(3),
       date: payment.paymentDate,
-      partyName: supplierName,
+      partyName: partyName,
       partyType: 'supplier',
     });
 
@@ -386,7 +386,7 @@ export default function PaymentOutPage() {
         </div>
         <div class="row"><span class="label">Voucher No:</span><span>PV-${payment.id}</span></div>
         <div class="row"><span class="label">Date:</span><span>${formatDate(payment.paymentDate)}</span></div>
-        <div class="row"><span class="label">Supplier:</span><span>${supplierName}</span></div>
+        <div class="row"><span class="label">Party:</span><span>${partyName}</span></div>
         <div class="row"><span class="label">Payment Type:</span><span>${payment.paymentType}</span></div>
         <div class="amount-box">
           <div>Amount Paid</div>
@@ -422,21 +422,21 @@ export default function PaymentOutPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Make Payment to Supplier</CardTitle>
+          <CardTitle>Make Payment</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="supplier">Supplier</Label>
+                <Label htmlFor="party">Party</Label>
                 <Select value={supplierId} onValueChange={(v) => { setSupplierId(v); setPurchaseOrderId(""); }}>
-                  <SelectTrigger data-testid="select-supplier">
-                    <SelectValue placeholder="Select supplier" />
+                  <SelectTrigger data-testid="select-party">
+                    <SelectValue placeholder="Select party" />
                   </SelectTrigger>
                   <SelectContent>
-                    {suppliers.map((supplier) => (
-                      <SelectItem key={supplier.id} value={supplier.id.toString()}>
-                        {supplier.name}
+                    {parties.map((party) => (
+                      <SelectItem key={party.id} value={party.id.toString()}>
+                        {party.name} {party.partyType ? `(${party.partyType})` : ''}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -621,7 +621,7 @@ export default function PaymentOutPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by supplier, reference..."
+                placeholder="Search by party, reference..."
                 value={searchTerm}
                 onChange={(e) => handleSearchChange(e.target.value)}
                 className="pl-9"
@@ -660,7 +660,7 @@ export default function PaymentOutPage() {
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-3 px-2 font-medium">Date</th>
-                      <th className="text-left py-3 px-2 font-medium">Supplier</th>
+                      <th className="text-left py-3 px-2 font-medium">Party</th>
                       <th className="text-left py-3 px-2 font-medium">Type</th>
                       <th className="text-right py-3 px-2 font-medium">FX Amount</th>
                       <th className="text-right py-3 px-2 font-medium">Amount (KWD)</th>
@@ -773,7 +773,7 @@ export default function PaymentOutPage() {
                   <p className="font-medium">{formatDate(selectedPayment.paymentDate)}</p>
                 </div>
                 <div>
-                  <Label className="text-muted-foreground">Supplier</Label>
+                  <Label className="text-muted-foreground">Party</Label>
                   <p className="font-medium">{selectedPayment.supplier?.name || "-"}</p>
                 </div>
                 <div>
