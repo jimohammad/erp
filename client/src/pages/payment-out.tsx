@@ -413,13 +413,6 @@ export default function PaymentOutPage() {
 
   return (
     <div className="p-4 space-y-6">
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <h1 className="text-2xl font-bold flex items-center gap-2" data-testid="text-page-title">
-          <ArrowUpRight className="h-6 w-6 text-red-600" />
-          Payment OUT (Pay)
-        </h1>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle>Make Payment</CardTitle>
