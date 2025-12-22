@@ -185,10 +185,6 @@ export default function ExpensesPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center justify-between gap-4 p-4 border-b flex-wrap">
-        <h1 className="text-2xl font-semibold" data-testid="heading-expenses">Expenses</h1>
-      </header>
-
       <div className="flex-1 overflow-auto p-4">
         <Tabs defaultValue="expenses" className="space-y-4">
           <TabsList data-testid="tabs-expense-type">
