@@ -273,6 +273,9 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
+            </div>
+
+          <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
             <Card data-testid="card-total-expenses" className="p-0 overflow-visible">
               <CardHeader className="flex flex-row items-center justify-between gap-2 p-3 pb-1">
                 <CardTitle className="text-xs font-medium text-muted-foreground">Total Expenses</CardTitle>
@@ -288,9 +291,6 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
 
-            </div>
-
-          <div className="grid gap-3 grid-cols-1 md:grid-cols-2">
             <Card data-testid="card-sales-comparison">
               <CardHeader className="flex flex-row items-center justify-between gap-2 p-3 pb-1">
                 <div>
