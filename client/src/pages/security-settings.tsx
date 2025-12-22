@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Lock, Shield, Trash2, Package, Copy, ExternalLink, RefreshCw, DollarSign } from "lucide-react";
+import { Loader2, Lock, Shield, Trash2, Package, Copy, ExternalLink, RefreshCw, DollarSign, Smartphone, QrCode } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,9 +40,20 @@ export default function SecuritySettingsPage() {
   const [showRevokeStockListDialog, setShowRevokeStockListDialog] = useState(false);
   const [priceListPin, setPriceListPin] = useState("");
   const [showRevokePriceListDialog, setShowRevokePriceListDialog] = useState(false);
+  
+  // TOTP (2FA) state
+  const [totpSetupData, setTotpSetupData] = useState<{ secret: string; qrCode: string } | null>(null);
+  const [totpVerifyCode, setTotpVerifyCode] = useState("");
+  const [totpDisableCode, setTotpDisableCode] = useState("");
+  const [showDisable2FADialog, setShowDisable2FADialog] = useState(false);
 
   const { data: passwordStatus, isLoading } = useQuery<{ isSet: boolean }>({
     queryKey: ["/api/settings/transaction-password-status"],
+  });
+
+  // TOTP status query
+  const { data: totpStatus, isLoading: totpLoading } = useQuery<{ enabled: boolean }>({
+    queryKey: ["/api/totp/status"],
   });
 
   const { data: stockListSettings, isLoading: stockListLoading } = useQuery<StockListSettings>({
@@ -208,6 +219,97 @@ export default function SecuritySettingsPage() {
     },
   });
 
+  // TOTP mutations
+  const setupTotpMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch("/api/totp/setup", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to setup TOTP");
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      setTotpSetupData({ secret: data.secret, qrCode: data.qrCode });
+      setTotpVerifyCode("");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate QR code. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const enableTotpMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const res = await apiRequest("POST", "/api/totp/enable", { code });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/totp/status"] });
+      setTotpSetupData(null);
+      setTotpVerifyCode("");
+      toast({
+        title: "Two-Factor Authentication Enabled",
+        description: "Your account is now protected with Google Authenticator.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Invalid Code",
+        description: error?.message || "The code you entered is incorrect. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const disableTotpMutation = useMutation({
+    mutationFn: async (code: string) => {
+      const res = await apiRequest("POST", "/api/totp/disable", { code });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/totp/status"] });
+      setShowDisable2FADialog(false);
+      setTotpDisableCode("");
+      toast({
+        title: "Two-Factor Authentication Disabled",
+        description: "2FA has been removed from your account.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to disable 2FA. Check your code.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEnableTotp = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!totpVerifyCode || totpVerifyCode.length !== 6) {
+      toast({
+        title: "Error",
+        description: "Please enter the 6-digit code from your authenticator app.",
+        variant: "destructive",
+      });
+      return;
+    }
+    enableTotpMutation.mutate(totpVerifyCode);
+  };
+
+  const handleDisableTotp = () => {
+    if (!totpDisableCode || totpDisableCode.length !== 6) {
+      toast({
+        title: "Error",
+        description: "Please enter the 6-digit code from your authenticator app.",
+        variant: "destructive",
+      });
+      return;
+    }
+    disableTotpMutation.mutate(totpDisableCode);
+  };
+
   const handleGeneratePriceList = (e: React.FormEvent) => {
     e.preventDefault();
     if (!priceListPin || priceListPin.length < 4 || priceListPin.length > 6) {
@@ -362,6 +464,140 @@ export default function SecuritySettingsPage() {
               )}
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      {/* Two-Factor Authentication Card */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Smartphone className="h-5 w-5" />
+              <CardTitle>Two-Factor Authentication</CardTitle>
+            </div>
+            <Badge variant={totpStatus?.enabled ? "default" : "secondary"}>
+              {totpStatus?.enabled ? "Enabled" : "Disabled"}
+            </Badge>
+          </div>
+          <CardDescription>
+            Add an extra layer of security to your account using Google Authenticator or any TOTP-compatible app.
+            When enabled, you'll need to enter a 6-digit code from your phone to log in.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {totpLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : totpStatus?.enabled ? (
+            <div className="space-y-4">
+              <div className="p-3 rounded-md bg-muted/50 border">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-green-600" />
+                  <span className="text-sm font-medium">Two-factor authentication is active</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your account is protected. You'll need your authenticator app to log in.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setShowDisable2FADialog(true)}
+                data-testid="button-disable-2fa"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Disable Two-Factor Authentication
+              </Button>
+            </div>
+          ) : totpSetupData ? (
+            <div className="space-y-4">
+              <div className="flex flex-col md:flex-row gap-6">
+                <div className="flex flex-col items-center gap-2">
+                  <div className="p-2 bg-white rounded-lg">
+                    <img 
+                      src={totpSetupData.qrCode} 
+                      alt="QR Code" 
+                      className="w-40 h-40"
+                      data-testid="img-totp-qr"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    Scan this QR code with Google Authenticator
+                  </p>
+                </div>
+                <div className="flex-1 space-y-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">
+                      Or enter this code manually:
+                    </Label>
+                    <div className="p-2 bg-muted rounded-md">
+                      <code className="text-sm font-mono break-all" data-testid="text-totp-secret">
+                        {totpSetupData.secret}
+                      </code>
+                    </div>
+                  </div>
+                  <form onSubmit={handleEnableTotp} className="space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="totpCode">Enter 6-digit code from app</Label>
+                      <Input
+                        id="totpCode"
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={totpVerifyCode}
+                        onChange={(e) => setTotpVerifyCode(e.target.value.replace(/\D/g, ""))}
+                        placeholder="000000"
+                        data-testid="input-totp-verify"
+                      />
+                    </div>
+                    <div className="flex gap-2 flex-wrap">
+                      <Button 
+                        type="submit" 
+                        disabled={enableTotpMutation.isPending}
+                        data-testid="button-verify-totp"
+                      >
+                        {enableTotpMutation.isPending && (
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        Verify & Enable
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setTotpSetupData(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="text-sm text-muted-foreground">
+                <p className="mb-2">To set up two-factor authentication:</p>
+                <ol className="list-decimal list-inside space-y-1">
+                  <li>Download Google Authenticator on your phone</li>
+                  <li>Click the button below to generate a QR code</li>
+                  <li>Scan the QR code with your authenticator app</li>
+                  <li>Enter the 6-digit code to verify</li>
+                </ol>
+              </div>
+              <Button
+                onClick={() => setupTotpMutation.mutate()}
+                disabled={setupTotpMutation.isPending}
+                data-testid="button-setup-2fa"
+              >
+                {setupTotpMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <QrCode className="mr-2 h-4 w-4" />
+                )}
+                Set Up Two-Factor Authentication
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -666,6 +902,42 @@ export default function SecuritySettingsPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleRemovePassword}>
               Remove Password
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showDisable2FADialog} onOpenChange={setShowDisable2FADialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disable Two-Factor Authentication?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enter the current 6-digit code from your authenticator app to disable two-factor authentication.
+              Your account will be less secure without 2FA.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Label htmlFor="disable2faCode">Authentication Code</Label>
+            <Input
+              id="disable2faCode"
+              type="text"
+              inputMode="numeric"
+              maxLength={6}
+              value={totpDisableCode}
+              onChange={(e) => setTotpDisableCode(e.target.value.replace(/\D/g, ""))}
+              placeholder="000000"
+              className="mt-2"
+              data-testid="input-disable-2fa-code"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTotpDisableCode("")}>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDisableTotp}
+              disabled={disableTotpMutation.isPending}
+            >
+              {disableTotpMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Disable 2FA
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
