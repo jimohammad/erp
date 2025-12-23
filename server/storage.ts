@@ -145,6 +145,7 @@ import {
   type AuditTrailWithDetails,
   landedCostVouchers,
   landedCostLineItems,
+  landedCostVoucherPurchaseOrders,
   type LandedCostVoucher,
   type InsertLandedCostVoucher,
   type LandedCostLineItem,
@@ -365,12 +366,12 @@ export interface IStorage {
   // Price list with stock for low stock indicator (for salesman)
   getPriceListOnly(): Promise<{ itemCode: string | null; itemName: string; category: string | null; sellingPriceKwd: string | null; currentStock: number }[]>;
 
-  // Landed Cost Vouchers
+  // Landed Cost Vouchers (supports multiple purchase orders per voucher)
   getLandedCostVouchers(options?: { branchId?: number }): Promise<LandedCostVoucherWithDetails[]>;
   getLandedCostVoucher(id: number): Promise<LandedCostVoucherWithDetails | undefined>;
   getLandedCostVoucherByPO(purchaseOrderId: number): Promise<LandedCostVoucherWithDetails | undefined>;
-  createLandedCostVoucher(voucher: InsertLandedCostVoucher, lineItems: Omit<InsertLandedCostLineItem, 'voucherId'>[]): Promise<LandedCostVoucherWithDetails>;
-  updateLandedCostVoucher(id: number, voucher: Partial<InsertLandedCostVoucher>, lineItems?: Omit<InsertLandedCostLineItem, 'voucherId'>[]): Promise<LandedCostVoucherWithDetails | undefined>;
+  createLandedCostVoucher(voucher: InsertLandedCostVoucher, lineItems: Omit<InsertLandedCostLineItem, 'voucherId'>[], purchaseOrderIds?: number[]): Promise<LandedCostVoucherWithDetails>;
+  updateLandedCostVoucher(id: number, voucher: Partial<InsertLandedCostVoucher>, lineItems?: Omit<InsertLandedCostLineItem, 'voucherId'>[], purchaseOrderIds?: number[]): Promise<LandedCostVoucherWithDetails | undefined>;
   deleteLandedCostVoucher(id: number): Promise<boolean>;
   getNextLandedCostVoucherNumber(): Promise<string>;
   getPendingLandedCostPayables(): Promise<LandedCostVoucherWithDetails[]>;
@@ -4774,9 +4775,35 @@ export class DatabaseStorage implements IStorage {
         packingPayment = pkPmt || null;
       }
 
+      // Fetch all linked purchase orders from junction table
+      const linkedPOs = await db.select()
+        .from(landedCostVoucherPurchaseOrders)
+        .leftJoin(purchaseOrders, eq(landedCostVoucherPurchaseOrders.purchaseOrderId, purchaseOrders.id))
+        .where(eq(landedCostVoucherPurchaseOrders.voucherId, row.landed_cost_vouchers.id))
+        .orderBy(landedCostVoucherPurchaseOrders.sortOrder);
+
+      // Build full PO details with line items
+      const purchaseOrdersWithDetails: PurchaseOrderWithDetails[] = [];
+      for (const linkedPO of linkedPOs) {
+        if (linkedPO.purchase_orders) {
+          const poLineItems = await db.select()
+            .from(purchaseOrderLineItems)
+            .where(eq(purchaseOrderLineItems.purchaseOrderId, linkedPO.purchase_orders.id));
+          const [supplierRow] = linkedPO.purchase_orders.supplierId 
+            ? await db.select().from(suppliers).where(eq(suppliers.id, linkedPO.purchase_orders.supplierId))
+            : [null];
+          purchaseOrdersWithDetails.push({
+            ...linkedPO.purchase_orders,
+            supplier: supplierRow || null,
+            lineItems: poLineItems,
+          });
+        }
+      }
+
       result.push({
         ...row.landed_cost_vouchers,
         purchaseOrder: row.purchase_orders || null,
+        purchaseOrders: purchaseOrdersWithDetails,
         party: row.suppliers || null,
         partnerParty,
         packingParty,
@@ -4833,9 +4860,35 @@ export class DatabaseStorage implements IStorage {
       packingPayment = pkPmt || null;
     }
 
+    // Fetch all linked purchase orders from junction table
+    const linkedPOs = await db.select()
+      .from(landedCostVoucherPurchaseOrders)
+      .leftJoin(purchaseOrders, eq(landedCostVoucherPurchaseOrders.purchaseOrderId, purchaseOrders.id))
+      .where(eq(landedCostVoucherPurchaseOrders.voucherId, id))
+      .orderBy(landedCostVoucherPurchaseOrders.sortOrder);
+
+    // Build full PO details with line items
+    const purchaseOrdersWithDetails: PurchaseOrderWithDetails[] = [];
+    for (const linkedPO of linkedPOs) {
+      if (linkedPO.purchase_orders) {
+        const poLineItems = await db.select()
+          .from(purchaseOrderLineItems)
+          .where(eq(purchaseOrderLineItems.purchaseOrderId, linkedPO.purchase_orders.id));
+        const [supplierRow] = linkedPO.purchase_orders.supplierId 
+          ? await db.select().from(suppliers).where(eq(suppliers.id, linkedPO.purchase_orders.supplierId))
+          : [null];
+        purchaseOrdersWithDetails.push({
+          ...linkedPO.purchase_orders,
+          supplier: supplierRow || null,
+          lineItems: poLineItems,
+        });
+      }
+    }
+
     return {
       ...voucherRow.landed_cost_vouchers,
       purchaseOrder: voucherRow.purchase_orders || null,
+      purchaseOrders: purchaseOrdersWithDetails,
       party: voucherRow.suppliers || null,
       partnerParty,
       packingParty,
@@ -4904,9 +4957,23 @@ export class DatabaseStorage implements IStorage {
 
   async createLandedCostVoucher(
     voucher: InsertLandedCostVoucher, 
-    lineItems: Omit<InsertLandedCostLineItem, 'voucherId'>[]
+    lineItems: Omit<InsertLandedCostLineItem, 'voucherId'>[],
+    purchaseOrderIds?: number[]
   ): Promise<LandedCostVoucherWithDetails> {
     const [newVoucher] = await db.insert(landedCostVouchers).values(voucher).returning();
+
+    // Insert links to purchase orders in junction table
+    const poIds = purchaseOrderIds && purchaseOrderIds.length > 0 
+      ? purchaseOrderIds 
+      : (voucher.purchaseOrderId ? [voucher.purchaseOrderId] : []);
+    
+    for (let i = 0; i < poIds.length; i++) {
+      await db.insert(landedCostVoucherPurchaseOrders).values({
+        voucherId: newVoucher.id,
+        purchaseOrderId: poIds[i],
+        sortOrder: i,
+      });
+    }
 
     const createdLineItems: LandedCostLineItem[] = [];
     for (const li of lineItems) {
@@ -4923,10 +4990,12 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // Get the related purchase order and party
-    const [poRow] = await db.select()
-      .from(purchaseOrders)
-      .where(eq(purchaseOrders.id, newVoucher.purchaseOrderId));
+    // Get the related purchase order and party (legacy single PO)
+    let poRow = null;
+    if (newVoucher.purchaseOrderId) {
+      const [row] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, newVoucher.purchaseOrderId));
+      poRow = row || null;
+    }
 
     let partyRow = null;
     if (newVoucher.partyId) {
@@ -4946,9 +5015,21 @@ export class DatabaseStorage implements IStorage {
       packingPartyRow = row || null;
     }
 
+    // Fetch all linked POs with details
+    const purchaseOrdersWithDetails: PurchaseOrderWithDetails[] = [];
+    for (const poId of poIds) {
+      const [po] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, poId));
+      if (po) {
+        const poLineItems = await db.select().from(purchaseOrderLineItems).where(eq(purchaseOrderLineItems.purchaseOrderId, po.id));
+        const [supplierRow] = po.supplierId ? await db.select().from(suppliers).where(eq(suppliers.id, po.supplierId)) : [null];
+        purchaseOrdersWithDetails.push({ ...po, supplier: supplierRow || null, lineItems: poLineItems });
+      }
+    }
+
     return {
       ...newVoucher,
-      purchaseOrder: poRow || null,
+      purchaseOrder: poRow,
+      purchaseOrders: purchaseOrdersWithDetails,
       party: partyRow,
       partnerParty: partnerPartyRow,
       packingParty: packingPartyRow,
@@ -4962,7 +5043,8 @@ export class DatabaseStorage implements IStorage {
   async updateLandedCostVoucher(
     id: number, 
     voucher: Partial<InsertLandedCostVoucher>, 
-    lineItems?: Omit<InsertLandedCostLineItem, 'voucherId'>[]
+    lineItems?: Omit<InsertLandedCostLineItem, 'voucherId'>[],
+    purchaseOrderIds?: number[]
   ): Promise<LandedCostVoucherWithDetails | undefined> {
     const [updated] = await db.update(landedCostVouchers)
       .set({ ...voucher, updatedAt: new Date() })
@@ -4970,6 +5052,18 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     if (!updated) return undefined;
+
+    // If purchase order IDs provided, replace junction table entries
+    if (purchaseOrderIds !== undefined) {
+      await db.delete(landedCostVoucherPurchaseOrders).where(eq(landedCostVoucherPurchaseOrders.voucherId, id));
+      for (let i = 0; i < purchaseOrderIds.length; i++) {
+        await db.insert(landedCostVoucherPurchaseOrders).values({
+          voucherId: id,
+          purchaseOrderId: purchaseOrderIds[i],
+          sortOrder: i,
+        });
+      }
+    }
 
     // If line items provided, replace them and update item costs
     if (lineItems) {
