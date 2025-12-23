@@ -1189,16 +1189,7 @@ export const landedCostVouchers = pgTable("landed_cost_vouchers", {
   // Partner Profit (total for the PO)
   totalPartnerProfitKwd: numeric("total_partner_profit_kwd", { precision: 12, scale: 3 }),
   
-  // Bank/FX Charges (optional)
-  bankChargesAmount: numeric("bank_charges_amount", { precision: 12, scale: 3 }),
-  bankChargesCurrency: text("bank_charges_currency").default("KWD"),
-  bankChargesFxRate: numeric("bank_charges_fx_rate", { precision: 10, scale: 4 }),
-  bankChargesKwd: numeric("bank_charges_kwd", { precision: 12, scale: 3 }),
-  
-  // Packing Charges (optional)
-  packingChargesAmount: numeric("packing_charges_amount", { precision: 12, scale: 3 }),
-  packingChargesCurrency: text("packing_charges_currency").default("KWD"),
-  packingChargesFxRate: numeric("packing_charges_fx_rate", { precision: 10, scale: 4 }),
+  // Packing Charges (fixed 0.210 KWD per unit, paid to packing party)
   packingChargesKwd: numeric("packing_charges_kwd", { precision: 12, scale: 3 }),
   
   // Totals
@@ -1215,6 +1206,9 @@ export const landedCostVouchers = pgTable("landed_cost_vouchers", {
   // Partner party (for partner profit - paid monthly)
   partnerPartyId: integer("partner_party_id").references(() => suppliers.id),
   
+  // Packing party (for packing charges - fixed 0.210 KWD per unit)
+  packingPartyId: integer("packing_party_id").references(() => suppliers.id),
+  
   // Freight payable status (logistics company)
   payableStatus: text("payable_status").default("pending"), // pending, paid
   paymentId: integer("payment_id").references(() => payments.id),
@@ -1222,6 +1216,10 @@ export const landedCostVouchers = pgTable("landed_cost_vouchers", {
   // Partner profit payable status (partner company - monthly settlement)
   partnerPayableStatus: text("partner_payable_status").default("pending"), // pending, paid
   partnerPaymentId: integer("partner_payment_id").references(() => payments.id),
+  
+  // Packing payable status (packing party)
+  packingPayableStatus: text("packing_payable_status").default("pending"), // pending, paid
+  packingPaymentId: integer("packing_payment_id").references(() => payments.id),
   
   notes: text("notes"),
   branchId: integer("branch_id").references(() => branches.id),
@@ -1249,6 +1247,11 @@ export const landedCostVouchersRelations = relations(landedCostVouchers, ({ one,
     references: [suppliers.id],
     relationName: "partnerParty",
   }),
+  packingParty: one(suppliers, {
+    fields: [landedCostVouchers.packingPartyId],
+    references: [suppliers.id],
+    relationName: "packingParty",
+  }),
   payment: one(payments, {
     fields: [landedCostVouchers.paymentId],
     references: [payments.id],
@@ -1258,6 +1261,11 @@ export const landedCostVouchersRelations = relations(landedCostVouchers, ({ one,
     fields: [landedCostVouchers.partnerPaymentId],
     references: [payments.id],
     relationName: "partnerPayment",
+  }),
+  packingPayment: one(payments, {
+    fields: [landedCostVouchers.packingPaymentId],
+    references: [payments.id],
+    relationName: "packingPayment",
   }),
   lineItems: many(landedCostLineItems),
 }));
@@ -1286,7 +1294,6 @@ export const landedCostLineItems = pgTable("landed_cost_line_items", {
   // Allocated costs per unit
   freightPerUnitKwd: numeric("freight_per_unit_kwd", { precision: 12, scale: 3 }),
   partnerProfitPerUnitKwd: numeric("partner_profit_per_unit_kwd", { precision: 12, scale: 3 }),
-  bankChargesPerUnitKwd: numeric("bank_charges_per_unit_kwd", { precision: 12, scale: 3 }),
   packingPerUnitKwd: numeric("packing_per_unit_kwd", { precision: 12, scale: 3 }),
   
   // Calculated landed cost
@@ -1316,7 +1323,9 @@ export type LandedCostVoucherWithDetails = LandedCostVoucher & {
   purchaseOrder: PurchaseOrder | null;
   party: Supplier | null;
   partnerParty: Supplier | null;
+  packingParty: Supplier | null;
   payment: Payment | null;
   partnerPayment: Payment | null;
+  packingPayment: Payment | null;
   lineItems: LandedCostLineItem[];
 };

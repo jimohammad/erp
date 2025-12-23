@@ -4753,6 +4753,13 @@ export class DatabaseStorage implements IStorage {
         partnerParty = pp || null;
       }
 
+      // Fetch packing party separately if exists
+      let packingParty: Supplier | null = null;
+      if (row.landed_cost_vouchers.packingPartyId) {
+        const [pkp] = await db.select().from(suppliers).where(eq(suppliers.id, row.landed_cost_vouchers.packingPartyId));
+        packingParty = pkp || null;
+      }
+
       // Fetch partner payment separately if exists
       let partnerPayment: Payment | null = null;
       if (row.landed_cost_vouchers.partnerPaymentId) {
@@ -4760,13 +4767,22 @@ export class DatabaseStorage implements IStorage {
         partnerPayment = pPmt || null;
       }
 
+      // Fetch packing payment separately if exists
+      let packingPayment: Payment | null = null;
+      if (row.landed_cost_vouchers.packingPaymentId) {
+        const [pkPmt] = await db.select().from(payments).where(eq(payments.id, row.landed_cost_vouchers.packingPaymentId));
+        packingPayment = pkPmt || null;
+      }
+
       result.push({
         ...row.landed_cost_vouchers,
         purchaseOrder: row.purchase_orders || null,
         party: row.suppliers || null,
         partnerParty,
+        packingParty,
         payment: row.payments || null,
         partnerPayment,
+        packingPayment,
         lineItems: lineItemsList,
       });
     }
@@ -4796,6 +4812,13 @@ export class DatabaseStorage implements IStorage {
       partnerParty = pp || null;
     }
 
+    // Fetch packing party separately if exists
+    let packingParty: Supplier | null = null;
+    if (voucherRow.landed_cost_vouchers.packingPartyId) {
+      const [pkp] = await db.select().from(suppliers).where(eq(suppliers.id, voucherRow.landed_cost_vouchers.packingPartyId));
+      packingParty = pkp || null;
+    }
+
     // Fetch partner payment separately if exists
     let partnerPayment: Payment | null = null;
     if (voucherRow.landed_cost_vouchers.partnerPaymentId) {
@@ -4803,13 +4826,22 @@ export class DatabaseStorage implements IStorage {
       partnerPayment = pPmt || null;
     }
 
+    // Fetch packing payment separately if exists
+    let packingPayment: Payment | null = null;
+    if (voucherRow.landed_cost_vouchers.packingPaymentId) {
+      const [pkPmt] = await db.select().from(payments).where(eq(payments.id, voucherRow.landed_cost_vouchers.packingPaymentId));
+      packingPayment = pkPmt || null;
+    }
+
     return {
       ...voucherRow.landed_cost_vouchers,
       purchaseOrder: voucherRow.purchase_orders || null,
       party: voucherRow.suppliers || null,
       partnerParty,
+      packingParty,
       payment: voucherRow.payments || null,
       partnerPayment,
+      packingPayment,
       lineItems: lineItemsList,
     };
   }
@@ -4836,6 +4868,13 @@ export class DatabaseStorage implements IStorage {
       partnerParty = pp || null;
     }
 
+    // Fetch packing party separately if exists
+    let packingParty: Supplier | null = null;
+    if (voucherRow.landed_cost_vouchers.packingPartyId) {
+      const [pkp] = await db.select().from(suppliers).where(eq(suppliers.id, voucherRow.landed_cost_vouchers.packingPartyId));
+      packingParty = pkp || null;
+    }
+
     // Fetch partner payment separately if exists
     let partnerPayment: Payment | null = null;
     if (voucherRow.landed_cost_vouchers.partnerPaymentId) {
@@ -4843,13 +4882,22 @@ export class DatabaseStorage implements IStorage {
       partnerPayment = pPmt || null;
     }
 
+    // Fetch packing payment separately if exists
+    let packingPayment: Payment | null = null;
+    if (voucherRow.landed_cost_vouchers.packingPaymentId) {
+      const [pkPmt] = await db.select().from(payments).where(eq(payments.id, voucherRow.landed_cost_vouchers.packingPaymentId));
+      packingPayment = pkPmt || null;
+    }
+
     return {
       ...voucherRow.landed_cost_vouchers,
       purchaseOrder: voucherRow.purchase_orders || null,
       party: voucherRow.suppliers || null,
       partnerParty,
+      packingParty,
       payment: voucherRow.payments || null,
       partnerPayment,
+      packingPayment,
       lineItems: lineItemsList,
     };
   }
@@ -4892,13 +4940,21 @@ export class DatabaseStorage implements IStorage {
       partnerPartyRow = row || null;
     }
 
+    let packingPartyRow = null;
+    if (newVoucher.packingPartyId) {
+      const [row] = await db.select().from(suppliers).where(eq(suppliers.id, newVoucher.packingPartyId));
+      packingPartyRow = row || null;
+    }
+
     return {
       ...newVoucher,
       purchaseOrder: poRow || null,
       party: partyRow,
       partnerParty: partnerPartyRow,
+      packingParty: packingPartyRow,
       payment: null,
       partnerPayment: null,
+      packingPayment: null,
       lineItems: createdLineItems,
     };
   }
