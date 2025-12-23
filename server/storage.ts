@@ -145,7 +145,7 @@ import {
   type AuditTrailWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, lte, sql, or, isNull, asc, inArray } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, or, isNull, asc, inArray, ne } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -610,11 +610,34 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createItem(item: InsertItem): Promise<Item> {
+    // Check for duplicate item code (case-insensitive)
+    if (item.code && item.code.trim() !== '') {
+      const existingItem = await db.select()
+        .from(items)
+        .where(sql`LOWER(${items.code}) = LOWER(${item.code.trim()})`)
+        .limit(1);
+      if (existingItem.length > 0) {
+        throw new Error(`Item code "${item.code}" already exists. Please use a unique item code.`);
+      }
+    }
     const [newItem] = await db.insert(items).values(item).returning();
     return newItem;
   }
 
   async updateItem(id: number, item: InsertItem): Promise<Item | undefined> {
+    // Check for duplicate item code (case-insensitive), excluding current item
+    if (item.code && item.code.trim() !== '') {
+      const existingItem = await db.select()
+        .from(items)
+        .where(and(
+          sql`LOWER(${items.code}) = LOWER(${item.code.trim()})`,
+          ne(items.id, id)
+        ))
+        .limit(1);
+      if (existingItem.length > 0) {
+        throw new Error(`Item code "${item.code}" already exists. Please use a unique item code.`);
+      }
+    }
     const [updated] = await db.update(items).set(item).where(eq(items.id, id)).returning();
     return updated || undefined;
   }
