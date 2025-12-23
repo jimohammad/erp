@@ -44,6 +44,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, DollarSign, Truck, Pencil, Users, Banknote, HandCoins } from "lucide-react";
 import { format } from "date-fns";
 import type { LandedCostVoucherWithDetails, PurchaseOrderWithDetails, Item, Supplier } from "@shared/schema";
@@ -109,7 +110,8 @@ export default function LandedCostPage() {
     const q = searchQuery.toLowerCase();
     return vouchers.filter(v => 
       v.voucherNumber.toLowerCase().includes(q) ||
-      v.purchaseOrder?.invoiceNumber?.toLowerCase().includes(q)
+      v.purchaseOrder?.invoiceNumber?.toLowerCase().includes(q) ||
+      v.purchaseOrders?.some(po => po.invoiceNumber?.toLowerCase().includes(q))
     );
   }, [vouchers, searchQuery]);
 
@@ -186,7 +188,11 @@ export default function LandedCostPage() {
                       {format(new Date(v.voucherDate), "dd/MM/yyyy")}
                     </TableCell>
                     <TableCell className="py-1">
-                      {v.purchaseOrder?.invoiceNumber || `PO #${v.purchaseOrderId}`}
+                      {v.purchaseOrders && v.purchaseOrders.length > 0
+                        ? v.purchaseOrders.length > 1
+                          ? <span title={v.purchaseOrders.map(po => po.invoiceNumber || `PO #${po.id}`).join(", ")}>{v.purchaseOrders.length} POs</span>
+                          : v.purchaseOrders[0].invoiceNumber || `PO #${v.purchaseOrders[0].id}`
+                        : v.purchaseOrder?.invoiceNumber || `PO #${v.purchaseOrderId}`}
                     </TableCell>
                     <TableCell className="py-1">
                       <div className="text-xs space-y-0.5">
@@ -321,7 +327,11 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
   const { toast } = useToast();
   const isEditing = !!voucher;
 
-  const [selectedPOId, setSelectedPOId] = useState<number | null>(voucher?.purchaseOrderId || null);
+  // Multi-PO selection: use purchaseOrders array if available, fallback to single purchaseOrderId
+  const initialPOIds = voucher?.purchaseOrders?.length 
+    ? voucher.purchaseOrders.map(po => po.id) 
+    : (voucher?.purchaseOrderId ? [voucher.purchaseOrderId] : []);
+  const [selectedPOIds, setSelectedPOIds] = useState<number[]>(initialPOIds);
   const [voucherDate, setVoucherDate] = useState(voucher?.voucherDate || new Date().toISOString().split("T")[0]);
   const [allocationMethod, setAllocationMethod] = useState(voucher?.allocationMethod || "quantity");
   const [notes, setNotes] = useState(voucher?.notes || "");
@@ -395,9 +405,23 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
     enabled: !isEditing,
   });
 
-  const selectedPO = useMemo(() => {
-    return purchases.find(p => p.id === selectedPOId);
-  }, [purchases, selectedPOId]);
+  // Multi-PO support: get all selected POs
+  const selectedPOs = useMemo(() => {
+    return purchases.filter(p => selectedPOIds.includes(p.id));
+  }, [purchases, selectedPOIds]);
+
+  // Aggregate all line items from all selected POs
+  const aggregatedLineItems = useMemo(() => {
+    const allLineItems: any[] = [];
+    selectedPOs.forEach(po => {
+      if (po.lineItems) {
+        po.lineItems.forEach(li => {
+          allLineItems.push({ ...li, poId: po.id, poInvoiceNumber: po.invoiceNumber });
+        });
+      }
+    });
+    return allLineItems;
+  }, [selectedPOs]);
 
   const hkToDxbKwd = parseDecimal(hkToDxbAmount);
   const dxbToKwiKwd = parseDecimal(dxbToKwiAmount);
@@ -406,9 +430,9 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
   const totalFreightKwd = hkToDxbKwd + dxbToKwiKwd;
 
   const totalQuantity = useMemo(() => {
-    if (!selectedPO?.lineItems) return 0;
-    return selectedPO.lineItems.reduce((sum, li) => sum + (li.quantity || 0), 0);
-  }, [selectedPO]);
+    if (aggregatedLineItems.length === 0) return 0;
+    return aggregatedLineItems.reduce((sum, li) => sum + (li.quantity || 0), 0);
+  }, [aggregatedLineItems]);
 
   // Packing charges: fixed 0.210 KWD per unit
   const PACKING_RATE_PER_UNIT = 0.210;
@@ -417,12 +441,12 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
   const grandTotalKwd = totalFreightKwd + partnerProfitKwd + packingChargesKwd;
 
   const allocatedLineItems = useMemo(() => {
-    if (!selectedPO?.lineItems) return [];
+    if (aggregatedLineItems.length === 0) return [];
     const freightPerUnit = totalQuantity > 0 ? (totalFreightKwd / totalQuantity) : 0;
     const partnerProfitPerUnit = totalQuantity > 0 ? (partnerProfitKwd / totalQuantity) : 0;
     const packingPerUnit = PACKING_RATE_PER_UNIT; // Fixed 0.210 KWD per unit
 
-    return selectedPO.lineItems.map(li => {
+    return aggregatedLineItems.map(li => {
       const category = itemCategoryMap[li.itemName] || "";
       const unitPriceKwd = parseDecimal(li.priceKwd);
       const landedCostPerUnit = unitPriceKwd + freightPerUnit + partnerProfitPerUnit + packingPerUnit;
@@ -442,10 +466,10 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
         totalLandedCostKwd: (landedCostPerUnit * qty).toFixed(3),
       };
     });
-  }, [selectedPO, totalFreightKwd, partnerProfitKwd, totalQuantity, itemCategoryMap]);
+  }, [aggregatedLineItems, totalFreightKwd, partnerProfitKwd, totalQuantity, itemCategoryMap]);
 
   const createMutation = useMutation({
-    mutationFn: async (data: { voucher: any; lineItems: any[] }) => {
+    mutationFn: async (data: { voucher: any; lineItems: any[]; purchaseOrderIds: number[] }) => {
       return apiRequest("POST", "/api/landed-cost-vouchers", data);
     },
     onSuccess: () => {
@@ -459,10 +483,11 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (data: { id: number; voucher: any; lineItems: any[] }) => {
+    mutationFn: async (data: { id: number; voucher: any; lineItems: any[]; purchaseOrderIds: number[] }) => {
       return apiRequest("PUT", `/api/landed-cost-vouchers/${data.id}`, {
         voucher: data.voucher,
         lineItems: data.lineItems,
+        purchaseOrderIds: data.purchaseOrderIds,
       });
     },
     onSuccess: () => {
@@ -476,14 +501,17 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
   });
 
   const handleSubmit = () => {
-    if (!selectedPOId) {
-      toast({ title: "Error", description: "Please select a purchase order.", variant: "destructive" });
+    if (selectedPOIds.length === 0) {
+      toast({ title: "Error", description: "Please select at least one purchase order.", variant: "destructive" });
       return;
     }
 
+    // For backward compatibility, use first PO ID as legacy purchaseOrderId
+    const primaryPOId = selectedPOIds[0];
+
     const voucherData = {
       voucherNumber: isEditing ? voucher.voucherNumber : (nextNumber?.voucherNumber || "LCV-0001"),
-      purchaseOrderId: selectedPOId,
+      purchaseOrderId: primaryPOId,
       voucherDate,
       hkToDxbAmount: hkToDxbAmount || null,
       hkToDxbCurrency: "KWD",
@@ -514,11 +542,13 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
         id: voucher.id,
         voucher: voucherData,
         lineItems: allocatedLineItems,
+        purchaseOrderIds: selectedPOIds,
       });
     } else {
       createMutation.mutate({
         voucher: voucherData,
         lineItems: allocatedLineItems,
+        purchaseOrderIds: selectedPOIds,
       });
     }
   };
@@ -557,24 +587,54 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
                   data-testid="input-voucher-date"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Purchase Order *</Label>
-                <Select
-                  value={selectedPOId?.toString() || ""}
-                  onValueChange={(v) => setSelectedPOId(parseInt(v))}
-                  disabled={isEditing}
-                >
-                  <SelectTrigger className="h-8" data-testid="select-purchase-order">
-                    <SelectValue placeholder="Select PO..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {purchases.map(po => (
-                      <SelectItem key={po.id} value={po.id.toString()}>
-                        {po.invoiceNumber || `PO #${po.id}`} - {po.supplier?.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-2 md:col-span-2">
+                <Label>Purchase Orders * ({selectedPOIds.length} selected)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-8 justify-start font-normal" 
+                      data-testid="button-select-purchase-orders"
+                      disabled={isEditing}
+                    >
+                      {selectedPOIds.length === 0 
+                        ? "Select PO(s)..." 
+                        : selectedPOIds.length === 1 
+                          ? purchases.find(p => p.id === selectedPOIds[0])?.invoiceNumber || `PO #${selectedPOIds[0]}`
+                          : `${selectedPOIds.length} POs selected`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0" align="start">
+                    <ScrollArea className="h-64 p-2">
+                      <div className="space-y-1">
+                        {purchases.map(po => (
+                          <div 
+                            key={po.id} 
+                            className={`flex items-center gap-2 p-2 rounded-md cursor-pointer hover-elevate ${selectedPOIds.includes(po.id) ? 'bg-accent' : ''}`}
+                            onClick={() => {
+                              if (isEditing) return;
+                              setSelectedPOIds(prev => 
+                                prev.includes(po.id) 
+                                  ? prev.filter(id => id !== po.id)
+                                  : [...prev, po.id]
+                              );
+                            }}
+                            data-testid={`checkbox-po-${po.id}`}
+                          >
+                            <Checkbox 
+                              checked={selectedPOIds.includes(po.id)}
+                              disabled={isEditing}
+                            />
+                            <div className="flex-1 text-sm">
+                              <div className="font-medium">{po.invoiceNumber || `PO #${po.id}`}</div>
+                              <div className="text-xs text-muted-foreground">{po.supplier?.name} - {po.lineItems?.reduce((sum, li) => sum + (li.quantity || 0), 0)} units</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
                 <Label>Logistics Company (Freight)</Label>
@@ -722,7 +782,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
               </CardContent>
             </Card>
 
-            {selectedPO && allocatedLineItems.length > 0 && (
+            {selectedPOIds.length > 0 && allocatedLineItems.length > 0 && (
               <Card>
                 <CardHeader className="py-3">
                   <CardTitle className="text-sm flex items-center justify-between">
@@ -785,7 +845,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
           <Button variant="outline" onClick={onClose} disabled={isPending}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isPending || !selectedPOId} data-testid="button-save-voucher">
+          <Button onClick={handleSubmit} disabled={isPending || selectedPOIds.length === 0} data-testid="button-save-voucher">
             {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             {isEditing ? "Update Voucher" : "Create Voucher"}
           </Button>
@@ -819,8 +879,12 @@ function LandedCostViewDialog({ voucher, onClose }: LandedCostViewDialogProps) {
                 <div>{format(new Date(voucher.voucherDate), "dd/MM/yyyy")}</div>
               </div>
               <div>
-                <div className="text-muted-foreground">PO Reference</div>
-                <div>{voucher.purchaseOrder?.invoiceNumber || `PO #${voucher.purchaseOrderId}`}</div>
+                <div className="text-muted-foreground">PO Reference(s)</div>
+                <div>
+                  {voucher.purchaseOrders && voucher.purchaseOrders.length > 0
+                    ? voucher.purchaseOrders.map(po => po.invoiceNumber || `PO #${po.id}`).join(", ")
+                    : voucher.purchaseOrder?.invoiceNumber || `PO #${voucher.purchaseOrderId}`}
+                </div>
               </div>
               <div>
                 <div className="text-muted-foreground">Allocation Method</div>
@@ -1298,7 +1362,13 @@ function PartnerSettlementsDialog({ onClose }: PartnerSettlementsDialogProps) {
                             </TableCell>
                             <TableCell className="py-1 font-medium">{v.voucherNumber}</TableCell>
                             <TableCell className="py-1">{format(new Date(v.voucherDate), "dd/MM/yyyy")}</TableCell>
-                            <TableCell className="py-1">{v.purchaseOrder?.invoiceNumber || `PO #${v.purchaseOrderId}`}</TableCell>
+                            <TableCell className="py-1">
+                              {v.purchaseOrders && v.purchaseOrders.length > 0
+                                ? v.purchaseOrders.length > 1
+                                  ? `${v.purchaseOrders.length} POs`
+                                  : v.purchaseOrders[0].invoiceNumber || `PO #${v.purchaseOrders[0].id}`
+                                : v.purchaseOrder?.invoiceNumber || `PO #${v.purchaseOrderId}`}
+                            </TableCell>
                             <TableCell className="py-1 text-right font-mono">{formatCurrency(v.totalPartnerProfitKwd)} KWD</TableCell>
                           </TableRow>
                         ))}
