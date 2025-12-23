@@ -319,7 +319,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
 
   const [partnerProfitAmount, setPartnerProfitAmount] = useState(voucher?.totalPartnerProfitKwd || "");
 
-  const { data: purchases = [] } = useQuery<PurchaseOrderWithDetails[]>({
+  const { data: purchasesResponse } = useQuery<{ data: PurchaseOrderWithDetails[]; total: number }>({
     queryKey: ["/api/purchase-orders"],
     queryFn: async () => {
       const res = await fetch("/api/purchase-orders", { credentials: "include" });
@@ -327,6 +327,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
       return res.json();
     },
   });
+  const purchases = purchasesResponse?.data || [];
 
   const { data: items = [] } = useQuery<Item[]>({
     queryKey: ["/api/items"],
