@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -328,10 +328,19 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
   const isEditing = !!voucher;
 
   // Multi-PO selection: use purchaseOrders array if available, fallback to single purchaseOrderId
-  const initialPOIds = voucher?.purchaseOrders?.length 
-    ? voucher.purchaseOrders.map(po => po.id) 
-    : (voucher?.purchaseOrderId ? [voucher.purchaseOrderId] : []);
-  const [selectedPOIds, setSelectedPOIds] = useState<number[]>(initialPOIds);
+  const getInitialPOIds = useCallback(() => {
+    if (voucher?.purchaseOrders?.length) {
+      return voucher.purchaseOrders.map(po => po.id);
+    }
+    return voucher?.purchaseOrderId ? [voucher.purchaseOrderId] : [];
+  }, [voucher]);
+  
+  const [selectedPOIds, setSelectedPOIds] = useState<number[]>(getInitialPOIds);
+  
+  // Sync PO IDs when voucher changes (e.g., when dialog opens with different voucher)
+  useEffect(() => {
+    setSelectedPOIds(getInitialPOIds());
+  }, [voucher?.id, getInitialPOIds]);
   const [voucherDate, setVoucherDate] = useState(voucher?.voucherDate || new Date().toISOString().split("T")[0]);
   const [allocationMethod, setAllocationMethod] = useState(voucher?.allocationMethod || "quantity");
   const [notes, setNotes] = useState(voucher?.notes || "");
