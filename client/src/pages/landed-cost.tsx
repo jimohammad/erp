@@ -42,7 +42,9 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, DollarSign, Truck, Pencil, Users, Banknote } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, DollarSign, Truck, Pencil, Users, Banknote, HandCoins } from "lucide-react";
 import { format } from "date-fns";
 import type { LandedCostVoucherWithDetails, PurchaseOrderWithDetails, Item, Supplier } from "@shared/schema";
 
@@ -74,6 +76,7 @@ export default function LandedCostPage() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [viewVoucher, setViewVoucher] = useState<LandedCostVoucherWithDetails | null>(null);
   const [payVoucher, setPayVoucher] = useState<LandedCostVoucherWithDetails | null>(null);
+  const [showPartnerSettlements, setShowPartnerSettlements] = useState(false);
 
   const { data: vouchers = [], isLoading } = useQuery<LandedCostVoucherWithDetails[]>({
     queryKey: ["/api/landed-cost-vouchers", currentBranch?.id],
@@ -127,10 +130,16 @@ export default function LandedCostPage() {
             Track freight, partner profit, and charges for accurate costing
           </p>
         </div>
-        <Button onClick={() => { setEditingVoucher(null); setShowForm(true); }} data-testid="button-new-voucher">
-          <Plus className="h-4 w-4 mr-2" />
-          New Voucher
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setShowPartnerSettlements(true)} data-testid="button-partner-settlements">
+            <HandCoins className="h-4 w-4 mr-2" />
+            Partner Settlements
+          </Button>
+          <Button onClick={() => { setEditingVoucher(null); setShowForm(true); }} data-testid="button-new-voucher">
+            <Plus className="h-4 w-4 mr-2" />
+            New Voucher
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -180,15 +189,26 @@ export default function LandedCostPage() {
                       {v.purchaseOrder?.invoiceNumber || `PO #${v.purchaseOrderId}`}
                     </TableCell>
                     <TableCell className="py-1">
-                      {v.party?.name || "-"}
+                      <div className="text-xs space-y-0.5">
+                        {v.party && <div>Freight: {v.party.name}</div>}
+                        {v.partnerParty && <div>Partner: {v.partnerParty.name}</div>}
+                        {!v.party && !v.partnerParty && "-"}
+                      </div>
                     </TableCell>
                     <TableCell className="py-1 text-right font-mono font-semibold">
                       {formatCurrency(v.grandTotalKwd)} KWD
                     </TableCell>
                     <TableCell className="py-1">
-                      <Badge variant={v.payableStatus === "paid" ? "default" : "secondary"}>
-                        {v.payableStatus === "paid" ? "Paid" : "Pending"}
-                      </Badge>
+                      <div className="flex flex-col gap-0.5">
+                        <Badge variant={v.payableStatus === "paid" ? "default" : "secondary"} className="text-xs">
+                          Freight: {v.payableStatus === "paid" ? "Paid" : "Pending"}
+                        </Badge>
+                        {v.partnerParty && parseFloat(v.totalPartnerProfitKwd || "0") > 0 && (
+                          <Badge variant={v.partnerPayableStatus === "paid" ? "default" : "secondary"} className="text-xs">
+                            Partner: {v.partnerPayableStatus === "paid" ? "Paid" : "Pending"}
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="py-1 text-right">
                       <Badge variant="secondary">{v.lineItems?.length || 0}</Badge>
@@ -281,6 +301,12 @@ export default function LandedCostPage() {
           onClose={() => setPayVoucher(null)}
         />
       )}
+
+      {showPartnerSettlements && (
+        <PartnerSettlementsDialog
+          onClose={() => setShowPartnerSettlements(false)}
+        />
+      )}
     </div>
   );
 }
@@ -300,6 +326,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
   const [allocationMethod, setAllocationMethod] = useState(voucher?.allocationMethod || "quantity");
   const [notes, setNotes] = useState(voucher?.notes || "");
   const [partyId, setPartyId] = useState<number | null>(voucher?.partyId || null);
+  const [partnerPartyId, setPartnerPartyId] = useState<number | null>(voucher?.partnerPartyId || null);
 
   const [hkToDxbAmount, setHkToDxbAmount] = useState(voucher?.hkToDxbAmount || "");
   const [hkToDxbCurrency, setHkToDxbCurrency] = useState(voucher?.hkToDxbCurrency || "USD");
@@ -487,7 +514,9 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
       grandTotalKwd: grandTotalKwd.toFixed(3),
       allocationMethod,
       partyId: partyId || null,
+      partnerPartyId: partnerPartyId || null,
       payableStatus: "pending",
+      partnerPayableStatus: partnerPartyId && partnerProfitKwd > 0 ? "pending" : "paid",
       notes: notes || null,
       branchId: branchId || null,
     };
@@ -520,7 +549,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
 
         <ScrollArea className="flex-1 pr-4">
           <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-5">
               <div className="space-y-2">
                 <Label>Voucher Number</Label>
                 <Input
@@ -560,13 +589,31 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Pay To (Party)</Label>
+                <Label>Logistics Company (Freight)</Label>
                 <Select
                   value={partyId?.toString() || ""}
                   onValueChange={(v) => setPartyId(v ? parseInt(v) : null)}
                 >
                   <SelectTrigger className="h-8" data-testid="select-party">
-                    <SelectValue placeholder="Select party..." />
+                    <SelectValue placeholder="Select logistics..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map(s => (
+                      <SelectItem key={s.id} value={s.id.toString()}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Partner Company (Profit)</Label>
+                <Select
+                  value={partnerPartyId?.toString() || ""}
+                  onValueChange={(v) => setPartnerPartyId(v ? parseInt(v) : null)}
+                >
+                  <SelectTrigger className="h-8" data-testid="select-partner-party">
+                    <SelectValue placeholder="Select partner..." />
                   </SelectTrigger>
                   <SelectContent>
                     {suppliers.map(s => (
@@ -1058,6 +1105,323 @@ function PayLandedCostDialog({ voucher, onClose }: PayLandedCostDialogProps) {
               </>
             )}
           </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface PartnerSettlementsDialogProps {
+  onClose: () => void;
+}
+
+function PartnerSettlementsDialog({ onClose }: PartnerSettlementsDialogProps) {
+  const { toast } = useToast();
+  const [selectedVouchers, setSelectedVouchers] = useState<number[]>([]);
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paymentType, setPaymentType] = useState("Cash");
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const { data: pendingPayables = [], isLoading } = useQuery<LandedCostVoucherWithDetails[]>({
+    queryKey: ["/api/partner-profit-payables"],
+    queryFn: async () => {
+      const res = await fetch("/api/partner-profit-payables", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch pending payables");
+      return res.json();
+    },
+  });
+
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: ["/api/suppliers"],
+    queryFn: async () => {
+      const res = await fetch("/api/suppliers", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch suppliers");
+      return res.json();
+    },
+  });
+
+  const groupedByPartner = useMemo(() => {
+    const map = new Map<number, { partner: Supplier; vouchers: LandedCostVoucherWithDetails[]; totalProfit: number }>();
+    pendingPayables.forEach(v => {
+      if (!v.partnerPartyId || !v.partnerParty) return;
+      const existing = map.get(v.partnerPartyId);
+      const profit = parseFloat(v.totalPartnerProfitKwd || "0");
+      if (existing) {
+        existing.vouchers.push(v);
+        existing.totalProfit += profit;
+      } else {
+        map.set(v.partnerPartyId, {
+          partner: v.partnerParty,
+          vouchers: [v],
+          totalProfit: profit,
+        });
+      }
+    });
+    return Array.from(map.values());
+  }, [pendingPayables]);
+
+  const selectedTotal = useMemo(() => {
+    return pendingPayables
+      .filter(v => selectedVouchers.includes(v.id))
+      .reduce((sum, v) => sum + parseFloat(v.totalPartnerProfitKwd || "0"), 0);
+  }, [pendingPayables, selectedVouchers]);
+
+  const selectedPartnerId = useMemo(() => {
+    const selected = pendingPayables.find(v => selectedVouchers.includes(v.id));
+    return selected?.partnerPartyId || null;
+  }, [pendingPayables, selectedVouchers]);
+
+  const selectedPartner = useMemo(() => {
+    const selected = pendingPayables.find(v => selectedVouchers.includes(v.id));
+    return selected?.partnerParty || null;
+  }, [pendingPayables, selectedVouchers]);
+
+  const bulkPayMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedPartnerId || selectedVouchers.length === 0) {
+        throw new Error("No vouchers selected");
+      }
+      const paymentPayload = {
+        date: paymentDate,
+        type: paymentType,
+        amount: selectedTotal.toFixed(3),
+        direction: "OUT",
+        supplierId: selectedPartnerId,
+        customerId: null,
+        invoiceNumbers: null,
+        reference: reference || `Partner Profit Settlement - ${selectedVouchers.length} vouchers`,
+        notes: notes || null,
+        currency: "KWD",
+        fxRate: null,
+        amountForeign: null,
+        branchId: null,
+      };
+      const paymentRes = await apiRequest("POST", "/api/payments", paymentPayload);
+      if (!paymentRes.ok) {
+        const err = await paymentRes.json();
+        throw new Error(err.error || "Failed to create payment");
+      }
+      const payment = await paymentRes.json();
+      for (const voucherId of selectedVouchers) {
+        const linkRes = await apiRequest("POST", `/api/landed-cost-vouchers/${voucherId}/pay-partner`, {
+          paymentId: payment.id,
+        });
+        if (!linkRes.ok) {
+          const err = await linkRes.json();
+          throw new Error(err.error || "Failed to mark voucher as paid");
+        }
+      }
+      return payment;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: (query) => 
+        String(query.queryKey[0]).startsWith("/api/landed-cost")
+      });
+      queryClient.invalidateQueries({ predicate: (query) => 
+        String(query.queryKey[0]).startsWith("/api/partner-profit-payables")
+      });
+      queryClient.invalidateQueries({ predicate: (query) => 
+        String(query.queryKey[0]).startsWith("/api/payments")
+      });
+      toast({ title: "Partner Profit Settled", description: `${selectedVouchers.length} voucher(s) marked as paid.` });
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const toggleVoucher = (voucherId: number, partnerPartyId: number) => {
+    if (selectedPartnerId && selectedPartnerId !== partnerPartyId) {
+      toast({ title: "Info", description: "You can only select vouchers from the same partner.", variant: "default" });
+      return;
+    }
+    setSelectedVouchers(prev => 
+      prev.includes(voucherId) 
+        ? prev.filter(id => id !== voucherId)
+        : [...prev, voucherId]
+    );
+  };
+
+  const selectAllForPartner = (partnerId: number) => {
+    if (selectedPartnerId && selectedPartnerId !== partnerId) {
+      setSelectedVouchers([]);
+    }
+    const partnerVouchers = pendingPayables.filter(v => v.partnerPartyId === partnerId).map(v => v.id);
+    setSelectedVouchers(partnerVouchers);
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <HandCoins className="h-5 w-5" />
+            Partner Profit Settlements
+          </DialogTitle>
+        </DialogHeader>
+
+        <ScrollArea className="flex-1 pr-4">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+            </div>
+          ) : groupedByPartner.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No pending partner profit settlements
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {groupedByPartner.map(({ partner, vouchers, totalProfit }) => (
+                <Card key={partner.id}>
+                  <CardHeader className="py-3 flex flex-row items-center justify-between gap-2">
+                    <div>
+                      <CardTitle className="text-base">{partner.name}</CardTitle>
+                      <CardDescription>
+                        {vouchers.length} voucher(s) - Total: {totalProfit.toFixed(3)} KWD
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => selectAllForPartner(partner.id)}
+                      data-testid={`button-select-all-${partner.id}`}
+                    >
+                      Select All
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="py-2 w-10"></TableHead>
+                          <TableHead className="py-2">Voucher</TableHead>
+                          <TableHead className="py-2">Date</TableHead>
+                          <TableHead className="py-2">PO Reference</TableHead>
+                          <TableHead className="py-2 text-right">Partner Profit</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {vouchers.map(v => (
+                          <TableRow key={v.id}>
+                            <TableCell className="py-1">
+                              <Checkbox
+                                checked={selectedVouchers.includes(v.id)}
+                                onCheckedChange={() => toggleVoucher(v.id, v.partnerPartyId!)}
+                                data-testid={`checkbox-voucher-${v.id}`}
+                              />
+                            </TableCell>
+                            <TableCell className="py-1 font-medium">{v.voucherNumber}</TableCell>
+                            <TableCell className="py-1">{format(new Date(v.voucherDate), "dd/MM/yyyy")}</TableCell>
+                            <TableCell className="py-1">{v.purchaseOrder?.invoiceNumber || `PO #${v.purchaseOrderId}`}</TableCell>
+                            <TableCell className="py-1 text-right font-mono">{formatCurrency(v.totalPartnerProfitKwd)} KWD</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              ))}
+
+              {selectedVouchers.length > 0 && (
+                <Card>
+                  <CardHeader className="py-3">
+                    <CardTitle className="text-base">Payment Details</CardTitle>
+                    <CardDescription>
+                      Paying {selectedPartner?.name} for {selectedVouchers.length} voucher(s)
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="p-3 bg-muted rounded-md mb-4">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Pay To:</span>
+                        <span className="font-medium">{selectedPartner?.name}</span>
+                      </div>
+                      <div className="flex justify-between text-sm mt-1">
+                        <span className="text-muted-foreground">Amount:</span>
+                        <span className="font-mono font-semibold">{selectedTotal.toFixed(3)} KWD</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label>Payment Date</Label>
+                        <Input
+                          type="date"
+                          value={paymentDate}
+                          onChange={(e) => setPaymentDate(e.target.value)}
+                          className="h-8"
+                          data-testid="input-partner-payment-date"
+                        />
+                      </div>
+                      <div>
+                        <Label>Payment Type</Label>
+                        <Select value={paymentType} onValueChange={setPaymentType}>
+                          <SelectTrigger className="h-8" data-testid="select-partner-payment-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Cash">Cash</SelectItem>
+                            <SelectItem value="NBK Bank">NBK Bank</SelectItem>
+                            <SelectItem value="CBK Bank">CBK Bank</SelectItem>
+                            <SelectItem value="Knet">Knet</SelectItem>
+                            <SelectItem value="Wamd">Wamd</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="mt-4">
+                      <Label>Reference (Optional)</Label>
+                      <Input
+                        value={reference}
+                        onChange={(e) => setReference(e.target.value)}
+                        placeholder="e.g., TT reference"
+                        className="h-8"
+                        data-testid="input-partner-reference"
+                      />
+                    </div>
+
+                    <div className="mt-4">
+                      <Label>Notes (Optional)</Label>
+                      <Textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={2}
+                        data-testid="input-partner-notes"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </ScrollArea>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+          {selectedVouchers.length > 0 && (
+            <Button
+              onClick={() => bulkPayMutation.mutate()}
+              disabled={bulkPayMutation.isPending}
+              data-testid="button-settle-partner-profit"
+            >
+              {bulkPayMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                <>
+                  <Banknote className="h-4 w-4 mr-2" />
+                  Settle {selectedVouchers.length} Voucher(s)
+                </>
+              )}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>

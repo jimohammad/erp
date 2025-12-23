@@ -152,7 +152,7 @@ import {
   type LandedCostVoucherWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, lte, sql, or, isNull, asc, inArray, ne } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, or, isNull, isNotNull, asc, inArray, ne } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -373,6 +373,10 @@ export interface IStorage {
   updateLandedCostVoucher(id: number, voucher: Partial<InsertLandedCostVoucher>, lineItems?: Omit<InsertLandedCostLineItem, 'voucherId'>[]): Promise<LandedCostVoucherWithDetails | undefined>;
   deleteLandedCostVoucher(id: number): Promise<boolean>;
   getNextLandedCostVoucherNumber(): Promise<string>;
+  getPendingLandedCostPayables(): Promise<LandedCostVoucherWithDetails[]>;
+  markLandedCostVoucherPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined>;
+  getPendingPartnerProfitPayables(): Promise<LandedCostVoucherWithDetails[]>;
+  markPartnerProfitPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4993,6 +4997,54 @@ export class DatabaseStorage implements IStorage {
   async markLandedCostVoucherPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
     const [updated] = await db.update(landedCostVouchers)
       .set({ payableStatus: "paid", paymentId, updatedAt: new Date() })
+      .where(eq(landedCostVouchers.id, voucherId))
+      .returning();
+
+    if (!updated) return undefined;
+    return this.getLandedCostVoucher(voucherId);
+  }
+
+  async getPendingPartnerProfitPayables(): Promise<LandedCostVoucherWithDetails[]> {
+    const voucherRows = await db.select()
+      .from(landedCostVouchers)
+      .leftJoin(purchaseOrders, eq(landedCostVouchers.purchaseOrderId, purchaseOrders.id))
+      .leftJoin(suppliers, eq(landedCostVouchers.partnerPartyId, suppliers.id))
+      .where(and(
+        eq(landedCostVouchers.partnerPayableStatus, "pending"),
+        isNotNull(landedCostVouchers.partnerPartyId)
+      ))
+      .orderBy(desc(landedCostVouchers.voucherDate));
+
+    const result: LandedCostVoucherWithDetails[] = [];
+    for (const row of voucherRows) {
+      const lineItemsList = await db.select()
+        .from(landedCostLineItems)
+        .where(eq(landedCostLineItems.voucherId, row.landed_cost_vouchers.id))
+        .orderBy(landedCostLineItems.id);
+
+      // Fetch freight party separately if exists
+      let freightParty: Supplier | null = null;
+      if (row.landed_cost_vouchers.partyId) {
+        const [fp] = await db.select().from(suppliers).where(eq(suppliers.id, row.landed_cost_vouchers.partyId));
+        freightParty = fp || null;
+      }
+
+      result.push({
+        ...row.landed_cost_vouchers,
+        purchaseOrder: row.purchase_orders || null,
+        party: freightParty,
+        partnerParty: row.suppliers || null,
+        payment: null,
+        partnerPayment: null,
+        lineItems: lineItemsList,
+      });
+    }
+    return result;
+  }
+
+  async markPartnerProfitPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
+    const [updated] = await db.update(landedCostVouchers)
+      .set({ partnerPayableStatus: "paid", partnerPaymentId: paymentId, updatedAt: new Date() })
       .where(eq(landedCostVouchers.id, voucherId))
       .returning();
 

@@ -3132,6 +3132,39 @@ export async function registerRoutes(
     }
   });
 
+  // Get pending partner profit payables
+  app.get("/api/partner-profit-payables", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const vouchers = await storage.getPendingPartnerProfitPayables();
+      res.json(vouchers);
+    } catch (error) {
+      console.error("Error fetching pending partner profit payables:", error);
+      res.status(500).json({ error: "Failed to fetch partner profit payables" });
+    }
+  });
+
+  // Mark partner profit as paid (link to payment)
+  app.post("/api/landed-cost-vouchers/:id/pay-partner", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const voucherId = parseInt(req.params.id);
+      if (isNaN(voucherId)) {
+        return res.status(400).json({ error: "Invalid voucher ID" });
+      }
+      const { paymentId } = req.body;
+      if (!paymentId) {
+        return res.status(400).json({ error: "Payment ID required" });
+      }
+      const updated = await storage.markPartnerProfitPaid(voucherId, paymentId);
+      if (!updated) {
+        return res.status(404).json({ error: "Voucher not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error marking partner profit as paid:", error);
+      res.status(500).json({ error: "Failed to mark partner profit as paid" });
+    }
+  });
+
   // ==================== IMEI TRACKING ====================
 
   app.get("/api/imei/search", isAuthenticated, async (req, res) => {
