@@ -344,29 +344,10 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
     return purchases.find(p => p.id === selectedPOId);
   }, [purchases, selectedPOId]);
 
-  const hkToDxbKwd = useMemo(() => {
-    const amt = parseDecimal(hkToDxbAmount);
-    const rate = parseDecimal(hkToDxbFxRate);
-    return amt * rate;
-  }, [hkToDxbAmount, hkToDxbFxRate]);
-
-  const dxbToKwiKwd = useMemo(() => {
-    const amt = parseDecimal(dxbToKwiAmount);
-    const rate = parseDecimal(dxbToKwiFxRate);
-    return amt * rate;
-  }, [dxbToKwiAmount, dxbToKwiFxRate]);
-
-  const bankChargesKwd = useMemo(() => {
-    const amt = parseDecimal(bankChargesAmount);
-    const rate = parseDecimal(bankChargesFxRate);
-    return amt * rate;
-  }, [bankChargesAmount, bankChargesFxRate]);
-
-  const packingChargesKwd = useMemo(() => {
-    const amt = parseDecimal(packingChargesAmount);
-    const rate = parseDecimal(packingChargesFxRate);
-    return amt * rate;
-  }, [packingChargesAmount, packingChargesFxRate]);
+  const hkToDxbKwd = parseDecimal(hkToDxbAmount);
+  const dxbToKwiKwd = parseDecimal(dxbToKwiAmount);
+  const bankChargesKwd = parseDecimal(bankChargesAmount);
+  const packingChargesKwd = parseDecimal(packingChargesAmount);
 
   const totalFreightKwd = hkToDxbKwd + dxbToKwiKwd;
   const totalChargesKwd = bankChargesKwd + packingChargesKwd;
@@ -470,21 +451,21 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
       purchaseOrderId: selectedPOId,
       voucherDate,
       hkToDxbAmount: hkToDxbAmount || null,
-      hkToDxbCurrency,
-      hkToDxbFxRate: hkToDxbFxRate || null,
+      hkToDxbCurrency: "KWD",
+      hkToDxbFxRate: "1",
       hkToDxbKwd: hkToDxbKwd.toFixed(3),
       dxbToKwiAmount: dxbToKwiAmount || null,
-      dxbToKwiCurrency,
-      dxbToKwiFxRate: dxbToKwiFxRate || null,
+      dxbToKwiCurrency: "KWD",
+      dxbToKwiFxRate: "1",
       dxbToKwiKwd: dxbToKwiKwd.toFixed(3),
       totalPartnerProfitKwd: totalPartnerProfitKwd.toFixed(3),
       bankChargesAmount: bankChargesAmount || null,
-      bankChargesCurrency,
-      bankChargesFxRate: bankChargesFxRate || null,
+      bankChargesCurrency: "KWD",
+      bankChargesFxRate: "1",
       bankChargesKwd: bankChargesKwd.toFixed(3),
       packingChargesAmount: packingChargesAmount || null,
-      packingChargesCurrency,
-      packingChargesFxRate: packingChargesFxRate || null,
+      packingChargesCurrency: "KWD",
+      packingChargesFxRate: "1",
       packingChargesKwd: packingChargesKwd.toFixed(3),
       totalFreightKwd: totalFreightKwd.toFixed(3),
       totalChargesKwd: totalChargesKwd.toFixed(3),
@@ -563,106 +544,67 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader className="py-3">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Truck className="h-4 w-4" />
-                    Freight Leg 1: HK to Dubai
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Amount</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={hkToDxbAmount}
-                        onChange={(e) => setHkToDxbAmount(e.target.value)}
-                        className="h-8"
-                        data-testid="input-hk-dxb-amount"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Currency</Label>
-                      <Select value={hkToDxbCurrency} onValueChange={setHkToDxbCurrency}>
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">FX Rate</Label>
-                      <Input
-                        type="number"
-                        step="0.0001"
-                        value={hkToDxbFxRate}
-                        onChange={(e) => setHkToDxbFxRate(e.target.value)}
-                        className="h-8"
-                        data-testid="input-hk-dxb-rate"
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right text-sm">
-                    <span className="text-muted-foreground">KWD: </span>
-                    <span className="font-mono font-semibold">{formatCurrency(hkToDxbKwd)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="py-3">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Truck className="h-4 w-4" />
-                    Freight Leg 2: Dubai to Kuwait
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Amount</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={dxbToKwiAmount}
-                        onChange={(e) => setDxbToKwiAmount(e.target.value)}
-                        className="h-8"
-                        data-testid="input-dxb-kwi-amount"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Currency</Label>
-                      <Select value={dxbToKwiCurrency} onValueChange={setDxbToKwiCurrency}>
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">FX Rate</Label>
-                      <Input
-                        type="number"
-                        step="0.0001"
-                        value={dxbToKwiFxRate}
-                        onChange={(e) => setDxbToKwiFxRate(e.target.value)}
-                        className="h-8"
-                        data-testid="input-dxb-kwi-rate"
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right text-sm">
-                    <span className="text-muted-foreground">KWD: </span>
-                    <span className="font-mono font-semibold">{formatCurrency(dxbToKwiKwd)}</span>
-                  </div>
-                </CardContent>
-              </Card>
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center gap-1">
+                  <Truck className="h-3 w-3" />
+                  HK to Dubai (KWD)
+                </Label>
+                <Input
+                  type="number"
+                  step="0.001"
+                  placeholder="0.000"
+                  value={hkToDxbAmount}
+                  onChange={(e) => setHkToDxbAmount(e.target.value)}
+                  className="h-8"
+                  data-testid="input-hk-dxb-amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center gap-1">
+                  <Truck className="h-3 w-3" />
+                  Dubai to Kuwait (KWD)
+                </Label>
+                <Input
+                  type="number"
+                  step="0.001"
+                  placeholder="0.000"
+                  value={dxbToKwiAmount}
+                  onChange={(e) => setDxbToKwiAmount(e.target.value)}
+                  className="h-8"
+                  data-testid="input-dxb-kwi-amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center gap-1">
+                  <DollarSign className="h-3 w-3" />
+                  Bank / FX Charges (KWD)
+                </Label>
+                <Input
+                  type="number"
+                  step="0.001"
+                  placeholder="0.000"
+                  value={bankChargesAmount}
+                  onChange={(e) => setBankChargesAmount(e.target.value)}
+                  className="h-8"
+                  data-testid="input-bank-amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center gap-1">
+                  <Package className="h-3 w-3" />
+                  Packing Charges (KWD)
+                </Label>
+                <Input
+                  type="number"
+                  step="0.001"
+                  placeholder="0.000"
+                  value={packingChargesAmount}
+                  onChange={(e) => setPackingChargesAmount(e.target.value)}
+                  className="h-8"
+                  data-testid="input-packing-amount"
+                />
+              </div>
             </div>
 
             <Card className="bg-muted/30">
@@ -706,108 +648,6 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
                 )}
               </CardContent>
             </Card>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <Card>
-                <CardHeader className="py-3">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <DollarSign className="h-4 w-4" />
-                    Bank / FX Charges
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Amount</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={bankChargesAmount}
-                        onChange={(e) => setBankChargesAmount(e.target.value)}
-                        className="h-8"
-                        data-testid="input-bank-amount"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Currency</Label>
-                      <Select value={bankChargesCurrency} onValueChange={setBankChargesCurrency}>
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">FX Rate</Label>
-                      <Input
-                        type="number"
-                        step="0.0001"
-                        value={bankChargesFxRate}
-                        onChange={(e) => setBankChargesFxRate(e.target.value)}
-                        className="h-8"
-                        data-testid="input-bank-rate"
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right text-sm">
-                    <span className="text-muted-foreground">KWD: </span>
-                    <span className="font-mono font-semibold">{formatCurrency(bankChargesKwd)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader className="py-3">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Package className="h-4 w-4" />
-                    Packing Charges
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="space-y-1">
-                      <Label className="text-xs">Amount</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={packingChargesAmount}
-                        onChange={(e) => setPackingChargesAmount(e.target.value)}
-                        className="h-8"
-                        data-testid="input-packing-amount"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Currency</Label>
-                      <Select value={packingChargesCurrency} onValueChange={setPackingChargesCurrency}>
-                        <SelectTrigger className="h-8">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CURRENCIES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">FX Rate</Label>
-                      <Input
-                        type="number"
-                        step="0.0001"
-                        value={packingChargesFxRate}
-                        onChange={(e) => setPackingChargesFxRate(e.target.value)}
-                        className="h-8"
-                        data-testid="input-packing-rate"
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right text-sm">
-                    <span className="text-muted-foreground">KWD: </span>
-                    <span className="font-mono font-semibold">{formatCurrency(packingChargesKwd)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
 
             <Card>
               <CardHeader className="py-3">
