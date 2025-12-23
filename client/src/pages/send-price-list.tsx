@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,14 +22,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
-import { Send, Search, CheckSquare, Square, MessageCircle, Link2, DollarSign, Package } from "lucide-react";
+import { Send, Search, CheckSquare, Square, MessageCircle, Link2, DollarSign, Package, Copy, ExternalLink, Trash2, RefreshCw, Loader2 } from "lucide-react";
 import type { Supplier, Item } from "@shared/schema";
 
 interface UrlSettings {
-  token: string;
-  pin: string;
-  url: string;
+  token: string | null;
+  pin: string | null;
+  hasAccess: boolean;
 }
 
 interface StockBalanceItem {
@@ -48,6 +59,12 @@ export default function SendPriceList() {
   const [includeQuantity, setIncludeQuantity] = useState(false);
   const [selectedPriceRecipientId, setSelectedPriceRecipientId] = useState<string>("");
   const [selectedStockRecipientId, setSelectedStockRecipientId] = useState<string>("");
+  
+  // URL management state
+  const [stockListPin, setStockListPin] = useState("");
+  const [priceListPin, setPriceListPin] = useState("");
+  const [showRevokeStockListDialog, setShowRevokeStockListDialog] = useState(false);
+  const [showRevokePriceListDialog, setShowRevokePriceListDialog] = useState(false);
 
   const { data: parties = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
@@ -61,23 +78,150 @@ export default function SendPriceList() {
     queryKey: ["/api/reports/stock-balance"],
   });
 
-  const { data: priceListSettings } = useQuery<UrlSettings | null>({
+  const { data: priceListSettings, isLoading: priceListLoading } = useQuery<UrlSettings>({
     queryKey: ["/api/settings/price-list"],
-    queryFn: async () => {
-      const res = await fetch("/api/settings/price-list");
-      if (!res.ok) return null;
-      return res.json();
+  });
+
+  const { data: stockListSettings, isLoading: stockListLoading } = useQuery<UrlSettings>({
+    queryKey: ["/api/settings/stock-list"],
+  });
+
+  // Stock List mutations
+  const generateStockListMutation = useMutation({
+    mutationFn: async (pin: string) => {
+      const res = await apiRequest("POST", "/api/settings/stock-list/generate", { pin });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/stock-list"] });
+      setStockListPin("");
+      toast({
+        title: "Stock List Link Generated",
+        description: "Share this link with authorized users.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate stock list link.",
+        variant: "destructive",
+      });
     },
   });
 
-  const { data: stockListSettings } = useQuery<UrlSettings | null>({
-    queryKey: ["/api/settings/stock-list"],
-    queryFn: async () => {
-      const res = await fetch("/api/settings/stock-list");
-      if (!res.ok) return null;
-      return res.json();
+  const revokeStockListMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/settings/stock-list");
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/stock-list"] });
+      setShowRevokeStockListDialog(false);
+      toast({
+        title: "Access Revoked",
+        description: "Stock list link has been disabled.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to revoke stock list access.",
+        variant: "destructive",
+      });
     },
   });
+
+  // Price List mutations
+  const generatePriceListMutation = useMutation({
+    mutationFn: async (pin: string) => {
+      const res = await apiRequest("POST", "/api/settings/price-list/generate", { pin });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/price-list"] });
+      setPriceListPin("");
+      toast({
+        title: "Price List Link Generated",
+        description: "Share this link with salesmen.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate price list link.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const revokePriceListMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("DELETE", "/api/settings/price-list");
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/price-list"] });
+      setShowRevokePriceListDialog(false);
+      toast({
+        title: "Access Revoked",
+        description: "Price list link has been disabled.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to revoke price list access.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Helper functions
+  const handleGenerateStockList = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!stockListPin || stockListPin.length < 4 || stockListPin.length > 6) {
+      toast({
+        title: "Error",
+        description: "PIN must be 4-6 digits.",
+        variant: "destructive",
+      });
+      return;
+    }
+    generateStockListMutation.mutate(stockListPin);
+  };
+
+  const handleGeneratePriceList = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!priceListPin || priceListPin.length < 4 || priceListPin.length > 6) {
+      toast({
+        title: "Error",
+        description: "PIN must be 4-6 digits.",
+        variant: "destructive",
+      });
+      return;
+    }
+    generatePriceListMutation.mutate(priceListPin);
+  };
+
+  const copyStockListLink = () => {
+    if (!stockListSettings?.token) return;
+    const url = `${window.location.origin}/s/${stockListSettings.token}`;
+    navigator.clipboard.writeText(url);
+    toast({
+      title: "Link Copied",
+      description: "Stock list URL copied to clipboard.",
+    });
+  };
+
+  const copyPriceListLink = () => {
+    if (!priceListSettings?.token) return;
+    const url = `${window.location.origin}/p/${priceListSettings.token}`;
+    navigator.clipboard.writeText(url);
+    toast({
+      title: "Link Copied",
+      description: "Price list URL copied to clipboard.",
+    });
+  };
 
   const customers = parties.filter(p => p.partyType === "customer" && p.phone);
   const allPartiesWithPhone = parties.filter(p => p.phone);
@@ -230,7 +374,7 @@ export default function SendPriceList() {
   const selectedStockRecipient = allPartiesWithPhone.find(p => p.id.toString() === selectedStockRecipientId);
 
   const handleSendPriceListUrl = () => {
-    if (!selectedPriceRecipientId || !selectedPriceRecipient?.phone || !priceListSettings?.url) {
+    if (!selectedPriceRecipientId || !selectedPriceRecipient?.phone || !priceListSettings?.token) {
       toast({
         title: "Selection Required",
         description: "Please select a recipient with a phone number",
@@ -240,7 +384,8 @@ export default function SendPriceList() {
     }
 
     const phone = formatPhoneForWhatsApp(selectedPriceRecipient.phone);
-    const message = `*Iqbal Electronics Co. WLL*\n\nView our latest price list:\n${priceListSettings.url}\n\nPIN: ${priceListSettings.pin}\n\nThank you for your business!`;
+    const url = `${window.location.origin}/p/${priceListSettings.token}`;
+    const message = `*Iqbal Electronics Co. WLL*\n\nView our latest price list:\n${url}\n\nPIN: ${priceListSettings.pin}\n\nThank you for your business!`;
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/${phone}?text=${encodedMessage}`;
 
@@ -253,7 +398,7 @@ export default function SendPriceList() {
   };
 
   const handleSendStockListUrl = () => {
-    if (!selectedStockRecipientId || !selectedStockRecipient?.phone || !stockListSettings?.url) {
+    if (!selectedStockRecipientId || !selectedStockRecipient?.phone || !stockListSettings?.token) {
       toast({
         title: "Selection Required",
         description: "Please select a recipient with a phone number",
@@ -263,7 +408,8 @@ export default function SendPriceList() {
     }
 
     const phone = formatPhoneForWhatsApp(selectedStockRecipient.phone);
-    const message = `*Iqbal Electronics Co. WLL*\n\nView our current stock & prices:\n${stockListSettings.url}\n\nPIN: ${stockListSettings.pin}\n\nThank you for your business!`;
+    const url = `${window.location.origin}/s/${stockListSettings.token}`;
+    const message = `*Iqbal Electronics Co. WLL*\n\nView our current stock & prices:\n${url}\n\nPIN: ${stockListSettings.pin}\n\nThank you for your business!`;
     const encodedMessage = encodeURIComponent(message);
     const whatsappUrl = `https://wa.me/${phone}?text=${encodedMessage}`;
 
@@ -277,29 +423,63 @@ export default function SendPriceList() {
 
   return (
     <div className="space-y-4">
-      {(stockListSettings?.url || priceListSettings?.url) && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {stockListSettings?.url && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Package className="h-5 w-5" />
-                  Share Stock List URL
-                </CardTitle>
-                <CardDescription>
-                  Send stock & prices link via WhatsApp
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
-                  <Link2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <span className="text-sm font-mono truncate">{stockListSettings.url}</span>
-                  <Badge variant="secondary" className="ml-auto flex-shrink-0">PIN: {stockListSettings.pin}</Badge>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Stock List URL Card */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Package className="h-5 w-5" />
+                Stock List URL
+              </CardTitle>
+              <Badge variant={stockListSettings?.hasAccess ? "default" : "secondary"}>
+                {stockListSettings?.hasAccess ? "Active" : "Not Set"}
+              </Badge>
+            </div>
+            <CardDescription>
+              Share stock & prices with authorized users
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {stockListLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : stockListSettings?.hasAccess ? (
+              <div className="space-y-4">
+                <div className="p-3 rounded-md bg-muted/50 border">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">URL: </span>
+                      <code className="bg-background px-1 rounded text-xs">
+                        {window.location.origin}/s/{stockListSettings.token?.substring(0, 8)}...
+                      </code>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={copyStockListLink} data-testid="button-copy-stock-link">
+                        <Copy className="h-4 w-4 mr-1" />
+                        Copy
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`/s/${stockListSettings.token}`, "_blank")}
+                        data-testid="button-open-stock-link"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Open
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm">
+                    <span className="text-muted-foreground">PIN: </span>
+                    <code className="bg-background px-1 rounded">{stockListSettings.pin}</code>
+                  </div>
                 </div>
                 <div className="flex flex-col gap-3">
                   <Select value={selectedStockRecipientId} onValueChange={setSelectedStockRecipientId}>
                     <SelectTrigger data-testid="select-stock-recipient">
-                      <SelectValue placeholder="Select recipient..." />
+                      <SelectValue placeholder="Select recipient to send..." />
                     </SelectTrigger>
                     <SelectContent>
                       {allPartiesWithPhone.map(party => (
@@ -319,31 +499,134 @@ export default function SendPriceList() {
                     Send via WhatsApp
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                <div className="flex gap-2 flex-wrap pt-2 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRevokeStockListDialog(true)}
+                    disabled={revokeStockListMutation.isPending}
+                    data-testid="button-revoke-stock-list"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Revoke
+                  </Button>
+                  <form onSubmit={handleGenerateStockList} className="flex gap-2 items-end">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      placeholder="New PIN"
+                      value={stockListPin}
+                      onChange={(e) => setStockListPin(e.target.value.replace(/\D/g, ""))}
+                      className="w-20"
+                      data-testid="input-new-stock-pin"
+                    />
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      size="sm"
+                      disabled={generateStockListMutation.isPending || stockListPin.length < 4}
+                      data-testid="button-regenerate-stock-link"
+                    >
+                      {generateStockListMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                      )}
+                      Regenerate
+                    </Button>
+                  </form>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleGenerateStockList} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="stockListPin">Set PIN Code (4-6 digits)</Label>
+                  <Input
+                    id="stockListPin"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    placeholder="Enter 4-6 digit PIN"
+                    value={stockListPin}
+                    onChange={(e) => setStockListPin(e.target.value.replace(/\D/g, ""))}
+                    className="max-w-xs"
+                    data-testid="input-stock-list-pin"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={generateStockListMutation.isPending || stockListPin.length < 4}
+                  data-testid="button-generate-stock-link"
+                >
+                  {generateStockListMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Generate Stock List Link
+                </Button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
 
-          {priceListSettings?.url && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <DollarSign className="h-5 w-5" />
-                  Share Price List URL
-                </CardTitle>
-                <CardDescription>
-                  Send prices only link via WhatsApp
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
-                  <Link2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <span className="text-sm font-mono truncate">{priceListSettings.url}</span>
-                  <Badge variant="secondary" className="ml-auto flex-shrink-0">PIN: {priceListSettings.pin}</Badge>
+        {/* Price List URL Card */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <DollarSign className="h-5 w-5" />
+                Price List URL
+              </CardTitle>
+              <Badge variant={priceListSettings?.hasAccess ? "default" : "secondary"}>
+                {priceListSettings?.hasAccess ? "Active" : "Not Set"}
+              </Badge>
+            </div>
+            <CardDescription>
+              Share prices only with salesmen
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {priceListLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : priceListSettings?.hasAccess ? (
+              <div className="space-y-4">
+                <div className="p-3 rounded-md bg-muted/50 border">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">URL: </span>
+                      <code className="bg-background px-1 rounded text-xs">
+                        {window.location.origin}/p/{priceListSettings.token?.substring(0, 8)}...
+                      </code>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={copyPriceListLink} data-testid="button-copy-price-link">
+                        <Copy className="h-4 w-4 mr-1" />
+                        Copy
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(`/p/${priceListSettings.token}`, "_blank")}
+                        data-testid="button-open-price-link"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Open
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm">
+                    <span className="text-muted-foreground">PIN: </span>
+                    <code className="bg-background px-1 rounded">{priceListSettings.pin}</code>
+                  </div>
                 </div>
                 <div className="flex flex-col gap-3">
                   <Select value={selectedPriceRecipientId} onValueChange={setSelectedPriceRecipientId}>
                     <SelectTrigger data-testid="select-price-recipient">
-                      <SelectValue placeholder="Select recipient..." />
+                      <SelectValue placeholder="Select recipient to send..." />
                     </SelectTrigger>
                     <SelectContent>
                       {allPartiesWithPhone.map(party => (
@@ -363,11 +646,78 @@ export default function SendPriceList() {
                     Send via WhatsApp
                   </Button>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      )}
+                <div className="flex gap-2 flex-wrap pt-2 border-t">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRevokePriceListDialog(true)}
+                    disabled={revokePriceListMutation.isPending}
+                    data-testid="button-revoke-price-list"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    Revoke
+                  </Button>
+                  <form onSubmit={handleGeneratePriceList} className="flex gap-2 items-end">
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      placeholder="New PIN"
+                      value={priceListPin}
+                      onChange={(e) => setPriceListPin(e.target.value.replace(/\D/g, ""))}
+                      className="w-20"
+                      data-testid="input-new-price-pin"
+                    />
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      size="sm"
+                      disabled={generatePriceListMutation.isPending || priceListPin.length < 4}
+                      data-testid="button-regenerate-price-link"
+                    >
+                      {generatePriceListMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                      ) : (
+                        <RefreshCw className="h-4 w-4 mr-1" />
+                      )}
+                      Regenerate
+                    </Button>
+                  </form>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleGeneratePriceList} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="priceListPin">Set PIN Code (4-6 digits)</Label>
+                  <Input
+                    id="priceListPin"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    placeholder="Enter 4-6 digit PIN"
+                    value={priceListPin}
+                    onChange={(e) => setPriceListPin(e.target.value.replace(/\D/g, ""))}
+                    className="max-w-xs"
+                    data-testid="input-price-list-pin"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={generatePriceListMutation.isPending || priceListPin.length < 4}
+                  data-testid="button-generate-price-link"
+                >
+                  {generatePriceListMutation.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Generate Price List Link
+                </Button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-3">
@@ -514,6 +864,42 @@ export default function SendPriceList() {
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={showRevokeStockListDialog} onOpenChange={setShowRevokeStockListDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke Stock List Access?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will disable the current stock list link. Anyone with the old link will no longer be able to access it.
+              You can generate a new link anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => revokeStockListMutation.mutate()}>
+              Revoke Access
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showRevokePriceListDialog} onOpenChange={setShowRevokePriceListDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Revoke Price List Access?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will disable the current price list link. Anyone with the old link will no longer be able to access it.
+              You can generate a new link anytime.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => revokePriceListMutation.mutate()}>
+              Revoke Access
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
