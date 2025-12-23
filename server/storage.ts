@@ -4730,6 +4730,8 @@ export class DatabaseStorage implements IStorage {
     const vouchersList = await db.select()
       .from(landedCostVouchers)
       .leftJoin(purchaseOrders, eq(landedCostVouchers.purchaseOrderId, purchaseOrders.id))
+      .leftJoin(suppliers, eq(landedCostVouchers.partyId, suppliers.id))
+      .leftJoin(payments, eq(landedCostVouchers.paymentId, payments.id))
       .where(whereClause)
       .orderBy(desc(landedCostVouchers.createdAt));
 
@@ -4743,6 +4745,8 @@ export class DatabaseStorage implements IStorage {
       result.push({
         ...row.landed_cost_vouchers,
         purchaseOrder: row.purchase_orders || null,
+        party: row.suppliers || null,
+        payment: row.payments || null,
         lineItems: lineItemsList,
       });
     }
@@ -4754,6 +4758,8 @@ export class DatabaseStorage implements IStorage {
     const [voucherRow] = await db.select()
       .from(landedCostVouchers)
       .leftJoin(purchaseOrders, eq(landedCostVouchers.purchaseOrderId, purchaseOrders.id))
+      .leftJoin(suppliers, eq(landedCostVouchers.partyId, suppliers.id))
+      .leftJoin(payments, eq(landedCostVouchers.paymentId, payments.id))
       .where(eq(landedCostVouchers.id, id));
 
     if (!voucherRow) return undefined;
@@ -4766,6 +4772,8 @@ export class DatabaseStorage implements IStorage {
     return {
       ...voucherRow.landed_cost_vouchers,
       purchaseOrder: voucherRow.purchase_orders || null,
+      party: voucherRow.suppliers || null,
+      payment: voucherRow.payments || null,
       lineItems: lineItemsList,
     };
   }
@@ -4774,6 +4782,8 @@ export class DatabaseStorage implements IStorage {
     const [voucherRow] = await db.select()
       .from(landedCostVouchers)
       .leftJoin(purchaseOrders, eq(landedCostVouchers.purchaseOrderId, purchaseOrders.id))
+      .leftJoin(suppliers, eq(landedCostVouchers.partyId, suppliers.id))
+      .leftJoin(payments, eq(landedCostVouchers.paymentId, payments.id))
       .where(eq(landedCostVouchers.purchaseOrderId, purchaseOrderId));
 
     if (!voucherRow) return undefined;
@@ -4786,6 +4796,8 @@ export class DatabaseStorage implements IStorage {
     return {
       ...voucherRow.landed_cost_vouchers,
       purchaseOrder: voucherRow.purchase_orders || null,
+      party: voucherRow.suppliers || null,
+      payment: voucherRow.payments || null,
       lineItems: lineItemsList,
     };
   }
@@ -4802,16 +4814,31 @@ export class DatabaseStorage implements IStorage {
         .values({ ...li, voucherId: newVoucher.id })
         .returning();
       createdLineItems.push(newItem);
+      
+      // Update item's landed cost
+      if (li.itemName && li.landedCostPerUnitKwd) {
+        await db.update(items)
+          .set({ landedCostKwd: li.landedCostPerUnitKwd })
+          .where(eq(items.name, li.itemName));
+      }
     }
 
-    // Get the related purchase order
+    // Get the related purchase order and party
     const [poRow] = await db.select()
       .from(purchaseOrders)
       .where(eq(purchaseOrders.id, newVoucher.purchaseOrderId));
 
+    let partyRow = null;
+    if (newVoucher.partyId) {
+      const [row] = await db.select().from(suppliers).where(eq(suppliers.id, newVoucher.partyId));
+      partyRow = row || null;
+    }
+
     return {
       ...newVoucher,
       purchaseOrder: poRow || null,
+      party: partyRow,
+      payment: null,
       lineItems: createdLineItems,
     };
   }
@@ -4828,13 +4855,20 @@ export class DatabaseStorage implements IStorage {
 
     if (!updated) return undefined;
 
-    // If line items provided, replace them
+    // If line items provided, replace them and update item costs
     if (lineItems) {
       await db.delete(landedCostLineItems).where(eq(landedCostLineItems.voucherId, id));
       
       for (const li of lineItems) {
         await db.insert(landedCostLineItems)
           .values({ ...li, voucherId: id });
+        
+        // Update item's landed cost
+        if (li.itemName && li.landedCostPerUnitKwd) {
+          await db.update(items)
+            .set({ landedCostKwd: li.landedCostPerUnitKwd })
+            .where(eq(items.name, li.itemName));
+        }
       }
     }
 

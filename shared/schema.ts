@@ -107,6 +107,7 @@ export const items = pgTable("items", {
   purchasePriceFx: numeric("purchase_price_fx", { precision: 12, scale: 3 }),
   fxCurrency: text("fx_currency"),
   sellingPriceKwd: numeric("selling_price_kwd", { precision: 12, scale: 3 }),
+  landedCostKwd: numeric("landed_cost_kwd", { precision: 12, scale: 3 }),
   minStockLevel: integer("min_stock_level").default(0),
 }, (table) => [
   index("idx_item_code").on(table.code),
@@ -1208,6 +1209,13 @@ export const landedCostVouchers = pgTable("landed_cost_vouchers", {
   // Allocation method: "quantity" or "value"
   allocationMethod: text("allocation_method").default("quantity"),
   
+  // Party to pay (logistics company, partner, etc.)
+  partyId: integer("party_id").references(() => suppliers.id),
+  
+  // Payable status
+  payableStatus: text("payable_status").default("pending"), // pending, paid
+  paymentId: integer("payment_id").references(() => payments.id),
+  
   notes: text("notes"),
   branchId: integer("branch_id").references(() => branches.id),
   createdBy: varchar("created_by").references(() => users.id),
@@ -1223,6 +1231,14 @@ export const landedCostVouchersRelations = relations(landedCostVouchers, ({ one,
   purchaseOrder: one(purchaseOrders, {
     fields: [landedCostVouchers.purchaseOrderId],
     references: [purchaseOrders.id],
+  }),
+  party: one(suppliers, {
+    fields: [landedCostVouchers.partyId],
+    references: [suppliers.id],
+  }),
+  payment: one(payments, {
+    fields: [landedCostVouchers.paymentId],
+    references: [payments.id],
   }),
   lineItems: many(landedCostLineItems),
 }));
@@ -1279,5 +1295,7 @@ export type LandedCostLineItem = typeof landedCostLineItems.$inferSelect;
 
 export type LandedCostVoucherWithDetails = LandedCostVoucher & {
   purchaseOrder: PurchaseOrder | null;
+  party: Supplier | null;
+  payment: Payment | null;
   lineItems: LandedCostLineItem[];
 };

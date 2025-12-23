@@ -44,7 +44,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, DollarSign, Truck, Pencil, Users } from "lucide-react";
 import { format } from "date-fns";
-import type { LandedCostVoucherWithDetails, PurchaseOrderWithDetails, Item } from "@shared/schema";
+import type { LandedCostVoucherWithDetails, PurchaseOrderWithDetails, Item, Supplier } from "@shared/schema";
 
 interface PartnerProfitSetting {
   category: string;
@@ -154,9 +154,9 @@ export default function LandedCostPage() {
                 <TableHead className="py-2">Voucher #</TableHead>
                 <TableHead className="py-2">Date</TableHead>
                 <TableHead className="py-2">PO Reference</TableHead>
-                <TableHead className="py-2 text-right">Total Freight</TableHead>
-                <TableHead className="py-2 text-right">Partner Profit</TableHead>
+                <TableHead className="py-2">Pay To</TableHead>
                 <TableHead className="py-2 text-right">Grand Total</TableHead>
+                <TableHead className="py-2">Status</TableHead>
                 <TableHead className="py-2 text-right">Items</TableHead>
                 <TableHead className="py-2 text-right">Actions</TableHead>
               </TableRow>
@@ -178,14 +178,16 @@ export default function LandedCostPage() {
                     <TableCell className="py-1">
                       {v.purchaseOrder?.invoiceNumber || `PO #${v.purchaseOrderId}`}
                     </TableCell>
-                    <TableCell className="py-1 text-right font-mono">
-                      {formatCurrency(v.totalFreightKwd)} KWD
-                    </TableCell>
-                    <TableCell className="py-1 text-right font-mono">
-                      {formatCurrency(v.totalPartnerProfitKwd)} KWD
+                    <TableCell className="py-1">
+                      {v.party?.name || "-"}
                     </TableCell>
                     <TableCell className="py-1 text-right font-mono font-semibold">
                       {formatCurrency(v.grandTotalKwd)} KWD
+                    </TableCell>
+                    <TableCell className="py-1">
+                      <Badge variant={v.payableStatus === "paid" ? "default" : "secondary"}>
+                        {v.payableStatus === "paid" ? "Paid" : "Pending"}
+                      </Badge>
                     </TableCell>
                     <TableCell className="py-1 text-right">
                       <Badge variant="secondary">{v.lineItems?.length || 0}</Badge>
@@ -278,6 +280,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
   const [voucherDate, setVoucherDate] = useState(voucher?.voucherDate || new Date().toISOString().split("T")[0]);
   const [allocationMethod, setAllocationMethod] = useState(voucher?.allocationMethod || "quantity");
   const [notes, setNotes] = useState(voucher?.notes || "");
+  const [partyId, setPartyId] = useState<number | null>(voucher?.partyId || null);
 
   const [hkToDxbAmount, setHkToDxbAmount] = useState(voucher?.hkToDxbAmount || "");
   const [hkToDxbCurrency, setHkToDxbCurrency] = useState(voucher?.hkToDxbCurrency || "USD");
@@ -311,6 +314,15 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
     queryFn: async () => {
       const res = await fetch("/api/items", { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch items");
+      return res.json();
+    },
+  });
+
+  const { data: suppliers = [] } = useQuery<Supplier[]>({
+    queryKey: ["/api/suppliers"],
+    queryFn: async () => {
+      const res = await fetch("/api/suppliers", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch suppliers");
       return res.json();
     },
   });
@@ -454,6 +466,8 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
       totalChargesKwd: totalChargesKwd.toFixed(3),
       grandTotalKwd: grandTotalKwd.toFixed(3),
       allocationMethod,
+      partyId: partyId || null,
+      payableStatus: "pending",
       notes: notes || null,
       branchId: branchId || null,
     };
@@ -486,7 +500,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
 
         <ScrollArea className="flex-1 pr-4">
           <div className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-2">
                 <Label>Voucher Number</Label>
                 <Input
@@ -520,6 +534,24 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
                     {purchases.map(po => (
                       <SelectItem key={po.id} value={po.id.toString()}>
                         {po.invoiceNumber || `PO #${po.id}`} - {po.supplier?.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Pay To (Party)</Label>
+                <Select
+                  value={partyId?.toString() || ""}
+                  onValueChange={(v) => setPartyId(v ? parseInt(v) : null)}
+                >
+                  <SelectTrigger className="h-8" data-testid="select-party">
+                    <SelectValue placeholder="Select party..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map(s => (
+                      <SelectItem key={s.id} value={s.id.toString()}>
+                        {s.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
