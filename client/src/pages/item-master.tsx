@@ -29,7 +29,8 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Loader2, Package, RefreshCw } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Package, RefreshCw, Download } from "lucide-react";
+import * as XLSX from "xlsx";
 import type { Item } from "@shared/schema";
 import { ITEM_CATEGORIES } from "@shared/schema";
 
@@ -236,6 +237,30 @@ export default function ItemMaster() {
     }
   };
 
+  const handleExportToExcel = () => {
+    const exportData = filteredItems.map((item) => ({
+      "ID": item.id,
+      "Item Code": item.code || "",
+      "Item Name": item.name,
+      "Category": item.category || "",
+      "Available Qty": stockMap.get(item.name) ?? 0,
+      "Purchase Price (KWD)": item.purchasePriceKwd ? parseFloat(item.purchasePriceKwd).toFixed(3) : "",
+      "Purchase Price (FX)": item.purchasePriceFx ? parseFloat(item.purchasePriceFx).toFixed(3) : "",
+      "FX Currency": item.fxCurrency || "",
+      "Selling Price (KWD)": item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "",
+      "Min Stock Level": item.minStockLevel ?? 0,
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Items");
+    
+    const today = new Date().toISOString().split("T")[0];
+    XLSX.writeFile(wb, `Item_Master_${today}.xlsx`);
+    
+    toast({ title: "Export successful", description: `Exported ${exportData.length} items to Excel.` });
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -260,6 +285,10 @@ export default function ItemMaster() {
               className="w-64"
               data-testid="input-search-item"
             />
+            <Button variant="outline" onClick={handleExportToExcel} data-testid="button-export-items">
+              <Download className="h-4 w-4 mr-2" />
+              Export
+            </Button>
             {isAdmin && (
               <Button onClick={handleOpenAdd} data-testid="button-add-item">
                 <Plus className="h-4 w-4 mr-2" />
