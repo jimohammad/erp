@@ -1163,3 +1163,121 @@ export const systemSettings = pgTable("system_settings", {
 export const insertSystemSettingSchema = createInsertSchema(systemSettings).omit({ id: true, updatedAt: true });
 export type InsertSystemSetting = z.infer<typeof insertSystemSettingSchema>;
 export type SystemSetting = typeof systemSettings.$inferSelect;
+
+// ==================== LANDED COST VOUCHERS ====================
+// ERP-style landed cost tracking for accurate margin analysis
+
+export const landedCostVouchers = pgTable("landed_cost_vouchers", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  voucherNumber: text("voucher_number").notNull().unique(),
+  purchaseOrderId: integer("purchase_order_id").references(() => purchaseOrders.id).notNull(),
+  voucherDate: date("voucher_date").notNull(),
+  
+  // Freight Leg 1: HK to Dubai
+  hkToDxbAmount: numeric("hk_to_dxb_amount", { precision: 12, scale: 3 }),
+  hkToDxbCurrency: text("hk_to_dxb_currency").default("USD"),
+  hkToDxbFxRate: numeric("hk_to_dxb_fx_rate", { precision: 10, scale: 4 }),
+  hkToDxbKwd: numeric("hk_to_dxb_kwd", { precision: 12, scale: 3 }),
+  
+  // Freight Leg 2: Dubai to Kuwait
+  dxbToKwiAmount: numeric("dxb_to_kwi_amount", { precision: 12, scale: 3 }),
+  dxbToKwiCurrency: text("dxb_to_kwi_currency").default("AED"),
+  dxbToKwiFxRate: numeric("dxb_to_kwi_fx_rate", { precision: 10, scale: 4 }),
+  dxbToKwiKwd: numeric("dxb_to_kwi_kwd", { precision: 12, scale: 3 }),
+  
+  // Partner Profit (total for the PO)
+  totalPartnerProfitKwd: numeric("total_partner_profit_kwd", { precision: 12, scale: 3 }),
+  
+  // Bank/FX Charges (optional)
+  bankChargesAmount: numeric("bank_charges_amount", { precision: 12, scale: 3 }),
+  bankChargesCurrency: text("bank_charges_currency").default("KWD"),
+  bankChargesFxRate: numeric("bank_charges_fx_rate", { precision: 10, scale: 4 }),
+  bankChargesKwd: numeric("bank_charges_kwd", { precision: 12, scale: 3 }),
+  
+  // Packing Charges (optional)
+  packingChargesAmount: numeric("packing_charges_amount", { precision: 12, scale: 3 }),
+  packingChargesCurrency: text("packing_charges_currency").default("KWD"),
+  packingChargesFxRate: numeric("packing_charges_fx_rate", { precision: 10, scale: 4 }),
+  packingChargesKwd: numeric("packing_charges_kwd", { precision: 12, scale: 3 }),
+  
+  // Totals
+  totalFreightKwd: numeric("total_freight_kwd", { precision: 12, scale: 3 }),
+  totalChargesKwd: numeric("total_charges_kwd", { precision: 12, scale: 3 }),
+  grandTotalKwd: numeric("grand_total_kwd", { precision: 12, scale: 3 }),
+  
+  // Allocation method: "quantity" or "value"
+  allocationMethod: text("allocation_method").default("quantity"),
+  
+  notes: text("notes"),
+  branchId: integer("branch_id").references(() => branches.id),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_lcv_po").on(table.purchaseOrderId),
+  index("idx_lcv_date").on(table.voucherDate),
+  index("idx_lcv_branch").on(table.branchId),
+]);
+
+export const landedCostVouchersRelations = relations(landedCostVouchers, ({ one, many }) => ({
+  purchaseOrder: one(purchaseOrders, {
+    fields: [landedCostVouchers.purchaseOrderId],
+    references: [purchaseOrders.id],
+  }),
+  lineItems: many(landedCostLineItems),
+}));
+
+export const insertLandedCostVoucherSchema = createInsertSchema(landedCostVouchers).omit({ 
+  id: true, 
+  createdAt: true,
+  updatedAt: true,
+});
+export type InsertLandedCostVoucher = z.infer<typeof insertLandedCostVoucherSchema>;
+export type LandedCostVoucher = typeof landedCostVouchers.$inferSelect;
+
+// Per-item cost allocation breakdown
+export const landedCostLineItems = pgTable("landed_cost_line_items", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  voucherId: integer("voucher_id").references(() => landedCostVouchers.id, { onDelete: "cascade" }).notNull(),
+  purchaseOrderLineItemId: integer("purchase_order_line_item_id").references(() => purchaseOrderLineItems.id),
+  itemName: text("item_name").notNull(),
+  itemCategory: text("item_category"),
+  quantity: integer("quantity").default(1),
+  
+  // Original purchase price
+  unitPriceKwd: numeric("unit_price_kwd", { precision: 12, scale: 3 }),
+  lineTotalKwd: numeric("line_total_kwd", { precision: 12, scale: 3 }),
+  
+  // Allocated costs per unit
+  freightPerUnitKwd: numeric("freight_per_unit_kwd", { precision: 12, scale: 3 }),
+  partnerProfitPerUnitKwd: numeric("partner_profit_per_unit_kwd", { precision: 12, scale: 3 }),
+  bankChargesPerUnitKwd: numeric("bank_charges_per_unit_kwd", { precision: 12, scale: 3 }),
+  packingPerUnitKwd: numeric("packing_per_unit_kwd", { precision: 12, scale: 3 }),
+  
+  // Calculated landed cost
+  landedCostPerUnitKwd: numeric("landed_cost_per_unit_kwd", { precision: 12, scale: 3 }),
+  totalLandedCostKwd: numeric("total_landed_cost_kwd", { precision: 12, scale: 3 }),
+}, (table) => [
+  index("idx_lcl_voucher").on(table.voucherId),
+  index("idx_lcl_item").on(table.itemName),
+]);
+
+export const landedCostLineItemsRelations = relations(landedCostLineItems, ({ one }) => ({
+  voucher: one(landedCostVouchers, {
+    fields: [landedCostLineItems.voucherId],
+    references: [landedCostVouchers.id],
+  }),
+  purchaseOrderLineItem: one(purchaseOrderLineItems, {
+    fields: [landedCostLineItems.purchaseOrderLineItemId],
+    references: [purchaseOrderLineItems.id],
+  }),
+}));
+
+export const insertLandedCostLineItemSchema = createInsertSchema(landedCostLineItems).omit({ id: true });
+export type InsertLandedCostLineItem = z.infer<typeof insertLandedCostLineItemSchema>;
+export type LandedCostLineItem = typeof landedCostLineItems.$inferSelect;
+
+export type LandedCostVoucherWithDetails = LandedCostVoucher & {
+  purchaseOrder: PurchaseOrder | null;
+  lineItems: LandedCostLineItem[];
+};
