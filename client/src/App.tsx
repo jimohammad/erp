@@ -65,6 +65,7 @@ const PurchaseOrdersPage = lazy(() => import("@/pages/purchase-orders"));
 const StockLookupPage = lazy(() => import("@/pages/stock-lookup"));
 const SecuritySettingsPage = lazy(() => import("@/pages/security-settings"));
 const PartnerProfitSettingsPage = lazy(() => import("@/pages/partner-profit-settings"));
+const LandedCostPage = lazy(() => import("@/pages/landed-cost"));
 const ImeiHistoryPage = lazy(() => import("@/pages/imei-history"));
 const BackupPage = lazy(() => import("@/pages/backup"));
 const UserManagementPage = lazy(() => import("@/pages/user-management"));
@@ -198,6 +199,7 @@ function AppSidebar() {
   const purchasesSubItems = [
     { title: "Purchase Orders", url: "/purchases/orders" },
     { title: "All Purchases", url: "/purchases/all" },
+    { title: "Landed Cost", url: "/purchases/landed-cost" },
   ];
 
   const salesSubItems = [
@@ -717,6 +719,7 @@ function AuthenticatedLayout() {
                 <Route path="/purchases" component={Home} />
                 <Route path="/purchases/orders" component={PurchaseOrdersPage} />
                 <Route path="/purchases/all" component={AllPurchasesPage} />
+                <Route path="/purchases/landed-cost" component={LandedCostPage} />
                 <Route path="/sales" component={SalesPage} />
                 <Route path="/sales/all" component={AllSalesPage} />
                 <Route path="/payments" component={PaymentsPage} />
