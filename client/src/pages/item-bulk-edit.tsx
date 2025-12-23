@@ -218,14 +218,14 @@ export default function ItemBulkEdit() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-16">ID</TableHead>
-                    <TableHead className="w-32">Code</TableHead>
-                    <TableHead className="min-w-[150px]">Name</TableHead>
-                    <TableHead className="w-36">Purchase KWD</TableHead>
-                    <TableHead className="w-36">Purchase FX</TableHead>
-                    <TableHead className="w-28">FX</TableHead>
-                    <TableHead className="w-36">Selling KWD</TableHead>
-                    <TableHead className="w-24">Fetch</TableHead>
+                    <TableHead className="w-16 py-2">ID</TableHead>
+                    <TableHead className="w-32 py-2">Code</TableHead>
+                    <TableHead className="min-w-[150px] py-2">Name</TableHead>
+                    <TableHead className="w-36 py-2">Purchase KWD</TableHead>
+                    <TableHead className="w-36 py-2">Purchase FX</TableHead>
+                    <TableHead className="w-28 py-2">FX</TableHead>
+                    <TableHead className="w-36 py-2">Selling KWD</TableHead>
+                    <TableHead className="w-24 py-2">Fetch</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -235,43 +235,43 @@ export default function ItemBulkEdit() {
                       className={editedItems[item.id]?.hasChanges ? "bg-accent/30" : ""}
                       data-testid={`row-bulk-item-${item.id}`}
                     >
-                      <TableCell className="font-mono text-sm text-muted-foreground">
+                      <TableCell className="py-1 font-mono text-sm text-muted-foreground">
                         {item.id}
                       </TableCell>
-                      <TableCell className="font-mono text-sm text-muted-foreground">
+                      <TableCell className="py-1 font-mono text-sm text-muted-foreground">
                         {item.code || "-"}
                       </TableCell>
-                      <TableCell className="font-medium">
+                      <TableCell className="py-1 font-medium">
                         {item.name}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-1">
                         <Input
                           value={getEditedValue(item, "purchasePriceKwd")}
                           onChange={(e) => handleFieldChange(item, "purchasePriceKwd", e.target.value)}
                           placeholder="0.000"
                           type="number"
                           step="0.001"
-                          className="h-8"
+                          className="h-7"
                           data-testid={`input-bulk-purchase-${item.id}`}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-1">
                         <Input
                           value={getEditedValue(item, "purchasePriceFx")}
                           onChange={(e) => handleFieldChange(item, "purchasePriceFx", e.target.value)}
                           placeholder="0.000"
                           type="number"
                           step="0.001"
-                          className="h-8"
+                          className="h-7"
                           data-testid={`input-bulk-purchase-fx-${item.id}`}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-1">
                         <Select
                           value={getEditedValue(item, "fxCurrency") || "none"}
                           onValueChange={(value) => handleFieldChange(item, "fxCurrency", value === "none" ? "" : value)}
                         >
-                          <SelectTrigger className="h-8" data-testid={`select-bulk-fx-${item.id}`}>
+                          <SelectTrigger className="h-7" data-testid={`select-bulk-fx-${item.id}`}>
                             <SelectValue placeholder="-" />
                           </SelectTrigger>
                           <SelectContent>
@@ -282,25 +282,25 @@ export default function ItemBulkEdit() {
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-1">
                         <Input
                           value={getEditedValue(item, "sellingPriceKwd")}
                           onChange={(e) => handleFieldChange(item, "sellingPriceKwd", e.target.value)}
                           placeholder="0.000"
                           type="number"
                           step="0.001"
-                          className="h-8"
+                          className="h-7"
                           data-testid={`input-bulk-selling-${item.id}`}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-1">
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => fetchLastPricing(item)}
                           disabled={fetchingPriceFor === item.id}
                           data-testid={`button-fetch-bulk-${item.id}`}
-                          className="h-8 w-8"
+                          className="h-7 w-7"
                         >
                           {fetchingPriceFor === item.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
