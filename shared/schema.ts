@@ -1209,12 +1209,19 @@ export const landedCostVouchers = pgTable("landed_cost_vouchers", {
   // Allocation method: "quantity" or "value"
   allocationMethod: text("allocation_method").default("quantity"),
   
-  // Party to pay (logistics company, partner, etc.)
+  // Logistics party (for freight costs - paid per shipment)
   partyId: integer("party_id").references(() => suppliers.id),
   
-  // Payable status
+  // Partner party (for partner profit - paid monthly)
+  partnerPartyId: integer("partner_party_id").references(() => suppliers.id),
+  
+  // Freight payable status (logistics company)
   payableStatus: text("payable_status").default("pending"), // pending, paid
   paymentId: integer("payment_id").references(() => payments.id),
+  
+  // Partner profit payable status (partner company - monthly settlement)
+  partnerPayableStatus: text("partner_payable_status").default("pending"), // pending, paid
+  partnerPaymentId: integer("partner_payment_id").references(() => payments.id),
   
   notes: text("notes"),
   branchId: integer("branch_id").references(() => branches.id),
@@ -1235,10 +1242,22 @@ export const landedCostVouchersRelations = relations(landedCostVouchers, ({ one,
   party: one(suppliers, {
     fields: [landedCostVouchers.partyId],
     references: [suppliers.id],
+    relationName: "logisticsParty",
+  }),
+  partnerParty: one(suppliers, {
+    fields: [landedCostVouchers.partnerPartyId],
+    references: [suppliers.id],
+    relationName: "partnerParty",
   }),
   payment: one(payments, {
     fields: [landedCostVouchers.paymentId],
     references: [payments.id],
+    relationName: "freightPayment",
+  }),
+  partnerPayment: one(payments, {
+    fields: [landedCostVouchers.partnerPaymentId],
+    references: [payments.id],
+    relationName: "partnerPayment",
   }),
   lineItems: many(landedCostLineItems),
 }));
@@ -1296,6 +1315,8 @@ export type LandedCostLineItem = typeof landedCostLineItems.$inferSelect;
 export type LandedCostVoucherWithDetails = LandedCostVoucher & {
   purchaseOrder: PurchaseOrder | null;
   party: Supplier | null;
+  partnerParty: Supplier | null;
   payment: Payment | null;
+  partnerPayment: Payment | null;
   lineItems: LandedCostLineItem[];
 };

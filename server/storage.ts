@@ -4742,11 +4742,27 @@ export class DatabaseStorage implements IStorage {
         .where(eq(landedCostLineItems.voucherId, row.landed_cost_vouchers.id))
         .orderBy(landedCostLineItems.id);
 
+      // Fetch partner party separately if exists
+      let partnerParty: Supplier | null = null;
+      if (row.landed_cost_vouchers.partnerPartyId) {
+        const [pp] = await db.select().from(suppliers).where(eq(suppliers.id, row.landed_cost_vouchers.partnerPartyId));
+        partnerParty = pp || null;
+      }
+
+      // Fetch partner payment separately if exists
+      let partnerPayment: Payment | null = null;
+      if (row.landed_cost_vouchers.partnerPaymentId) {
+        const [pPmt] = await db.select().from(payments).where(eq(payments.id, row.landed_cost_vouchers.partnerPaymentId));
+        partnerPayment = pPmt || null;
+      }
+
       result.push({
         ...row.landed_cost_vouchers,
         purchaseOrder: row.purchase_orders || null,
         party: row.suppliers || null,
+        partnerParty,
         payment: row.payments || null,
+        partnerPayment,
         lineItems: lineItemsList,
       });
     }
@@ -4769,11 +4785,27 @@ export class DatabaseStorage implements IStorage {
       .where(eq(landedCostLineItems.voucherId, id))
       .orderBy(landedCostLineItems.id);
 
+    // Fetch partner party separately if exists
+    let partnerParty: Supplier | null = null;
+    if (voucherRow.landed_cost_vouchers.partnerPartyId) {
+      const [pp] = await db.select().from(suppliers).where(eq(suppliers.id, voucherRow.landed_cost_vouchers.partnerPartyId));
+      partnerParty = pp || null;
+    }
+
+    // Fetch partner payment separately if exists
+    let partnerPayment: Payment | null = null;
+    if (voucherRow.landed_cost_vouchers.partnerPaymentId) {
+      const [pPmt] = await db.select().from(payments).where(eq(payments.id, voucherRow.landed_cost_vouchers.partnerPaymentId));
+      partnerPayment = pPmt || null;
+    }
+
     return {
       ...voucherRow.landed_cost_vouchers,
       purchaseOrder: voucherRow.purchase_orders || null,
       party: voucherRow.suppliers || null,
+      partnerParty,
       payment: voucherRow.payments || null,
+      partnerPayment,
       lineItems: lineItemsList,
     };
   }
@@ -4793,11 +4825,27 @@ export class DatabaseStorage implements IStorage {
       .where(eq(landedCostLineItems.voucherId, voucherRow.landed_cost_vouchers.id))
       .orderBy(landedCostLineItems.id);
 
+    // Fetch partner party separately if exists
+    let partnerParty: Supplier | null = null;
+    if (voucherRow.landed_cost_vouchers.partnerPartyId) {
+      const [pp] = await db.select().from(suppliers).where(eq(suppliers.id, voucherRow.landed_cost_vouchers.partnerPartyId));
+      partnerParty = pp || null;
+    }
+
+    // Fetch partner payment separately if exists
+    let partnerPayment: Payment | null = null;
+    if (voucherRow.landed_cost_vouchers.partnerPaymentId) {
+      const [pPmt] = await db.select().from(payments).where(eq(payments.id, voucherRow.landed_cost_vouchers.partnerPaymentId));
+      partnerPayment = pPmt || null;
+    }
+
     return {
       ...voucherRow.landed_cost_vouchers,
       purchaseOrder: voucherRow.purchase_orders || null,
       party: voucherRow.suppliers || null,
+      partnerParty,
       payment: voucherRow.payments || null,
+      partnerPayment,
       lineItems: lineItemsList,
     };
   }
@@ -4834,11 +4882,19 @@ export class DatabaseStorage implements IStorage {
       partyRow = row || null;
     }
 
+    let partnerPartyRow = null;
+    if (newVoucher.partnerPartyId) {
+      const [row] = await db.select().from(suppliers).where(eq(suppliers.id, newVoucher.partnerPartyId));
+      partnerPartyRow = row || null;
+    }
+
     return {
       ...newVoucher,
       purchaseOrder: poRow || null,
       party: partyRow,
+      partnerParty: partnerPartyRow,
       payment: null,
+      partnerPayment: null,
       lineItems: createdLineItems,
     };
   }
@@ -4914,11 +4970,20 @@ export class DatabaseStorage implements IStorage {
         .where(eq(landedCostLineItems.voucherId, row.landed_cost_vouchers.id))
         .orderBy(landedCostLineItems.id);
 
+      // Fetch partner party separately if exists
+      let partnerParty: Supplier | null = null;
+      if (row.landed_cost_vouchers.partnerPartyId) {
+        const [pp] = await db.select().from(suppliers).where(eq(suppliers.id, row.landed_cost_vouchers.partnerPartyId));
+        partnerParty = pp || null;
+      }
+
       result.push({
         ...row.landed_cost_vouchers,
         purchaseOrder: row.purchase_orders || null,
         party: row.suppliers || null,
+        partnerParty,
         payment: null,
+        partnerPayment: null,
         lineItems: lineItemsList,
       });
     }
