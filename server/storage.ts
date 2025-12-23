@@ -516,22 +516,20 @@ export class DatabaseStorage implements IStorage {
     // Use raw SQL to calculate current stock for low stock indicator
     const result = await db.execute(sql`
       WITH purchased AS (
-        SELECT li.item_name, SUM(li.quantity) as qty
-        FROM purchase_order_line_items li
-        JOIN purchase_orders po ON li.purchase_order_id = po.id
-        GROUP BY li.item_name
+        SELECT item_name, COALESCE(SUM(quantity), 0) as qty
+        FROM purchase_order_line_items
+        GROUP BY item_name
       ),
       sold AS (
-        SELECT sli.item_name, SUM(sli.quantity) as qty
-        FROM sales_order_line_items sli
-        JOIN sales_orders so ON sli.sales_order_id = so.id
-        GROUP BY sli.item_name
+        SELECT item_name, COALESCE(SUM(quantity), 0) as qty
+        FROM sales_order_line_items
+        GROUP BY item_name
       ),
       opening_stock AS (
-        SELECT name as item_name, SUM(opening_qty) as qty
-        FROM items
-        WHERE opening_qty > 0
-        GROUP BY name
+        SELECT i.name as item_name, COALESCE(SUM(ia.quantity), 0) as qty
+        FROM inventory_adjustments ia
+        JOIN items i ON ia.item_id = i.id
+        GROUP BY i.name
       ),
       sale_returns AS (
         SELECT rl.item_name, SUM(rl.quantity) as qty
