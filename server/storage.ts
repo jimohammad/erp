@@ -4898,6 +4898,42 @@ export class DatabaseStorage implements IStorage {
     const nextNum = (numPart + 1).toString().padStart(4, "0");
     return `LCV-${nextNum}`;
   }
+
+  async getPendingLandedCostPayables(): Promise<LandedCostVoucherWithDetails[]> {
+    const voucherRows = await db.select()
+      .from(landedCostVouchers)
+      .leftJoin(purchaseOrders, eq(landedCostVouchers.purchaseOrderId, purchaseOrders.id))
+      .leftJoin(suppliers, eq(landedCostVouchers.partyId, suppliers.id))
+      .where(eq(landedCostVouchers.payableStatus, "pending"))
+      .orderBy(desc(landedCostVouchers.voucherDate));
+
+    const result: LandedCostVoucherWithDetails[] = [];
+    for (const row of voucherRows) {
+      const lineItemsList = await db.select()
+        .from(landedCostLineItems)
+        .where(eq(landedCostLineItems.voucherId, row.landed_cost_vouchers.id))
+        .orderBy(landedCostLineItems.id);
+
+      result.push({
+        ...row.landed_cost_vouchers,
+        purchaseOrder: row.purchase_orders || null,
+        party: row.suppliers || null,
+        payment: null,
+        lineItems: lineItemsList,
+      });
+    }
+    return result;
+  }
+
+  async markLandedCostVoucherPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
+    const [updated] = await db.update(landedCostVouchers)
+      .set({ payableStatus: "paid", paymentId, updatedAt: new Date() })
+      .where(eq(landedCostVouchers.id, voucherId))
+      .returning();
+
+    if (!updated) return undefined;
+    return this.getLandedCostVoucher(voucherId);
+  }
 }
 
 export const storage = new DatabaseStorage();

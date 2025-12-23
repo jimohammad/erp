@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, DollarSign, Truck, Pencil, Users } from "lucide-react";
+import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, DollarSign, Truck, Pencil, Users, Banknote } from "lucide-react";
 import { format } from "date-fns";
 import type { LandedCostVoucherWithDetails, PurchaseOrderWithDetails, Item, Supplier } from "@shared/schema";
 
@@ -73,6 +73,7 @@ export default function LandedCostPage() {
   const [editingVoucher, setEditingVoucher] = useState<LandedCostVoucherWithDetails | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [viewVoucher, setViewVoucher] = useState<LandedCostVoucherWithDetails | null>(null);
+  const [payVoucher, setPayVoucher] = useState<LandedCostVoucherWithDetails | null>(null);
 
   const { data: vouchers = [], isLoading } = useQuery<LandedCostVoucherWithDetails[]>({
     queryKey: ["/api/landed-cost-vouchers", currentBranch?.id],
@@ -194,6 +195,17 @@ export default function LandedCostPage() {
                     </TableCell>
                     <TableCell className="py-1 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {v.payableStatus === "pending" && v.party && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => setPayVoucher(v)}
+                            data-testid={`button-pay-${v.id}`}
+                            title="Record Payment"
+                          >
+                            <Banknote className="h-4 w-4 text-green-600" />
+                          </Button>
+                        )}
                         <Button
                           size="icon"
                           variant="ghost"
@@ -262,6 +274,13 @@ export default function LandedCostPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {payVoucher && (
+        <PayLandedCostDialog
+          voucher={payVoucher}
+          onClose={() => setPayVoucher(null)}
+        />
+      )}
     </div>
   );
 }
@@ -872,6 +891,172 @@ function LandedCostViewDialog({ voucher, onClose }: LandedCostViewDialogProps) {
 
         <DialogFooter>
           <Button onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface PayLandedCostDialogProps {
+  voucher: LandedCostVoucherWithDetails;
+  onClose: () => void;
+}
+
+function PayLandedCostDialog({ voucher, onClose }: PayLandedCostDialogProps) {
+  const { toast } = useToast();
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paymentType, setPaymentType] = useState<string>("Cash");
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState(`Payment for ${voucher.voucherNumber}`);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const payMutation = useMutation({
+    mutationFn: async () => {
+      // First create a payment OUT to the supplier (matching payments.tsx format)
+      const paymentData = {
+        paymentDate,
+        direction: "OUT",
+        customerId: null,
+        supplierId: voucher.partyId,
+        purchaseOrderId: null,
+        paymentType,
+        amount: voucher.grandTotalKwd || "0",
+        fxCurrency: null,
+        fxRate: null,
+        fxAmount: null,
+        reference: reference || null,
+        notes: notes || null,
+      };
+
+      const paymentRes = await apiRequest("POST", "/api/payments", paymentData);
+      if (!paymentRes.ok) {
+        const err = await paymentRes.json();
+        throw new Error(err.error || "Failed to create payment");
+      }
+      const payment = await paymentRes.json();
+
+      // Then link the payment to the voucher
+      const linkRes = await apiRequest("POST", `/api/landed-cost-vouchers/${voucher.id}/pay`, {
+        paymentId: payment.id,
+      });
+      if (!linkRes.ok) {
+        const err = await linkRes.json();
+        throw new Error(err.error || "Failed to link payment to voucher");
+      }
+
+      return payment;
+    },
+    onSuccess: () => {
+      // Invalidate all landed cost voucher queries (matches any branch filter)
+      queryClient.invalidateQueries({ predicate: (query) => 
+        String(query.queryKey[0]).startsWith("/api/landed-cost-vouchers")
+      });
+      queryClient.invalidateQueries({ predicate: (query) => 
+        String(query.queryKey[0]).startsWith("/api/payments")
+      });
+      toast({ title: "Payment recorded and voucher marked as paid" });
+      onClose();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = () => {
+    setIsSubmitting(true);
+    payMutation.mutate();
+  };
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Record Payment for {voucher.voucherNumber}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="p-3 bg-muted rounded-md">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Pay To:</span>
+              <span className="font-medium">{voucher.party?.name}</span>
+            </div>
+            <div className="flex justify-between text-sm mt-1">
+              <span className="text-muted-foreground">Amount:</span>
+              <span className="font-mono font-semibold">{formatCurrency(voucher.grandTotalKwd)} KWD</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Payment Date</Label>
+              <Input
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                className="h-8"
+                data-testid="input-payment-date"
+              />
+            </div>
+            <div>
+              <Label>Payment Type</Label>
+              <Select value={paymentType} onValueChange={setPaymentType}>
+                <SelectTrigger className="h-8" data-testid="select-payment-type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="NBK Bank">NBK Bank</SelectItem>
+                  <SelectItem value="CBK Bank">CBK Bank</SelectItem>
+                  <SelectItem value="Knet">Knet</SelectItem>
+                  <SelectItem value="Wamd">Wamd</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div>
+            <Label>Reference (Optional)</Label>
+            <Input
+              value={reference}
+              onChange={(e) => setReference(e.target.value)}
+              placeholder="e.g., Cheque number or TT reference"
+              className="h-8"
+              data-testid="input-reference"
+            />
+          </div>
+
+          <div>
+            <Label>Notes</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={2}
+              data-testid="input-notes"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={payMutation.isPending || isSubmitting}
+            data-testid="button-submit-payment"
+          >
+            {payMutation.isPending ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Banknote className="h-4 w-4 mr-2" />
+                Record Payment
+              </>
+            )}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
