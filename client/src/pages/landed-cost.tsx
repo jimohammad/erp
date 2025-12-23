@@ -44,7 +44,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, Truck, Pencil, Users, Banknote, HandCoins, X, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import type { LandedCostVoucherWithDetails, PurchaseOrderWithDetails, Item, Supplier } from "@shared/schema";
@@ -555,11 +555,32 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
   const grandTotalKwd = totalFreightKwd + partnerProfitKwd + packingChargesKwd;
 
   const totalQuantity = useMemo(() => {
+    // When editing and aggregatedLineItems haven't loaded, use voucher's line items
+    if (aggregatedLineItems.length === 0 && isEditing && voucher?.lineItems?.length > 0) {
+      return voucher.lineItems.reduce((sum: number, li: any) => sum + (li.quantity || 0), 0);
+    }
     if (aggregatedLineItems.length === 0) return 0;
     return aggregatedLineItems.reduce((sum, li) => sum + (li.quantity || 0), 0);
-  }, [aggregatedLineItems]);
+  }, [aggregatedLineItems, isEditing, voucher]);
 
   const allocatedLineItems = useMemo(() => {
+    // When editing and aggregatedLineItems haven't loaded yet, use existing voucher line items
+    if (aggregatedLineItems.length === 0 && isEditing && voucher?.lineItems?.length > 0) {
+      return voucher.lineItems.map((li: any) => ({
+        purchaseOrderLineItemId: li.purchaseOrderLineItemId,
+        itemName: li.itemName,
+        itemCategory: li.itemCategory || "",
+        quantity: li.quantity,
+        unitPriceKwd: li.unitPriceKwd,
+        lineTotalKwd: li.lineTotalKwd,
+        freightPerUnitKwd: li.freightPerUnitKwd,
+        partnerProfitPerUnitKwd: li.partnerProfitPerUnitKwd,
+        packingPerUnitKwd: li.packingPerUnitKwd,
+        landedCostPerUnitKwd: li.landedCostPerUnitKwd,
+        totalLandedCostKwd: li.totalLandedCostKwd,
+      }));
+    }
+    
     if (aggregatedLineItems.length === 0) return [];
     const freightPerUnit = totalQuantity > 0 ? (totalFreightKwd / totalQuantity) : 0;
     const partnerProfitPerUnit = totalQuantity > 0 ? (partnerProfitKwd / totalQuantity) : 0;
@@ -585,7 +606,7 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
         totalLandedCostKwd: (landedCostPerUnit * qty).toFixed(3),
       };
     });
-  }, [aggregatedLineItems, totalFreightKwd, partnerProfitKwd, packingChargesKwd, totalQuantity, itemCategoryMap]);
+  }, [aggregatedLineItems, totalFreightKwd, partnerProfitKwd, packingChargesKwd, totalQuantity, itemCategoryMap, isEditing, voucher]);
 
   const createMutation = useMutation({
     mutationFn: async (data: { voucher: any; lineItems: any[]; purchaseOrderIds: number[] }) => {
@@ -686,256 +707,322 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 overflow-auto p-4">
-        <div className="space-y-4">
-          {/* Step 1: Basics */}
-          <Accordion 
-            type="multiple" 
-            defaultValue={selectedPOIds.length > 0 ? ["basics", "costs", "items"] : ["basics"]} 
-            className="space-y-2"
-          >
-            <AccordionItem value="basics" className="border rounded-md px-3">
-              <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
-                <span className="flex items-center gap-2">
-                  <Badge variant="outline" className="h-5 w-5 p-0 justify-center text-xs">1</Badge>
-                  Basic Information
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="pb-3">
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Voucher #</Label>
-                    <Input
-                      value={isEditing ? voucher.voucherNumber : (nextNumber?.voucherNumber || "LCV-0001")}
-                      disabled
-                      className="h-8"
-                      data-testid="input-voucher-number"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Date</Label>
-                    <Input
-                      type="date"
-                      value={voucherDate}
-                      onChange={(e) => setVoucherDate(e.target.value)}
-                      className="h-8"
-                      data-testid="input-voucher-date"
-                    />
-                  </div>
-                  <div className="space-y-1.5 md:col-span-2">
-                    <Label className="text-xs">Purchase Orders ({selectedPOIds.length} selected)</Label>
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button 
-                          variant="outline" 
-                          className="w-full h-8 justify-start font-normal" 
-                          data-testid="button-select-purchase-orders"
-                        >
-                          {selectedPOIds.length === 0 
-                            ? "Select PO(s)..." 
-                            : selectedPOIds.length === 1 
-                              ? purchases.find(p => p.id === selectedPOIds[0])?.invoiceNumber || `PO #${selectedPOIds[0]}`
-                              : `${selectedPOIds.length} POs selected`}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-80 p-0" align="start">
-                        <ScrollArea className="h-64 p-2">
-                          <div className="space-y-1">
-                            {purchases.map(po => (
-                              <div 
-                                key={po.id} 
-                                className={`flex items-center gap-2 p-2 rounded-md cursor-pointer hover-elevate ${selectedPOIds.includes(po.id) ? 'bg-accent' : ''}`}
-                                onClick={() => {
-                                  setSelectedPOIds(prev => 
-                                    prev.includes(po.id) 
-                                      ? prev.filter(id => id !== po.id)
-                                      : [...prev, po.id]
-                                  );
-                                }}
-                                data-testid={`checkbox-po-${po.id}`}
-                              >
-                                <Checkbox checked={selectedPOIds.includes(po.id)} />
-                                <div className="flex-1 text-sm">
-                                  <div className="font-medium">{po.invoiceNumber || `PO #${po.id}`}</div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {po.supplier?.name} - {po.lineItems?.reduce((sum, li) => sum + (li.quantity || 0), 0)} units
-                                  </div>
-                                </div>
+      <CardContent className="flex-1 overflow-auto p-0">
+        <Tabs defaultValue="basics" className="h-full flex flex-col">
+          <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 flex-wrap">
+            <TabsTrigger 
+              value="basics" 
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
+              data-testid="tab-basics"
+            >
+              Basics
+            </TabsTrigger>
+            <TabsTrigger 
+              value="freight" 
+              disabled={!isEditing && selectedPOIds.length === 0}
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2 disabled:opacity-50"
+              data-testid="tab-freight"
+            >
+              <Truck className="h-3 w-3 mr-1" />
+              Freight
+            </TabsTrigger>
+            <TabsTrigger 
+              value="partner" 
+              disabled={!isEditing && selectedPOIds.length === 0}
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2 disabled:opacity-50"
+              data-testid="tab-partner"
+            >
+              <Users className="h-3 w-3 mr-1" />
+              Partner
+            </TabsTrigger>
+            <TabsTrigger 
+              value="packing" 
+              disabled={!isEditing && selectedPOIds.length === 0}
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2 disabled:opacity-50"
+              data-testid="tab-packing"
+            >
+              <Package className="h-3 w-3 mr-1" />
+              Packing
+            </TabsTrigger>
+            <TabsTrigger 
+              value="summary" 
+              disabled={!isEditing && selectedPOIds.length === 0}
+              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2 disabled:opacity-50"
+              data-testid="tab-summary"
+            >
+              Summary
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Basics Tab */}
+          <TabsContent value="basics" className="flex-1 p-4 m-0">
+            <div className="space-y-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Voucher #</Label>
+                  <Input
+                    value={isEditing ? voucher.voucherNumber : (nextNumber?.voucherNumber || "LCV-0001")}
+                    disabled
+                    className="h-8"
+                    data-testid="input-voucher-number"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Date</Label>
+                  <Input
+                    type="date"
+                    value={voucherDate}
+                    onChange={(e) => setVoucherDate(e.target.value)}
+                    className="h-8"
+                    data-testid="input-voucher-date"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Purchase Orders ({selectedPOIds.length} selected)</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-8 justify-start font-normal" 
+                      data-testid="button-select-purchase-orders"
+                    >
+                      {selectedPOIds.length === 0 
+                        ? "Select PO(s)..." 
+                        : selectedPOIds.length === 1 
+                          ? purchases.find(p => p.id === selectedPOIds[0])?.invoiceNumber || `PO #${selectedPOIds[0]}`
+                          : `${selectedPOIds.length} POs selected`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0" align="start">
+                    <ScrollArea className="h-64 p-2">
+                      <div className="space-y-1">
+                        {purchases.map(po => (
+                          <div 
+                            key={po.id} 
+                            className={`flex items-center gap-2 p-2 rounded-md cursor-pointer hover-elevate ${selectedPOIds.includes(po.id) ? 'bg-accent' : ''}`}
+                            onClick={() => {
+                              setSelectedPOIds(prev => 
+                                prev.includes(po.id) 
+                                  ? prev.filter(id => id !== po.id)
+                                  : [...prev, po.id]
+                              );
+                            }}
+                            data-testid={`checkbox-po-${po.id}`}
+                          >
+                            <Checkbox checked={selectedPOIds.includes(po.id)} />
+                            <div className="flex-1 text-sm">
+                              <div className="font-medium">{po.invoiceNumber || `PO #${po.id}`}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {po.supplier?.name} - {po.lineItems?.reduce((sum, li) => sum + (li.quantity || 0), 0)} units
                               </div>
-                            ))}
+                            </div>
                           </div>
-                        </ScrollArea>
-                      </PopoverContent>
-                    </Popover>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Notes (Optional)</Label>
+                <Textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Notes about this shipment..."
+                  rows={2}
+                  data-testid="input-notes"
+                />
+              </div>
+              {selectedPOIds.length === 0 && (
+                <div className="p-4 bg-muted rounded-md text-center text-sm text-muted-foreground">
+                  Select at least one Purchase Order to enter cost details
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Freight Tab */}
+          <TabsContent value="freight" className="flex-1 p-4 m-0">
+            <div className="space-y-4">
+              <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-md space-y-4">
+                <div className="text-sm font-medium flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                  <Truck className="h-4 w-4" /> Freight Costs (KWD)
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">HK to Dubai</Label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      placeholder="0.000"
+                      value={hkToDxbAmount}
+                      onChange={(e) => setHkToDxbAmount(e.target.value)}
+                      className="h-9"
+                      data-testid="input-hk-dxb-amount"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Dubai to Kuwait</Label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      placeholder="0.000"
+                      value={dxbToKwiAmount}
+                      onChange={(e) => setDxbToKwiAmount(e.target.value)}
+                      className="h-9"
+                      data-testid="input-dxb-kwi-amount"
+                    />
                   </div>
                 </div>
-              </AccordionContent>
-            </AccordionItem>
-
-            {/* Step 2: Costs */}
-            <AccordionItem value="costs" className="border rounded-md px-3">
-              <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline" disabled={selectedPOIds.length === 0}>
-                <span className="flex items-center gap-2">
-                  <Badge variant={selectedPOIds.length > 0 ? "outline" : "secondary"} className="h-5 w-5 p-0 justify-center text-xs">2</Badge>
-                  Costs & Charges
-                  {selectedPOIds.length === 0 && <span className="text-xs text-muted-foreground ml-2">(select PO first)</span>}
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="pb-3">
-                {selectedPOIds.length === 0 ? (
-                  <div className="text-center py-4 text-muted-foreground text-sm">
-                    Please select at least one Purchase Order first
-                  </div>
-                ) : (
-                <div className="space-y-3">
-                  {/* Freight */}
-                  <div className="p-3 bg-blue-50 dark:bg-blue-950/30 rounded-md space-y-3">
-                    <div className="text-xs font-medium flex items-center gap-1 text-blue-700 dark:text-blue-300">
-                      <Truck className="h-3 w-3" /> Freight Costs (KWD)
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">HK to Dubai</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          placeholder="0.000"
-                          value={hkToDxbAmount}
-                          onChange={(e) => setHkToDxbAmount(e.target.value)}
-                          className="h-8"
-                          data-testid="input-hk-dxb-amount"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Dubai to Kuwait</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          placeholder="0.000"
-                          value={dxbToKwiAmount}
-                          onChange={(e) => setDxbToKwiAmount(e.target.value)}
-                          className="h-8"
-                          data-testid="input-dxb-kwi-amount"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Logistics Company</Label>
-                      <Select value={partyId?.toString() || ""} onValueChange={(v) => setPartyId(v ? parseInt(v) : null)}>
-                        <SelectTrigger className="h-8" data-testid="select-party">
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {suppliers.map(s => (
-                            <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  {/* Partner Profit */}
-                  <div className="p-3 bg-purple-50 dark:bg-purple-950/30 rounded-md space-y-3">
-                    <div className="text-xs font-medium flex items-center gap-1 text-purple-700 dark:text-purple-300">
-                      <Users className="h-3 w-3" /> Partner Profit (KWD)
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Amount</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          placeholder="0.000"
-                          value={partnerProfitAmount}
-                          onChange={(e) => setPartnerProfitAmount(e.target.value)}
-                          className="h-8"
-                          data-testid="input-partner-profit"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Partner Company</Label>
-                        <Select value={partnerPartyId?.toString() || ""} onValueChange={(v) => setPartnerPartyId(v ? parseInt(v) : null)}>
-                          <SelectTrigger className="h-8" data-testid="select-partner-party">
-                            <SelectValue placeholder="Select..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {suppliers.map(s => (
-                              <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Packing */}
-                  <div className="p-3 bg-green-50 dark:bg-green-950/30 rounded-md space-y-3">
-                    <div className="text-xs font-medium flex items-center gap-1 text-green-700 dark:text-green-300">
-                      <Package className="h-3 w-3" /> Packing Charges (KWD)
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Amount</Label>
-                        <Input
-                          type="number"
-                          step="0.001"
-                          placeholder="0.000"
-                          value={packingAmount}
-                          onChange={(e) => setPackingAmount(e.target.value)}
-                          className="h-8"
-                          data-testid="input-packing-amount"
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Packing Company</Label>
-                        <Select value={packingPartyId?.toString() || ""} onValueChange={(v) => setPackingPartyId(v ? parseInt(v) : null)}>
-                          <SelectTrigger className="h-8" data-testid="select-packing-party">
-                            <SelectValue placeholder="Select..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {suppliers.map(s => (
-                              <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Live Total */}
-                  <div className="p-3 bg-muted rounded-md">
-                    <div className="flex justify-between items-center text-sm">
-                      <span>Total Freight:</span>
-                      <span className="font-mono">{formatCurrency(totalFreightKwd)} KWD</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span>Partner Profit:</span>
-                      <span className="font-mono">{formatCurrency(partnerProfitKwd)} KWD</span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span>Packing:</span>
-                      <span className="font-mono">{formatCurrency(packingChargesKwd)} KWD</span>
-                    </div>
-                    <div className="flex justify-between items-center font-bold text-lg border-t mt-2 pt-2">
-                      <span>Grand Total:</span>
-                      <span className="font-mono">{formatCurrency(grandTotalKwd)} KWD</span>
-                    </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Logistics Company</Label>
+                  <Select value={partyId?.toString() || ""} onValueChange={(v) => setPartyId(v ? parseInt(v) : null)}>
+                    <SelectTrigger className="h-9" data-testid="select-party">
+                      <SelectValue placeholder="Select logistics company..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {suppliers.map(s => (
+                        <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="pt-2 border-t border-blue-200 dark:border-blue-800">
+                  <div className="flex justify-between items-center text-sm font-medium">
+                    <span>Total Freight:</span>
+                    <span className="font-mono text-blue-700 dark:text-blue-300">{formatCurrency(totalFreightKwd)} KWD</span>
                   </div>
                 </div>
-                )}
-              </AccordionContent>
-            </AccordionItem>
+              </div>
+            </div>
+          </TabsContent>
 
-            {/* Step 3: Items */}
-            {selectedPOIds.length > 0 && allocatedLineItems.length > 0 && (
-              <AccordionItem value="items" className="border rounded-md px-3">
-                <AccordionTrigger className="py-2 text-sm font-medium hover:no-underline">
+          {/* Partner Tab */}
+          <TabsContent value="partner" className="flex-1 p-4 m-0">
+            <div className="space-y-4">
+              <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-md space-y-4">
+                <div className="text-sm font-medium flex items-center gap-2 text-purple-700 dark:text-purple-300">
+                  <Users className="h-4 w-4" /> Partner Profit (KWD)
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Profit Amount</Label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      placeholder="0.000"
+                      value={partnerProfitAmount}
+                      onChange={(e) => setPartnerProfitAmount(e.target.value)}
+                      className="h-9"
+                      data-testid="input-partner-profit"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Partner Company</Label>
+                    <Select value={partnerPartyId?.toString() || ""} onValueChange={(v) => setPartnerPartyId(v ? parseInt(v) : null)}>
+                      <SelectTrigger className="h-9" data-testid="select-partner-party">
+                        <SelectValue placeholder="Select partner..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers.map(s => (
+                          <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
+                  <div className="flex justify-between items-center text-sm font-medium">
+                    <span>Partner Total:</span>
+                    <span className="font-mono text-purple-700 dark:text-purple-300">{formatCurrency(partnerProfitKwd)} KWD</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Packing Tab */}
+          <TabsContent value="packing" className="flex-1 p-4 m-0">
+            <div className="space-y-4">
+              <div className="p-4 bg-green-50 dark:bg-green-950/30 rounded-md space-y-4">
+                <div className="text-sm font-medium flex items-center gap-2 text-green-700 dark:text-green-300">
+                  <Package className="h-4 w-4" /> Packing Charges (KWD)
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Packing Amount</Label>
+                    <Input
+                      type="number"
+                      step="0.001"
+                      placeholder="0.000"
+                      value={packingAmount}
+                      onChange={(e) => setPackingAmount(e.target.value)}
+                      className="h-9"
+                      data-testid="input-packing-amount"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Packing Company</Label>
+                    <Select value={packingPartyId?.toString() || ""} onValueChange={(v) => setPackingPartyId(v ? parseInt(v) : null)}>
+                      <SelectTrigger className="h-9" data-testid="select-packing-party">
+                        <SelectValue placeholder="Select packing company..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {suppliers.map(s => (
+                          <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-green-200 dark:border-green-800">
+                  <div className="flex justify-between items-center text-sm font-medium">
+                    <span>Packing Total:</span>
+                    <span className="font-mono text-green-700 dark:text-green-300">{formatCurrency(packingChargesKwd)} KWD</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Summary Tab */}
+          <TabsContent value="summary" className="flex-1 p-4 m-0">
+            <div className="space-y-4">
+              {/* Cost Summary */}
+              <div className="p-4 bg-muted rounded-md space-y-2">
+                <div className="text-sm font-medium mb-3">Cost Breakdown</div>
+                <div className="flex justify-between items-center text-sm">
                   <span className="flex items-center gap-2">
-                    <Badge variant="outline" className="h-5 w-5 p-0 justify-center text-xs">3</Badge>
-                    Items ({totalQuantity} units)
+                    <Truck className="h-3 w-3 text-blue-600" />
+                    Total Freight:
                   </span>
-                </AccordionTrigger>
-                <AccordionContent className="pb-3">
+                  <span className="font-mono">{formatCurrency(totalFreightKwd)} KWD</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="flex items-center gap-2">
+                    <Users className="h-3 w-3 text-purple-600" />
+                    Partner Profit:
+                  </span>
+                  <span className="font-mono">{formatCurrency(partnerProfitKwd)} KWD</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="flex items-center gap-2">
+                    <Package className="h-3 w-3 text-green-600" />
+                    Packing:
+                  </span>
+                  <span className="font-mono">{formatCurrency(packingChargesKwd)} KWD</span>
+                </div>
+                <div className="flex justify-between items-center font-bold text-lg border-t mt-3 pt-3">
+                  <span>Grand Total:</span>
+                  <span className="font-mono">{formatCurrency(grandTotalKwd)} KWD</span>
+                </div>
+              </div>
+
+              {/* Items Table */}
+              {allocatedLineItems.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Items ({totalQuantity} units)</div>
                   <div className="border rounded-md overflow-hidden">
                     <Table>
                       <TableHeader>
@@ -958,23 +1045,11 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
                       </TableBody>
                     </Table>
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            )}
-          </Accordion>
-
-          {/* Notes */}
-          <div className="space-y-1.5">
-            <Label className="text-xs">Notes (Optional)</Label>
-            <Textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Notes about this shipment..."
-              rows={2}
-              data-testid="input-notes"
-            />
-          </div>
-        </div>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </CardContent>
 
       {/* Footer */}
@@ -982,7 +1057,7 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
         <Button variant="outline" onClick={onClose} disabled={isPending}>
           Cancel
         </Button>
-        <Button onClick={handleSubmit} disabled={isPending || selectedPOIds.length === 0} data-testid="button-save-voucher">
+        <Button onClick={handleSubmit} disabled={isPending || (!isEditing && selectedPOIds.length === 0)} data-testid="button-save-voucher">
           {isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
           {isEditing ? "Update" : "Create"}
         </Button>
