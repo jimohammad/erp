@@ -88,6 +88,7 @@ export const ITEM_CATEGORIES = [
   "Apple",
   "Honor", 
   "Meizu",
+  "Motorola",
   "Redmi",
   "Realme",
   "Samsung",
