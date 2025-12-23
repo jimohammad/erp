@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,8 +22,14 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Send, Search, CheckSquare, Square, MessageCircle } from "lucide-react";
+import { Send, Search, CheckSquare, Square, MessageCircle, Link2, DollarSign } from "lucide-react";
 import type { Supplier, Item } from "@shared/schema";
+
+interface PriceListSettings {
+  token: string;
+  pin: string;
+  url: string;
+}
 
 interface StockBalanceItem {
   itemName: string;
@@ -40,6 +46,7 @@ export default function SendPriceList() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
   const [includeQuantity, setIncludeQuantity] = useState(false);
+  const [selectedRecipientId, setSelectedRecipientId] = useState<string>("");
 
   const { data: parties = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
@@ -53,7 +60,17 @@ export default function SendPriceList() {
     queryKey: ["/api/reports/stock-balance"],
   });
 
+  const { data: priceListSettings } = useQuery<PriceListSettings>({
+    queryKey: ["/api/settings/price-list"],
+    queryFn: async () => {
+      const res = await fetch("/api/settings/price-list");
+      if (!res.ok) return null;
+      return res.json();
+    },
+  });
+
   const customers = parties.filter(p => p.partyType === "customer" && p.phone);
+  const allPartiesWithPhone = parties.filter(p => p.phone);
 
   const selectedCustomer = customers.find(c => c.id.toString() === selectedCustomerId);
 
@@ -199,8 +216,76 @@ export default function SendPriceList() {
     return { label: `In Stock (${stock})`, variant: "default" as const };
   };
 
+  const selectedRecipient = allPartiesWithPhone.find(p => p.id.toString() === selectedRecipientId);
+
+  const handleSendPriceListUrl = () => {
+    if (!selectedRecipientId || !selectedRecipient?.phone || !priceListSettings?.url) {
+      toast({
+        title: "Selection Required",
+        description: "Please select a recipient with a phone number",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const phone = formatPhoneForWhatsApp(selectedRecipient.phone);
+    const message = `*Iqbal Electronics Co. WLL*\n\nView our latest price list:\n${priceListSettings.url}\n\nPIN: ${priceListSettings.pin}\n\nThank you for your business!`;
+    const encodedMessage = encodeURIComponent(message);
+    const whatsappUrl = `https://wa.me/${phone}?text=${encodedMessage}`;
+
+    window.open(whatsappUrl, '_blank');
+
+    toast({
+      title: "WhatsApp Opened",
+      description: `Price list URL ready to send to ${selectedRecipient.name}`,
+    });
+  };
+
   return (
     <div className="space-y-4">
+      {priceListSettings?.url && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <DollarSign className="h-5 w-5" />
+              Share Price List URL
+            </CardTitle>
+            <CardDescription>
+              Send the price list link via WhatsApp. Recipients can view all prices online.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-md">
+              <Link2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm font-mono truncate">{priceListSettings.url}</span>
+              <Badge variant="secondary" className="ml-auto flex-shrink-0">PIN: {priceListSettings.pin}</Badge>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Select value={selectedRecipientId} onValueChange={setSelectedRecipientId}>
+                <SelectTrigger className="flex-1" data-testid="select-recipient-url">
+                  <SelectValue placeholder="Select recipient..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {allPartiesWithPhone.map(party => (
+                    <SelectItem key={party.id} value={party.id.toString()}>
+                      {party.name} ({party.phone})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={handleSendPriceListUrl}
+                disabled={!selectedRecipientId}
+                data-testid="button-send-url-whatsapp"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Send URL via WhatsApp
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="flex flex-row items-center justify-between gap-4 space-y-0 pb-3">
           <CardTitle className="flex items-center gap-2 text-base">
