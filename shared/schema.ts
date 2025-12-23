@@ -1319,8 +1319,33 @@ export const insertLandedCostLineItemSchema = createInsertSchema(landedCostLineI
 export type InsertLandedCostLineItem = z.infer<typeof insertLandedCostLineItemSchema>;
 export type LandedCostLineItem = typeof landedCostLineItems.$inferSelect;
 
+// Junction table for many-to-many relationship between vouchers and purchase orders
+export const landedCostVoucherPurchaseOrders = pgTable("landed_cost_voucher_purchase_orders", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  voucherId: integer("voucher_id").references(() => landedCostVouchers.id, { onDelete: "cascade" }).notNull(),
+  purchaseOrderId: integer("purchase_order_id").references(() => purchaseOrders.id).notNull(),
+  sortOrder: integer("sort_order").default(0), // For ordering POs in the voucher
+}, (table) => [
+  index("idx_lcvpo_voucher").on(table.voucherId),
+  index("idx_lcvpo_po").on(table.purchaseOrderId),
+]);
+
+export const landedCostVoucherPurchaseOrdersRelations = relations(landedCostVoucherPurchaseOrders, ({ one }) => ({
+  voucher: one(landedCostVouchers, {
+    fields: [landedCostVoucherPurchaseOrders.voucherId],
+    references: [landedCostVouchers.id],
+  }),
+  purchaseOrder: one(purchaseOrders, {
+    fields: [landedCostVoucherPurchaseOrders.purchaseOrderId],
+    references: [purchaseOrders.id],
+  }),
+}));
+
+export type LandedCostVoucherPurchaseOrder = typeof landedCostVoucherPurchaseOrders.$inferSelect;
+
 export type LandedCostVoucherWithDetails = LandedCostVoucher & {
-  purchaseOrder: PurchaseOrder | null;
+  purchaseOrder: PurchaseOrder | null; // Legacy single PO (deprecated, kept for backward compat)
+  purchaseOrders: PurchaseOrderWithDetails[]; // New multi-PO support
   party: Supplier | null;
   partnerParty: Supplier | null;
   packingParty: Supplier | null;
