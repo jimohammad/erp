@@ -295,6 +295,8 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
   const [packingChargesCurrency, setPackingChargesCurrency] = useState(voucher?.packingChargesCurrency || "KWD");
   const [packingChargesFxRate, setPackingChargesFxRate] = useState(voucher?.packingChargesFxRate || "1");
 
+  const [partnerProfitAmount, setPartnerProfitAmount] = useState(voucher?.totalPartnerProfitKwd || "");
+
   const { data: purchases = [] } = useQuery<PurchaseOrderWithDetails[]>({
     queryKey: ["/api/purchases"],
     queryFn: async () => {
@@ -348,6 +350,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
   const dxbToKwiKwd = parseDecimal(dxbToKwiAmount);
   const bankChargesKwd = parseDecimal(bankChargesAmount);
   const packingChargesKwd = parseDecimal(packingChargesAmount);
+  const partnerProfitKwd = parseDecimal(partnerProfitAmount);
 
   const totalFreightKwd = hkToDxbKwd + dxbToKwiKwd;
   const totalChargesKwd = bankChargesKwd + packingChargesKwd;
@@ -357,37 +360,17 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
     return selectedPO.lineItems.reduce((sum, li) => sum + (li.quantity || 0), 0);
   }, [selectedPO]);
 
-  const totalPartnerProfitKwd = useMemo(() => {
-    if (!selectedPO?.lineItems || !partnerProfitSettings?.settings) return 0;
-    let total = 0;
-    const profitMap: Record<string, number> = {};
-    partnerProfitSettings.settings.forEach(s => {
-      profitMap[s.category] = parseFloat(s.profitPerUnit) || 0;
-    });
-    for (const li of selectedPO.lineItems) {
-      const category = itemCategoryMap[li.itemName] || "";
-      const profit = profitMap[category] || 0;
-      total += profit * (li.quantity || 0);
-    }
-    return total;
-  }, [selectedPO, partnerProfitSettings, itemCategoryMap]);
-
-  const grandTotalKwd = totalFreightKwd + totalPartnerProfitKwd + totalChargesKwd;
+  const grandTotalKwd = totalFreightKwd + partnerProfitKwd + totalChargesKwd;
 
   const allocatedLineItems = useMemo(() => {
     if (!selectedPO?.lineItems) return [];
     const freightPerUnit = totalQuantity > 0 ? (totalFreightKwd / totalQuantity) : 0;
     const bankPerUnit = totalQuantity > 0 ? (bankChargesKwd / totalQuantity) : 0;
     const packingPerUnit = totalQuantity > 0 ? (packingChargesKwd / totalQuantity) : 0;
-
-    const profitMap: Record<string, number> = {};
-    partnerProfitSettings?.settings?.forEach(s => {
-      profitMap[s.category] = parseFloat(s.profitPerUnit) || 0;
-    });
+    const partnerProfitPerUnit = totalQuantity > 0 ? (partnerProfitKwd / totalQuantity) : 0;
 
     return selectedPO.lineItems.map(li => {
       const category = itemCategoryMap[li.itemName] || "";
-      const partnerProfitPerUnit = profitMap[category] || 0;
       const unitPriceKwd = parseDecimal(li.priceKwd);
       const landedCostPerUnit = unitPriceKwd + freightPerUnit + partnerProfitPerUnit + bankPerUnit + packingPerUnit;
       const qty = li.quantity || 0;
@@ -407,7 +390,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
         totalLandedCostKwd: (landedCostPerUnit * qty).toFixed(3),
       };
     });
-  }, [selectedPO, totalFreightKwd, bankChargesKwd, packingChargesKwd, totalQuantity, partnerProfitSettings, itemCategoryMap]);
+  }, [selectedPO, totalFreightKwd, bankChargesKwd, packingChargesKwd, partnerProfitKwd, totalQuantity, itemCategoryMap]);
 
   const createMutation = useMutation({
     mutationFn: async (data: { voucher: any; lineItems: any[] }) => {
@@ -458,7 +441,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
       dxbToKwiCurrency: "KWD",
       dxbToKwiFxRate: "1",
       dxbToKwiKwd: dxbToKwiKwd.toFixed(3),
-      totalPartnerProfitKwd: totalPartnerProfitKwd.toFixed(3),
+      totalPartnerProfitKwd: partnerProfitKwd.toFixed(3),
       bankChargesAmount: bankChargesAmount || null,
       bankChargesCurrency: "KWD",
       bankChargesFxRate: "1",
@@ -544,7 +527,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-5">
               <div className="space-y-2">
                 <Label className="text-xs flex items-center gap-1">
                   <Truck className="h-3 w-3" />
@@ -573,6 +556,21 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
                   onChange={(e) => setDxbToKwiAmount(e.target.value)}
                   className="h-8"
                   data-testid="input-dxb-kwi-amount"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  Partner Profit (KWD)
+                </Label>
+                <Input
+                  type="number"
+                  step="0.001"
+                  placeholder="0.000"
+                  value={partnerProfitAmount}
+                  onChange={(e) => setPartnerProfitAmount(e.target.value)}
+                  className="h-8"
+                  data-testid="input-partner-profit"
                 />
               </div>
               <div className="space-y-2">
@@ -607,48 +605,6 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
               </div>
             </div>
 
-            <Card className="bg-muted/30">
-              <CardHeader className="py-3">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Partner Profit (Auto-calculated)
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {!selectedPO ? (
-                  <p className="text-sm text-muted-foreground">Select a Purchase Order to calculate partner profit</p>
-                ) : selectedPO.lineItems.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No line items in selected PO</p>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="grid grid-cols-4 gap-2 text-xs font-medium text-muted-foreground border-b pb-1">
-                      <div>Item</div>
-                      <div>Category</div>
-                      <div className="text-right">Qty</div>
-                      <div className="text-right">Profit (KWD)</div>
-                    </div>
-                    {selectedPO.lineItems.map((li, idx) => {
-                      const category = itemCategoryMap[li.itemName] || "";
-                      const profitPerUnit = partnerProfitSettings?.settings?.find(s => s.category === category)?.profitPerUnit || "0";
-                      const profit = parseFloat(profitPerUnit) * (li.quantity || 0);
-                      return (
-                        <div key={idx} className="grid grid-cols-4 gap-2 text-sm">
-                          <div className="truncate">{li.itemName}</div>
-                          <div className="text-muted-foreground">{category || "N/A"}</div>
-                          <div className="text-right font-mono">{li.quantity}</div>
-                          <div className="text-right font-mono">{formatCurrency(profit)}</div>
-                        </div>
-                      );
-                    })}
-                    <div className="border-t pt-2 flex justify-between items-center">
-                      <span className="text-sm font-medium">Total Partner Profit</span>
-                      <span className="font-mono font-semibold text-primary">{formatCurrency(totalPartnerProfitKwd)} KWD</span>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
             <Card>
               <CardHeader className="py-3">
                 <CardTitle className="text-sm">Cost Summary</CardTitle>
@@ -661,7 +617,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
                   </div>
                   <div>
                     <div className="text-muted-foreground">Partner Profit</div>
-                    <div className="font-mono font-semibold">{formatCurrency(totalPartnerProfitKwd)} KWD</div>
+                    <div className="font-mono font-semibold">{formatCurrency(partnerProfitKwd)} KWD</div>
                   </div>
                   <div>
                     <div className="text-muted-foreground">Bank Charges</div>
