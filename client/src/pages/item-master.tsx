@@ -307,46 +307,46 @@ export default function ItemMaster() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-16">ID</TableHead>
-                    <TableHead className="w-32">Item Code</TableHead>
-                    <TableHead>Item Name</TableHead>
-                    <TableHead className="w-24 text-right">Avail Qty</TableHead>
-                    <TableHead className="w-28 text-right">Purchase KWD</TableHead>
-                    <TableHead className="w-28 text-right">Purchase FX</TableHead>
-                    <TableHead className="w-20">FX</TableHead>
-                    <TableHead className="w-28 text-right">Selling KWD</TableHead>
-                    {isAdmin && <TableHead className="w-24 text-right">Actions</TableHead>}
+                    <TableHead className="w-16 py-2">ID</TableHead>
+                    <TableHead className="w-32 py-2">Item Code</TableHead>
+                    <TableHead className="py-2">Item Name</TableHead>
+                    <TableHead className="w-24 text-right py-2">Avail Qty</TableHead>
+                    <TableHead className="w-28 text-right py-2">Purchase KWD</TableHead>
+                    <TableHead className="w-28 text-right py-2">Purchase FX</TableHead>
+                    <TableHead className="w-20 py-2">FX</TableHead>
+                    <TableHead className="w-28 text-right py-2">Selling KWD</TableHead>
+                    {isAdmin && <TableHead className="w-24 text-right py-2">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredItems.map((item) => (
                     <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
-                      <TableCell className="font-mono text-sm text-muted-foreground">
+                      <TableCell className="py-1 font-mono text-sm text-muted-foreground">
                         {item.id}
                       </TableCell>
-                      <TableCell className="font-mono text-sm" data-testid={`text-item-code-${item.id}`}>
+                      <TableCell className="py-1 font-mono text-sm" data-testid={`text-item-code-${item.id}`}>
                         {item.code || "-"}
                       </TableCell>
-                      <TableCell className="font-medium" data-testid={`text-item-name-${item.id}`}>
+                      <TableCell className="py-1 font-medium" data-testid={`text-item-name-${item.id}`}>
                         {item.name}
                       </TableCell>
-                      <TableCell className="text-right font-mono" data-testid={`text-avail-qty-${item.id}`}>
+                      <TableCell className="py-1 text-right font-mono" data-testid={`text-avail-qty-${item.id}`}>
                         {stockMap.get(item.name) ?? 0}
                       </TableCell>
-                      <TableCell className="text-right font-mono" data-testid={`text-purchase-price-${item.id}`}>
+                      <TableCell className="py-1 text-right font-mono" data-testid={`text-purchase-price-${item.id}`}>
                         {item.purchasePriceKwd ? parseFloat(item.purchasePriceKwd).toFixed(3) : "-"}
                       </TableCell>
-                      <TableCell className="text-right font-mono" data-testid={`text-purchase-price-fx-${item.id}`}>
+                      <TableCell className="py-1 text-right font-mono" data-testid={`text-purchase-price-fx-${item.id}`}>
                         {item.purchasePriceFx ? parseFloat(item.purchasePriceFx).toFixed(3) : "-"}
                       </TableCell>
-                      <TableCell data-testid={`text-fx-currency-${item.id}`}>
+                      <TableCell className="py-1" data-testid={`text-fx-currency-${item.id}`}>
                         {item.fxCurrency || "-"}
                       </TableCell>
-                      <TableCell className="text-right font-mono" data-testid={`text-selling-price-${item.id}`}>
+                      <TableCell className="py-1 text-right font-mono" data-testid={`text-selling-price-${item.id}`}>
                         {item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "-"}
                       </TableCell>
                       {isAdmin && (
-                        <TableCell className="text-right">
+                        <TableCell className="py-1 text-right">
                           <div className="flex justify-end gap-1">
                             <Button
                               variant="ghost"
