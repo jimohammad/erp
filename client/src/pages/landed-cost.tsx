@@ -320,10 +320,10 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
   const [partnerProfitAmount, setPartnerProfitAmount] = useState(voucher?.totalPartnerProfitKwd || "");
 
   const { data: purchases = [] } = useQuery<PurchaseOrderWithDetails[]>({
-    queryKey: ["/api/purchases"],
+    queryKey: ["/api/purchase-orders"],
     queryFn: async () => {
-      const res = await fetch("/api/purchases", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch purchases");
+      const res = await fetch("/api/purchase-orders", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch purchase orders");
       return res.json();
     },
   });
