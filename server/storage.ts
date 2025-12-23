@@ -517,13 +517,13 @@ export class DatabaseStorage implements IStorage {
     const result = await db.execute(sql`
       WITH purchased AS (
         SELECT li.item_name, SUM(li.quantity) as qty
-        FROM line_items li
+        FROM purchase_order_line_items li
         JOIN purchase_orders po ON li.purchase_order_id = po.id
         GROUP BY li.item_name
       ),
       sold AS (
         SELECT sli.item_name, SUM(sli.quantity) as qty
-        FROM sales_line_items sli
+        FROM sales_order_line_items sli
         JOIN sales_orders so ON sli.sales_order_id = so.id
         GROUP BY sli.item_name
       ),
@@ -2052,7 +2052,7 @@ export class DatabaseStorage implements IStorage {
         sli.quantity::int as quantity,
         COALESCE(CAST(sli.unit_price AS DECIMAL), 0)::float as "unitPrice",
         (sli.quantity * COALESCE(CAST(sli.unit_price AS DECIMAL), 0))::float as "totalAmount"
-      FROM sales_line_items sli
+      FROM sales_order_line_items sli
       JOIN sales_orders so ON sli.sales_order_id = so.id
       JOIN customers c ON so.customer_id = c.id
       WHERE sli.item_name = ${itemName}
