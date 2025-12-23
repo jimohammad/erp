@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, DollarSign, Truck, Pencil } from "lucide-react";
+import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, DollarSign, Truck, Pencil, Users } from "lucide-react";
 import { format } from "date-fns";
 import type { LandedCostVoucherWithDetails, PurchaseOrderWithDetails, Item } from "@shared/schema";
 
@@ -664,6 +664,48 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
                 </CardContent>
               </Card>
             </div>
+
+            <Card className="bg-muted/30">
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Partner Profit (Auto-calculated)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!selectedPO ? (
+                  <p className="text-sm text-muted-foreground">Select a Purchase Order to calculate partner profit</p>
+                ) : selectedPO.lineItems.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No line items in selected PO</p>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-4 gap-2 text-xs font-medium text-muted-foreground border-b pb-1">
+                      <div>Item</div>
+                      <div>Category</div>
+                      <div className="text-right">Qty</div>
+                      <div className="text-right">Profit (KWD)</div>
+                    </div>
+                    {selectedPO.lineItems.map((li, idx) => {
+                      const category = itemCategoryMap[li.itemName] || "";
+                      const profitPerUnit = partnerProfitSettings?.settings?.find(s => s.category === category)?.profitPerUnit || "0";
+                      const profit = parseFloat(profitPerUnit) * (li.quantity || 0);
+                      return (
+                        <div key={idx} className="grid grid-cols-4 gap-2 text-sm">
+                          <div className="truncate">{li.itemName}</div>
+                          <div className="text-muted-foreground">{category || "N/A"}</div>
+                          <div className="text-right font-mono">{li.quantity}</div>
+                          <div className="text-right font-mono">{formatCurrency(profit)}</div>
+                        </div>
+                      );
+                    })}
+                    <div className="border-t pt-2 flex justify-between items-center">
+                      <span className="text-sm font-medium">Total Partner Profit</span>
+                      <span className="font-mono font-semibold text-primary">{formatCurrency(totalPartnerProfitKwd)} KWD</span>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             <div className="grid gap-4 md:grid-cols-2">
               <Card>
