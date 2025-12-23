@@ -336,13 +336,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
   const [dxbToKwiCurrency, setDxbToKwiCurrency] = useState(voucher?.dxbToKwiCurrency || "AED");
   const [dxbToKwiFxRate, setDxbToKwiFxRate] = useState(voucher?.dxbToKwiFxRate || "0.0835");
 
-  const [bankChargesAmount, setBankChargesAmount] = useState(voucher?.bankChargesAmount || "");
-  const [bankChargesCurrency, setBankChargesCurrency] = useState(voucher?.bankChargesCurrency || "KWD");
-  const [bankChargesFxRate, setBankChargesFxRate] = useState(voucher?.bankChargesFxRate || "1");
-
-  const [packingChargesAmount, setPackingChargesAmount] = useState(voucher?.packingChargesAmount || "");
-  const [packingChargesCurrency, setPackingChargesCurrency] = useState(voucher?.packingChargesCurrency || "KWD");
-  const [packingChargesFxRate, setPackingChargesFxRate] = useState(voucher?.packingChargesFxRate || "1");
+  const [packingPartyId, setPackingPartyId] = useState<number | null>(voucher?.packingPartyId || null);
 
   const [partnerProfitAmount, setPartnerProfitAmount] = useState(voucher?.totalPartnerProfitKwd || "");
 
@@ -407,31 +401,31 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
 
   const hkToDxbKwd = parseDecimal(hkToDxbAmount);
   const dxbToKwiKwd = parseDecimal(dxbToKwiAmount);
-  const bankChargesKwd = parseDecimal(bankChargesAmount);
-  const packingChargesKwd = parseDecimal(packingChargesAmount);
   const partnerProfitKwd = parseDecimal(partnerProfitAmount);
 
   const totalFreightKwd = hkToDxbKwd + dxbToKwiKwd;
-  const totalChargesKwd = bankChargesKwd + packingChargesKwd;
 
   const totalQuantity = useMemo(() => {
     if (!selectedPO?.lineItems) return 0;
     return selectedPO.lineItems.reduce((sum, li) => sum + (li.quantity || 0), 0);
   }, [selectedPO]);
 
-  const grandTotalKwd = totalFreightKwd + partnerProfitKwd + totalChargesKwd;
+  // Packing charges: fixed 0.210 KWD per unit
+  const PACKING_RATE_PER_UNIT = 0.210;
+  const packingChargesKwd = totalQuantity * PACKING_RATE_PER_UNIT;
+
+  const grandTotalKwd = totalFreightKwd + partnerProfitKwd + packingChargesKwd;
 
   const allocatedLineItems = useMemo(() => {
     if (!selectedPO?.lineItems) return [];
     const freightPerUnit = totalQuantity > 0 ? (totalFreightKwd / totalQuantity) : 0;
-    const bankPerUnit = totalQuantity > 0 ? (bankChargesKwd / totalQuantity) : 0;
-    const packingPerUnit = totalQuantity > 0 ? (packingChargesKwd / totalQuantity) : 0;
     const partnerProfitPerUnit = totalQuantity > 0 ? (partnerProfitKwd / totalQuantity) : 0;
+    const packingPerUnit = PACKING_RATE_PER_UNIT; // Fixed 0.210 KWD per unit
 
     return selectedPO.lineItems.map(li => {
       const category = itemCategoryMap[li.itemName] || "";
       const unitPriceKwd = parseDecimal(li.priceKwd);
-      const landedCostPerUnit = unitPriceKwd + freightPerUnit + partnerProfitPerUnit + bankPerUnit + packingPerUnit;
+      const landedCostPerUnit = unitPriceKwd + freightPerUnit + partnerProfitPerUnit + packingPerUnit;
       const qty = li.quantity || 0;
 
       return {
@@ -443,13 +437,12 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
         lineTotalKwd: (unitPriceKwd * qty).toFixed(3),
         freightPerUnitKwd: freightPerUnit.toFixed(3),
         partnerProfitPerUnitKwd: partnerProfitPerUnit.toFixed(3),
-        bankChargesPerUnitKwd: bankPerUnit.toFixed(3),
         packingPerUnitKwd: packingPerUnit.toFixed(3),
         landedCostPerUnitKwd: landedCostPerUnit.toFixed(3),
         totalLandedCostKwd: (landedCostPerUnit * qty).toFixed(3),
       };
     });
-  }, [selectedPO, totalFreightKwd, bankChargesKwd, packingChargesKwd, partnerProfitKwd, totalQuantity, itemCategoryMap]);
+  }, [selectedPO, totalFreightKwd, partnerProfitKwd, totalQuantity, itemCategoryMap]);
 
   const createMutation = useMutation({
     mutationFn: async (data: { voucher: any; lineItems: any[] }) => {
@@ -501,22 +494,17 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
       dxbToKwiFxRate: "1",
       dxbToKwiKwd: dxbToKwiKwd.toFixed(3),
       totalPartnerProfitKwd: partnerProfitKwd.toFixed(3),
-      bankChargesAmount: bankChargesAmount || null,
-      bankChargesCurrency: "KWD",
-      bankChargesFxRate: "1",
-      bankChargesKwd: bankChargesKwd.toFixed(3),
-      packingChargesAmount: packingChargesAmount || null,
-      packingChargesCurrency: "KWD",
-      packingChargesFxRate: "1",
       packingChargesKwd: packingChargesKwd.toFixed(3),
       totalFreightKwd: totalFreightKwd.toFixed(3),
-      totalChargesKwd: totalChargesKwd.toFixed(3),
+      totalChargesKwd: packingChargesKwd.toFixed(3),
       grandTotalKwd: grandTotalKwd.toFixed(3),
       allocationMethod,
       partyId: partyId || null,
       partnerPartyId: partnerPartyId || null,
+      packingPartyId: packingPartyId || null,
       payableStatus: "pending",
       partnerPayableStatus: partnerPartyId && partnerProfitKwd > 0 ? "pending" : "paid",
+      packingPayableStatus: packingPartyId && packingChargesKwd > 0 ? "pending" : "paid",
       notes: notes || null,
       branchId: branchId || null,
     };
@@ -674,31 +662,35 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
               </div>
               <div className="space-y-2">
                 <Label className="text-xs flex items-center gap-1">
-                  <DollarSign className="h-3 w-3" />
-                  Bank / FX Charges (KWD)
+                  <Package className="h-3 w-3" />
+                  Packing Party
                 </Label>
-                <Input
-                  type="number"
-                  step="0.001"
-                  placeholder="0.000"
-                  value={bankChargesAmount}
-                  onChange={(e) => setBankChargesAmount(e.target.value)}
-                  className="h-8"
-                  data-testid="input-bank-amount"
-                />
+                <Select
+                  value={packingPartyId?.toString() || ""}
+                  onValueChange={(v) => setPackingPartyId(v ? parseInt(v) : null)}
+                >
+                  <SelectTrigger className="h-8" data-testid="select-packing-party">
+                    <SelectValue placeholder="Select packing..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map(s => (
+                      <SelectItem key={s.id} value={s.id.toString()}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label className="text-xs flex items-center gap-1">
                   <Package className="h-3 w-3" />
-                  Packing Charges (KWD)
+                  Packing (0.210/unit)
                 </Label>
                 <Input
-                  type="number"
-                  step="0.001"
-                  placeholder="0.000"
-                  value={packingChargesAmount}
-                  onChange={(e) => setPackingChargesAmount(e.target.value)}
-                  className="h-8"
+                  type="text"
+                  value={`${formatCurrency(packingChargesKwd)} KWD`}
+                  disabled
+                  className="h-8 bg-muted"
                   data-testid="input-packing-amount"
                 />
               </div>
@@ -709,7 +701,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
                 <CardTitle className="text-sm">Cost Summary</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                   <div>
                     <div className="text-muted-foreground">Total Freight</div>
                     <div className="font-mono font-semibold">{formatCurrency(totalFreightKwd)} KWD</div>
@@ -719,11 +711,7 @@ function LandedCostFormDialog({ voucher, branchId, onClose }: LandedCostFormDial
                     <div className="font-mono font-semibold">{formatCurrency(partnerProfitKwd)} KWD</div>
                   </div>
                   <div>
-                    <div className="text-muted-foreground">Bank Charges</div>
-                    <div className="font-mono font-semibold">{formatCurrency(bankChargesKwd)} KWD</div>
-                  </div>
-                  <div>
-                    <div className="text-muted-foreground">Packing</div>
+                    <div className="text-muted-foreground">Packing ({totalQuantity} x 0.210)</div>
                     <div className="font-mono font-semibold">{formatCurrency(packingChargesKwd)} KWD</div>
                   </div>
                   <div className="bg-muted rounded p-2">
@@ -872,10 +860,6 @@ function LandedCostViewDialog({ voucher, onClose }: LandedCostViewDialogProps) {
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Partner Profit:</span>
                       <span className="font-mono">{formatCurrency(voucher.totalPartnerProfitKwd)} KWD</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Bank Charges:</span>
-                      <span className="font-mono">{formatCurrency(voucher.bankChargesKwd)} KWD</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Packing Charges:</span>
