@@ -64,6 +64,7 @@ const OpeningBalancesPage = lazy(() => import("@/pages/opening-balances"));
 const PurchaseOrdersPage = lazy(() => import("@/pages/purchase-orders"));
 const StockLookupPage = lazy(() => import("@/pages/stock-lookup"));
 const SecuritySettingsPage = lazy(() => import("@/pages/security-settings"));
+const PartnerProfitSettingsPage = lazy(() => import("@/pages/partner-profit-settings"));
 const ImeiHistoryPage = lazy(() => import("@/pages/imei-history"));
 const BackupPage = lazy(() => import("@/pages/backup"));
 const UserManagementPage = lazy(() => import("@/pages/user-management"));
@@ -224,6 +225,7 @@ function AppSidebar() {
     { title: "User Roles", url: "/settings/user-roles" },
     { title: "Branches", url: "/settings/branches" },
     { title: "Opening Balances", url: "/settings/opening-balances" },
+    { title: "Partner Profit", url: "/settings/partner-profit" },
     { title: "Security", url: "/settings/security" },
     { title: "Backup", url: "/settings/backup" },
   ];
@@ -743,6 +745,7 @@ function AuthenticatedLayout() {
                 <Route path="/settings/branches" component={BranchesPage} />
                 <Route path="/settings/opening-balances" component={OpeningBalancesPage} />
                 <Route path="/settings/security" component={SecuritySettingsPage} />
+                <Route path="/settings/partner-profit" component={PartnerProfitSettingsPage} />
                 <Route path="/settings/backup" component={BackupPage} />
                 <Route path="/stock-transfers/new" component={StockTransferNewPage} />
                 <Route path="/stock-transfers" component={StockTransfersPage} />

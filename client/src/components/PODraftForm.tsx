@@ -76,6 +76,10 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
   const [fxRate, setFxRate] = useState("");
   const [fxTransferred, setFxTransferred] = useState("");
   const [kwdTransferred, setKwdTransferred] = useState("");
+  const [hkToDxbFx, setHkToDxbFx] = useState("");
+  const [dxbToKwiFx, setDxbToKwiFx] = useState("");
+  const [freightCurrency, setFreightCurrency] = useState<"AED" | "USD">("AED");
+  const [freightFxRate, setFreightFxRate] = useState("");
   const [notes, setNotes] = useState("");
   const [lineItems, setLineItems] = useState<LineItemData[]>([
     { id: generateItemId(), itemName: "", quantity: "", priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
@@ -111,6 +115,10 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
     setFxRate("");
     setFxTransferred("");
     setKwdTransferred("");
+    setHkToDxbFx("");
+    setDxbToKwiFx("");
+    setFreightCurrency("AED");
+    setFreightFxRate("");
     setNotes("");
     setLineItems([
       { id: generateItemId(), itemName: "", quantity: "", priceKwd: "", fxPrice: "", totalKwd: "0.000", imeiNumbers: [] },
@@ -136,6 +144,10 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
       setFxRate(editingPO.fxRate || "");
       setFxTransferred((editingPO as any).fxTransferred || "");
       setKwdTransferred((editingPO as any).kwdTransferred || "");
+      setHkToDxbFx((editingPO as any).hkToDxbFx || "");
+      setDxbToKwiFx((editingPO as any).dxbToKwiFx || "");
+      setFreightCurrency(((editingPO as any).freightCurrency as "AED" | "USD") || "AED");
+      setFreightFxRate((editingPO as any).freightFxRate || "");
       setNotes(editingPO.notes || "");
       setLineItems(
         editingPO.lineItems.map((item) => ({
@@ -448,6 +460,12 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
       ttCopyFilePath = await uploadFile(ttCopyFile);
     }
 
+    // Calculate total freight in KWD
+    const hkToDxbVal = parseFloat(hkToDxbFx) || 0;
+    const dxbToKwiVal = parseFloat(dxbToKwiFx) || 0;
+    const freightRate = parseFloat(freightFxRate) || 0;
+    const totalFreightKwd = (hkToDxbVal + dxbToKwiVal) * freightRate;
+
     const payload = {
       poNumber,
       poDate,
@@ -459,6 +477,11 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
       totalFx: totals.totalFx || null,
       fxTransferred: fxTransferred || null,
       kwdTransferred: kwdTransferred || null,
+      hkToDxbFx: hkToDxbFx || null,
+      dxbToKwiFx: dxbToKwiFx || null,
+      freightCurrency: freightCurrency || null,
+      freightFxRate: freightFxRate || null,
+      totalFreightKwd: totalFreightKwd > 0 ? totalFreightKwd.toFixed(3) : null,
       notes: notes || null,
       invoiceFilePath,
       deliveryNoteFilePath,
@@ -596,6 +619,58 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
               {fxTransferred && kwdTransferred && (
                 <p className="text-xs text-muted-foreground">
                   Rate: {fxRate} KWD/{fxCurrency}
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Freight Section */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/30 rounded-md">
+            <div className="md:col-span-4">
+              <Label className="text-base font-medium">Freight Costs (for landed cost calculation)</Label>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="hk-to-dxb">HK to DXB ({freightCurrency})</Label>
+              <Input
+                id="hk-to-dxb"
+                type="number"
+                step="0.001"
+                value={hkToDxbFx}
+                onChange={(e) => setHkToDxbFx(e.target.value)}
+                placeholder="0.000"
+                data-testid="input-hk-to-dxb"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dxb-to-kwi">DXB to KWI ({freightCurrency})</Label>
+              <Input
+                id="dxb-to-kwi"
+                type="number"
+                step="0.001"
+                value={dxbToKwiFx}
+                onChange={(e) => setDxbToKwiFx(e.target.value)}
+                placeholder="0.000"
+                data-testid="input-dxb-to-kwi"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Freight Currency</Label>
+              <CurrencyToggle value={freightCurrency} onChange={setFreightCurrency} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="freight-fx-rate">Freight FX Rate</Label>
+              <Input
+                id="freight-fx-rate"
+                type="number"
+                step="0.0001"
+                value={freightFxRate}
+                onChange={(e) => setFreightFxRate(e.target.value)}
+                placeholder={`KWD per 1 ${freightCurrency}`}
+                data-testid="input-freight-fx-rate"
+              />
+              {hkToDxbFx && dxbToKwiFx && freightFxRate && (
+                <p className="text-xs text-muted-foreground">
+                  Total Freight: {((parseFloat(hkToDxbFx || "0") + parseFloat(dxbToKwiFx || "0")) * parseFloat(freightFxRate || "0")).toFixed(3)} KWD
                 </p>
               )}
             </div>
