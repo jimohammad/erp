@@ -3052,11 +3052,11 @@ export async function registerRoutes(
 
   app.post("/api/landed-cost-vouchers", isAuthenticated, isAdmin, async (req, res) => {
     try {
-      const { voucher, lineItems } = req.body;
+      const { voucher, lineItems, purchaseOrderIds } = req.body;
       if (!voucher || !lineItems) {
         return res.status(400).json({ error: "Voucher and line items are required" });
       }
-      const newVoucher = await storage.createLandedCostVoucher(voucher, lineItems);
+      const newVoucher = await storage.createLandedCostVoucher(voucher, lineItems, purchaseOrderIds);
       res.status(201).json(newVoucher);
     } catch (error) {
       console.error("Error creating landed cost voucher:", error);
@@ -3070,8 +3070,8 @@ export async function registerRoutes(
       if (isNaN(id)) {
         return res.status(400).json({ error: "Invalid voucher ID" });
       }
-      const { voucher, lineItems } = req.body;
-      const updated = await storage.updateLandedCostVoucher(id, voucher, lineItems);
+      const { voucher, lineItems, purchaseOrderIds } = req.body;
+      const updated = await storage.updateLandedCostVoucher(id, voucher, lineItems, purchaseOrderIds);
       if (!updated) {
         return res.status(404).json({ error: "Voucher not found" });
       }
