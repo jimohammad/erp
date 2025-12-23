@@ -4815,8 +4815,8 @@ export class DatabaseStorage implements IStorage {
         .returning();
       createdLineItems.push(newItem);
       
-      // Update item's landed cost
-      if (li.itemName && li.landedCostPerUnitKwd) {
+      // Update item's landed cost (allow zero values)
+      if (li.itemName && li.landedCostPerUnitKwd !== undefined && li.landedCostPerUnitKwd !== null) {
         await db.update(items)
           .set({ landedCostKwd: li.landedCostPerUnitKwd })
           .where(eq(items.name, li.itemName));
@@ -4863,8 +4863,8 @@ export class DatabaseStorage implements IStorage {
         await db.insert(landedCostLineItems)
           .values({ ...li, voucherId: id });
         
-        // Update item's landed cost
-        if (li.itemName && li.landedCostPerUnitKwd) {
+        // Update item's landed cost (allow zero values)
+        if (li.itemName && li.landedCostPerUnitKwd !== undefined && li.landedCostPerUnitKwd !== null) {
           await db.update(items)
             .set({ landedCostKwd: li.landedCostPerUnitKwd })
             .where(eq(items.name, li.itemName));
