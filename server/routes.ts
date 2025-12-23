@@ -2996,6 +2996,109 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== LANDED COST VOUCHERS ====================
+
+  app.get("/api/landed-cost-vouchers", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const branchId = req.query.branchId ? parseInt(req.query.branchId as string) : undefined;
+      const vouchers = await storage.getLandedCostVouchers({ branchId });
+      res.json(vouchers);
+    } catch (error) {
+      console.error("Error fetching landed cost vouchers:", error);
+      res.status(500).json({ error: "Failed to fetch landed cost vouchers" });
+    }
+  });
+
+  app.get("/api/landed-cost-vouchers/next-number", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const voucherNumber = await storage.getNextLandedCostVoucherNumber();
+      res.json({ voucherNumber });
+    } catch (error) {
+      console.error("Error getting next voucher number:", error);
+      res.status(500).json({ error: "Failed to get next voucher number" });
+    }
+  });
+
+  app.get("/api/landed-cost-vouchers/by-po/:poId", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const poId = parseInt(req.params.poId);
+      if (isNaN(poId)) {
+        return res.status(400).json({ error: "Invalid PO ID" });
+      }
+      const voucher = await storage.getLandedCostVoucherByPO(poId);
+      res.json(voucher || null);
+    } catch (error) {
+      console.error("Error fetching landed cost voucher by PO:", error);
+      res.status(500).json({ error: "Failed to fetch landed cost voucher" });
+    }
+  });
+
+  app.get("/api/landed-cost-vouchers/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid voucher ID" });
+      }
+      const voucher = await storage.getLandedCostVoucher(id);
+      if (!voucher) {
+        return res.status(404).json({ error: "Voucher not found" });
+      }
+      res.json(voucher);
+    } catch (error) {
+      console.error("Error fetching landed cost voucher:", error);
+      res.status(500).json({ error: "Failed to fetch landed cost voucher" });
+    }
+  });
+
+  app.post("/api/landed-cost-vouchers", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { voucher, lineItems } = req.body;
+      if (!voucher || !lineItems) {
+        return res.status(400).json({ error: "Voucher and line items are required" });
+      }
+      const newVoucher = await storage.createLandedCostVoucher(voucher, lineItems);
+      res.status(201).json(newVoucher);
+    } catch (error) {
+      console.error("Error creating landed cost voucher:", error);
+      res.status(500).json({ error: "Failed to create landed cost voucher" });
+    }
+  });
+
+  app.put("/api/landed-cost-vouchers/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid voucher ID" });
+      }
+      const { voucher, lineItems } = req.body;
+      const updated = await storage.updateLandedCostVoucher(id, voucher, lineItems);
+      if (!updated) {
+        return res.status(404).json({ error: "Voucher not found" });
+      }
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating landed cost voucher:", error);
+      res.status(500).json({ error: "Failed to update landed cost voucher" });
+    }
+  });
+
+  app.delete("/api/landed-cost-vouchers/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid voucher ID" });
+      }
+      const deleted = await storage.deleteLandedCostVoucher(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Voucher not found" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting landed cost voucher:", error);
+      res.status(500).json({ error: "Failed to delete landed cost voucher" });
+    }
+  });
+
   // ==================== IMEI TRACKING ====================
 
   app.get("/api/imei/search", isAuthenticated, async (req, res) => {

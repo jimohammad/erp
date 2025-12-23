@@ -143,6 +143,13 @@ import {
   type AuditTrail,
   type InsertAuditTrail,
   type AuditTrailWithDetails,
+  landedCostVouchers,
+  landedCostLineItems,
+  type LandedCostVoucher,
+  type InsertLandedCostVoucher,
+  type LandedCostLineItem,
+  type InsertLandedCostLineItem,
+  type LandedCostVoucherWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql, or, isNull, asc, inArray, ne } from "drizzle-orm";
@@ -357,6 +364,15 @@ export interface IStorage {
   
   // Price list with stock for low stock indicator (for salesman)
   getPriceListOnly(): Promise<{ itemCode: string | null; itemName: string; category: string | null; sellingPriceKwd: string | null; currentStock: number }[]>;
+
+  // Landed Cost Vouchers
+  getLandedCostVouchers(options?: { branchId?: number }): Promise<LandedCostVoucherWithDetails[]>;
+  getLandedCostVoucher(id: number): Promise<LandedCostVoucherWithDetails | undefined>;
+  getLandedCostVoucherByPO(purchaseOrderId: number): Promise<LandedCostVoucherWithDetails | undefined>;
+  createLandedCostVoucher(voucher: InsertLandedCostVoucher, lineItems: Omit<InsertLandedCostLineItem, 'voucherId'>[]): Promise<LandedCostVoucherWithDetails>;
+  updateLandedCostVoucher(id: number, voucher: Partial<InsertLandedCostVoucher>, lineItems?: Omit<InsertLandedCostLineItem, 'voucherId'>[]): Promise<LandedCostVoucherWithDetails | undefined>;
+  deleteLandedCostVoucher(id: number): Promise<boolean>;
+  getNextLandedCostVoucherNumber(): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -4698,6 +4714,155 @@ export class DatabaseStorage implements IStorage {
     }
     
     return changedFields;
+  }
+
+  // ============================================================
+  // LANDED COST VOUCHERS
+  // ============================================================
+
+  async getLandedCostVouchers(options?: { branchId?: number }): Promise<LandedCostVoucherWithDetails[]> {
+    const conditions = [];
+    if (options?.branchId) {
+      conditions.push(eq(landedCostVouchers.branchId, options.branchId));
+    }
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+
+    const vouchersList = await db.select()
+      .from(landedCostVouchers)
+      .leftJoin(purchaseOrders, eq(landedCostVouchers.purchaseOrderId, purchaseOrders.id))
+      .where(whereClause)
+      .orderBy(desc(landedCostVouchers.createdAt));
+
+    const result: LandedCostVoucherWithDetails[] = [];
+    for (const row of vouchersList) {
+      const lineItemsList = await db.select()
+        .from(landedCostLineItems)
+        .where(eq(landedCostLineItems.voucherId, row.landed_cost_vouchers.id))
+        .orderBy(landedCostLineItems.id);
+
+      result.push({
+        ...row.landed_cost_vouchers,
+        purchaseOrder: row.purchase_orders || null,
+        lineItems: lineItemsList,
+      });
+    }
+
+    return result;
+  }
+
+  async getLandedCostVoucher(id: number): Promise<LandedCostVoucherWithDetails | undefined> {
+    const [voucherRow] = await db.select()
+      .from(landedCostVouchers)
+      .leftJoin(purchaseOrders, eq(landedCostVouchers.purchaseOrderId, purchaseOrders.id))
+      .where(eq(landedCostVouchers.id, id));
+
+    if (!voucherRow) return undefined;
+
+    const lineItemsList = await db.select()
+      .from(landedCostLineItems)
+      .where(eq(landedCostLineItems.voucherId, id))
+      .orderBy(landedCostLineItems.id);
+
+    return {
+      ...voucherRow.landed_cost_vouchers,
+      purchaseOrder: voucherRow.purchase_orders || null,
+      lineItems: lineItemsList,
+    };
+  }
+
+  async getLandedCostVoucherByPO(purchaseOrderId: number): Promise<LandedCostVoucherWithDetails | undefined> {
+    const [voucherRow] = await db.select()
+      .from(landedCostVouchers)
+      .leftJoin(purchaseOrders, eq(landedCostVouchers.purchaseOrderId, purchaseOrders.id))
+      .where(eq(landedCostVouchers.purchaseOrderId, purchaseOrderId));
+
+    if (!voucherRow) return undefined;
+
+    const lineItemsList = await db.select()
+      .from(landedCostLineItems)
+      .where(eq(landedCostLineItems.voucherId, voucherRow.landed_cost_vouchers.id))
+      .orderBy(landedCostLineItems.id);
+
+    return {
+      ...voucherRow.landed_cost_vouchers,
+      purchaseOrder: voucherRow.purchase_orders || null,
+      lineItems: lineItemsList,
+    };
+  }
+
+  async createLandedCostVoucher(
+    voucher: InsertLandedCostVoucher, 
+    lineItems: Omit<InsertLandedCostLineItem, 'voucherId'>[]
+  ): Promise<LandedCostVoucherWithDetails> {
+    const [newVoucher] = await db.insert(landedCostVouchers).values(voucher).returning();
+
+    const createdLineItems: LandedCostLineItem[] = [];
+    for (const li of lineItems) {
+      const [newItem] = await db.insert(landedCostLineItems)
+        .values({ ...li, voucherId: newVoucher.id })
+        .returning();
+      createdLineItems.push(newItem);
+    }
+
+    // Get the related purchase order
+    const [poRow] = await db.select()
+      .from(purchaseOrders)
+      .where(eq(purchaseOrders.id, newVoucher.purchaseOrderId));
+
+    return {
+      ...newVoucher,
+      purchaseOrder: poRow || null,
+      lineItems: createdLineItems,
+    };
+  }
+
+  async updateLandedCostVoucher(
+    id: number, 
+    voucher: Partial<InsertLandedCostVoucher>, 
+    lineItems?: Omit<InsertLandedCostLineItem, 'voucherId'>[]
+  ): Promise<LandedCostVoucherWithDetails | undefined> {
+    const [updated] = await db.update(landedCostVouchers)
+      .set({ ...voucher, updatedAt: new Date() })
+      .where(eq(landedCostVouchers.id, id))
+      .returning();
+
+    if (!updated) return undefined;
+
+    // If line items provided, replace them
+    if (lineItems) {
+      await db.delete(landedCostLineItems).where(eq(landedCostLineItems.voucherId, id));
+      
+      for (const li of lineItems) {
+        await db.insert(landedCostLineItems)
+          .values({ ...li, voucherId: id });
+      }
+    }
+
+    return this.getLandedCostVoucher(id);
+  }
+
+  async deleteLandedCostVoucher(id: number): Promise<boolean> {
+    const result = await db.delete(landedCostVouchers)
+      .where(eq(landedCostVouchers.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  async getNextLandedCostVoucherNumber(): Promise<string> {
+    const result = await db.execute(sql`
+      SELECT voucher_number FROM landed_cost_vouchers 
+      ORDER BY id DESC LIMIT 1
+    `);
+    
+    const rows = result.rows as { voucher_number: string }[];
+    if (rows.length === 0) {
+      return "LCV-0001";
+    }
+    
+    const lastNumber = rows[0].voucher_number;
+    const numPart = parseInt(lastNumber.replace("LCV-", ""), 10);
+    const nextNum = (numPart + 1).toString().padStart(4, "0");
+    return `LCV-${nextNum}`;
   }
 }
 
