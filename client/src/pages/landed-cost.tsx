@@ -44,7 +44,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, Truck, Pencil, Users, Banknote, HandCoins, X, ChevronRight } from "lucide-react";
+import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, Truck, Pencil, Users, Banknote, X, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import type { LandedCostVoucherWithDetails, PurchaseOrderWithDetails, Item, Supplier } from "@shared/schema";
 
@@ -76,7 +76,6 @@ export default function LandedCostPage() {
   const [panelMode, setPanelMode] = useState<PanelMode>("closed");
   const [selectedVoucher, setSelectedVoucher] = useState<LandedCostVoucherWithDetails | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
-  const [showPartnerSettlements, setShowPartnerSettlements] = useState(false);
   const [showMonthlySettlements, setShowMonthlySettlements] = useState(false);
   const [payVoucher, setPayVoucher] = useState<LandedCostVoucherWithDetails | null>(null);
 
@@ -165,11 +164,7 @@ export default function LandedCostPage() {
         <div className="flex items-center gap-2 flex-wrap">
           <Button variant="outline" onClick={() => setShowMonthlySettlements(true)} data-testid="button-monthly-settlements">
             <Calculator className="h-4 w-4 mr-2" />
-            Monthly Settlements
-          </Button>
-          <Button variant="outline" onClick={() => setShowPartnerSettlements(true)} data-testid="button-partner-settlements">
-            <HandCoins className="h-4 w-4 mr-2" />
-            Partner Settlements
+            Party Settlements
           </Button>
           <Button onClick={handleNewVoucher} data-testid="button-new-voucher">
             <Plus className="h-4 w-4 mr-2" />
@@ -291,12 +286,6 @@ export default function LandedCostPage() {
         <PayLandedCostDialog
           voucher={payVoucher}
           onClose={() => setPayVoucher(null)}
-        />
-      )}
-
-      {showPartnerSettlements && (
-        <PartnerSettlementsDialog
-          onClose={() => setShowPartnerSettlements(false)}
         />
       )}
 
@@ -1264,289 +1253,6 @@ function PayLandedCostDialog({ voucher, onClose }: PayLandedCostDialogProps) {
             {payMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
             Record Payment
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-interface PartnerSettlementsDialogProps {
-  onClose: () => void;
-}
-
-function PartnerSettlementsDialog({ onClose }: PartnerSettlementsDialogProps) {
-  const { toast } = useToast();
-  const [selectedVouchers, setSelectedVouchers] = useState<number[]>([]);
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
-  const [paymentType, setPaymentType] = useState("cash");
-  const [paymentReference, setPaymentReference] = useState("");
-  const [accountId, setAccountId] = useState<number | null>(null);
-
-  const { data: vouchers = [] } = useQuery<LandedCostVoucherWithDetails[]>({
-    queryKey: ["/api/landed-cost-vouchers"],
-    queryFn: async () => {
-      const res = await fetch("/api/landed-cost-vouchers", { credentials: "include" });
-      if (!res.ok) throw new Error("Failed to fetch vouchers");
-      return res.json();
-    },
-  });
-
-  const { data: accounts = [] } = useQuery<any[]>({
-    queryKey: ["/api/accounts"],
-    queryFn: async () => {
-      const res = await fetch("/api/accounts", { credentials: "include" });
-      if (!res.ok) return [];
-      return res.json();
-    },
-  });
-
-  const unpaidPartnerVouchers = useMemo(() => {
-    return vouchers.filter(v => 
-      v.partnerPartyId && 
-      v.partnerPayableStatus === "pending" && 
-      parseFloat(v.totalPartnerProfitKwd || "0") > 0
-    );
-  }, [vouchers]);
-
-  const vouchersByPartner = useMemo(() => {
-    const grouped: Record<number, LandedCostVoucherWithDetails[]> = {};
-    unpaidPartnerVouchers.forEach(v => {
-      if (v.partnerPartyId) {
-        if (!grouped[v.partnerPartyId]) grouped[v.partnerPartyId] = [];
-        grouped[v.partnerPartyId].push(v);
-      }
-    });
-    return grouped;
-  }, [unpaidPartnerVouchers]);
-
-  const selectedPartner = useMemo(() => {
-    if (selectedVouchers.length === 0) return null;
-    const v = unpaidPartnerVouchers.find(v => v.id === selectedVouchers[0]);
-    return v?.partnerParty || null;
-  }, [selectedVouchers, unpaidPartnerVouchers]);
-
-  const selectedTotal = useMemo(() => {
-    return selectedVouchers.reduce((sum, id) => {
-      const v = unpaidPartnerVouchers.find(v => v.id === id);
-      return sum + parseFloat(v?.totalPartnerProfitKwd || "0");
-    }, 0);
-  }, [selectedVouchers, unpaidPartnerVouchers]);
-
-  const toggleVoucher = (id: number, partnerId: number) => {
-    setSelectedVouchers(prev => {
-      if (prev.includes(id)) {
-        return prev.filter(v => v !== id);
-      }
-      const samePartner = prev.every(vid => {
-        const v = unpaidPartnerVouchers.find(v => v.id === vid);
-        return v?.partnerPartyId === partnerId;
-      });
-      if (!samePartner && prev.length > 0) {
-        return [id];
-      }
-      return [...prev, id];
-    });
-  };
-
-  const selectAllForPartner = (partnerId: number) => {
-    const partnerVouchers = vouchersByPartner[partnerId] || [];
-    setSelectedVouchers(partnerVouchers.map(v => v.id));
-  };
-
-  const payMutation = useMutation({
-    mutationFn: async (data: any) => {
-      return apiRequest("POST", "/api/landed-cost-vouchers/pay-partner", data);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/landed-cost-vouchers"] });
-      toast({ title: "Payment Recorded", description: "Partner payment has been recorded." });
-      setSelectedVouchers([]);
-    },
-    onError: (err: any) => {
-      toast({ title: "Error", description: err.message || "Failed to record payment.", variant: "destructive" });
-    },
-  });
-
-  const handlePay = () => {
-    if (selectedVouchers.length === 0) return;
-    payMutation.mutate({
-      voucherIds: selectedVouchers,
-      paymentDate,
-      paymentType,
-      paymentReference: paymentReference || null,
-      accountId: accountId || null,
-    });
-  };
-
-  return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <HandCoins className="h-5 w-5" />
-            Partner Settlements
-          </DialogTitle>
-        </DialogHeader>
-
-        <ScrollArea className="flex-1">
-          <div className="space-y-4 pr-4">
-            {Object.keys(vouchersByPartner).length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                No pending partner settlements
-              </div>
-            ) : (
-              Object.entries(vouchersByPartner).map(([partnerIdStr, partnerVouchers]) => {
-                const partnerId = parseInt(partnerIdStr);
-                const partner = partnerVouchers[0]?.partnerParty;
-                const totalProfit = partnerVouchers.reduce((sum, v) => sum + parseFloat(v.totalPartnerProfitKwd || "0"), 0);
-
-                return (
-                  <Card key={partnerId}>
-                    <CardHeader className="py-3 flex flex-row items-center justify-between gap-2">
-                      <div>
-                        <CardTitle className="text-base">{partner?.name}</CardTitle>
-                        <CardDescription className="text-xs">
-                          {partnerVouchers.length} voucher(s) - Total: {totalProfit.toFixed(3)} KWD
-                        </CardDescription>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => selectAllForPartner(partnerId)}
-                        data-testid={`button-select-all-${partnerId}`}
-                      >
-                        Select All
-                      </Button>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="py-2 w-10"></TableHead>
-                            <TableHead className="py-2">Voucher</TableHead>
-                            <TableHead className="py-2">Date</TableHead>
-                            <TableHead className="py-2">PO Reference</TableHead>
-                            <TableHead className="py-2 text-right">Partner Profit</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {partnerVouchers.map(v => (
-                            <TableRow key={v.id}>
-                              <TableCell className="py-1">
-                                <Checkbox
-                                  checked={selectedVouchers.includes(v.id)}
-                                  onCheckedChange={() => toggleVoucher(v.id, v.partnerPartyId!)}
-                                  data-testid={`checkbox-voucher-${v.id}`}
-                                />
-                              </TableCell>
-                              <TableCell className="py-1 font-medium">{v.voucherNumber}</TableCell>
-                              <TableCell className="py-1">{format(new Date(v.voucherDate), "dd/MM/yyyy")}</TableCell>
-                              <TableCell className="py-1">
-                                {v.purchaseOrders && v.purchaseOrders.length > 0
-                                  ? v.purchaseOrders.length > 1
-                                    ? `${v.purchaseOrders.length} POs`
-                                    : v.purchaseOrders[0].invoiceNumber || `PO #${v.purchaseOrders[0].id}`
-                                  : v.purchaseOrder?.invoiceNumber || `PO #${v.purchaseOrderId}`}
-                              </TableCell>
-                              <TableCell className="py-1 text-right font-mono">{formatCurrency(v.totalPartnerProfitKwd)} KWD</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </CardContent>
-                  </Card>
-                );
-              })
-            )}
-
-            {selectedVouchers.length > 0 && (
-              <Card>
-                <CardHeader className="py-3">
-                  <CardTitle className="text-base">Payment Details</CardTitle>
-                  <CardDescription>
-                    Paying {selectedPartner?.name} for {selectedVouchers.length} voucher(s)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="p-3 bg-muted rounded-md mb-4">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Pay To:</span>
-                      <span className="font-medium">{selectedPartner?.name}</span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-muted-foreground">Amount:</span>
-                      <span className="font-mono font-semibold">{selectedTotal.toFixed(3)} KWD</span>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Date</Label>
-                      <Input
-                        type="date"
-                        value={paymentDate}
-                        onChange={(e) => setPaymentDate(e.target.value)}
-                        className="h-8"
-                        data-testid="input-partner-payment-date"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs">Type</Label>
-                      <Select value={paymentType} onValueChange={setPaymentType}>
-                        <SelectTrigger className="h-8" data-testid="select-partner-payment-type">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="cash">Cash</SelectItem>
-                          <SelectItem value="bank">Bank</SelectItem>
-                          <SelectItem value="cheque">Cheque</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 space-y-1.5">
-                    <Label className="text-xs">Account</Label>
-                    <Select value={accountId?.toString() || ""} onValueChange={(v) => setAccountId(v ? parseInt(v) : null)}>
-                      <SelectTrigger className="h-8" data-testid="select-partner-account">
-                        <SelectValue placeholder="Select account..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {accounts.map(acc => (
-                          <SelectItem key={acc.id} value={acc.id.toString()}>{acc.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="mt-4 space-y-1.5">
-                    <Label className="text-xs">Reference</Label>
-                    <Input
-                      placeholder="Payment reference..."
-                      value={paymentReference}
-                      onChange={(e) => setPaymentReference(e.target.value)}
-                      className="h-8"
-                      data-testid="input-partner-payment-reference"
-                    />
-                  </div>
-
-                  <Button
-                    className="w-full mt-4"
-                    onClick={handlePay}
-                    disabled={payMutation.isPending}
-                    data-testid="button-pay-partner"
-                  >
-                    {payMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    Pay {selectedTotal.toFixed(3)} KWD
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </ScrollArea>
-
-        <DialogFooter className="mt-4">
-          <Button variant="outline" onClick={onClose}>Close</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
