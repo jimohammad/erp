@@ -4767,6 +4767,13 @@ export class DatabaseStorage implements IStorage {
         partnerParty = pp || null;
       }
 
+      // Fetch DXB→KWI logistics party separately if exists
+      let dxbKwiParty: Supplier | null = null;
+      if (row.landed_cost_vouchers.dxbKwiPartyId) {
+        const [dkp] = await db.select().from(suppliers).where(eq(suppliers.id, row.landed_cost_vouchers.dxbKwiPartyId));
+        dxbKwiParty = dkp || null;
+      }
+
       // Fetch packing party separately if exists
       let packingParty: Supplier | null = null;
       if (row.landed_cost_vouchers.packingPartyId) {
@@ -4786,6 +4793,13 @@ export class DatabaseStorage implements IStorage {
       if (row.landed_cost_vouchers.packingPaymentId) {
         const [pkPmt] = await db.select().from(payments).where(eq(payments.id, row.landed_cost_vouchers.packingPaymentId));
         packingPayment = pkPmt || null;
+      }
+
+      // Fetch DXB→KWI freight payment separately if exists
+      let dxbKwiPayment: Payment | null = null;
+      if (row.landed_cost_vouchers.dxbKwiPaymentId) {
+        const [dkPmt] = await db.select().from(payments).where(eq(payments.id, row.landed_cost_vouchers.dxbKwiPaymentId));
+        dxbKwiPayment = dkPmt || null;
       }
 
       // Fetch all linked purchase orders from junction table
@@ -4818,9 +4832,11 @@ export class DatabaseStorage implements IStorage {
         purchaseOrder: row.purchase_orders || null,
         purchaseOrders: purchaseOrdersWithDetails,
         party: row.suppliers || null,
+        dxbKwiParty,
         partnerParty,
         packingParty,
         payment: row.payments || null,
+        dxbKwiPayment,
         partnerPayment,
         packingPayment,
         lineItems: lineItemsList,
@@ -4852,6 +4868,13 @@ export class DatabaseStorage implements IStorage {
       partnerParty = pp || null;
     }
 
+    // Fetch DXB→KWI logistics party separately if exists
+    let dxbKwiParty: Supplier | null = null;
+    if (voucherRow.landed_cost_vouchers.dxbKwiPartyId) {
+      const [dkp] = await db.select().from(suppliers).where(eq(suppliers.id, voucherRow.landed_cost_vouchers.dxbKwiPartyId));
+      dxbKwiParty = dkp || null;
+    }
+
     // Fetch packing party separately if exists
     let packingParty: Supplier | null = null;
     if (voucherRow.landed_cost_vouchers.packingPartyId) {
@@ -4871,6 +4894,13 @@ export class DatabaseStorage implements IStorage {
     if (voucherRow.landed_cost_vouchers.packingPaymentId) {
       const [pkPmt] = await db.select().from(payments).where(eq(payments.id, voucherRow.landed_cost_vouchers.packingPaymentId));
       packingPayment = pkPmt || null;
+    }
+
+    // Fetch DXB→KWI freight payment separately if exists
+    let dxbKwiPayment: Payment | null = null;
+    if (voucherRow.landed_cost_vouchers.dxbKwiPaymentId) {
+      const [dkPmt] = await db.select().from(payments).where(eq(payments.id, voucherRow.landed_cost_vouchers.dxbKwiPaymentId));
+      dxbKwiPayment = dkPmt || null;
     }
 
     // Fetch all linked purchase orders from junction table
@@ -4903,9 +4933,11 @@ export class DatabaseStorage implements IStorage {
       purchaseOrder: voucherRow.purchase_orders || null,
       purchaseOrders: purchaseOrdersWithDetails,
       party: voucherRow.suppliers || null,
+      dxbKwiParty,
       partnerParty,
       packingParty,
       payment: voucherRow.payments || null,
+      dxbKwiPayment,
       partnerPayment,
       packingPayment,
       lineItems: lineItemsList,
@@ -4934,6 +4966,13 @@ export class DatabaseStorage implements IStorage {
       partnerParty = pp || null;
     }
 
+    // Fetch DXB→KWI logistics party separately if exists
+    let dxbKwiParty: Supplier | null = null;
+    if (voucherRow.landed_cost_vouchers.dxbKwiPartyId) {
+      const [dkp] = await db.select().from(suppliers).where(eq(suppliers.id, voucherRow.landed_cost_vouchers.dxbKwiPartyId));
+      dxbKwiParty = dkp || null;
+    }
+
     // Fetch packing party separately if exists
     let packingParty: Supplier | null = null;
     if (voucherRow.landed_cost_vouchers.packingPartyId) {
@@ -4955,13 +4994,23 @@ export class DatabaseStorage implements IStorage {
       packingPayment = pkPmt || null;
     }
 
+    // Fetch DXB→KWI freight payment separately if exists
+    let dxbKwiPayment: Payment | null = null;
+    if (voucherRow.landed_cost_vouchers.dxbKwiPaymentId) {
+      const [dkPmt] = await db.select().from(payments).where(eq(payments.id, voucherRow.landed_cost_vouchers.dxbKwiPaymentId));
+      dxbKwiPayment = dkPmt || null;
+    }
+
     return {
       ...voucherRow.landed_cost_vouchers,
       purchaseOrder: voucherRow.purchase_orders || null,
+      purchaseOrders: [],
       party: voucherRow.suppliers || null,
+      dxbKwiParty,
       partnerParty,
       packingParty,
       payment: voucherRow.payments || null,
+      dxbKwiPayment,
       partnerPayment,
       packingPayment,
       lineItems: lineItemsList,
@@ -5028,6 +5077,12 @@ export class DatabaseStorage implements IStorage {
       packingPartyRow = row || null;
     }
 
+    let dxbKwiPartyRow = null;
+    if (newVoucher.dxbKwiPartyId) {
+      const [row] = await db.select().from(suppliers).where(eq(suppliers.id, newVoucher.dxbKwiPartyId));
+      dxbKwiPartyRow = row || null;
+    }
+
     // Fetch all linked POs with details
     const purchaseOrdersWithDetails: PurchaseOrderWithDetails[] = [];
     for (const poId of poIds) {
@@ -5044,9 +5099,11 @@ export class DatabaseStorage implements IStorage {
       purchaseOrder: poRow,
       purchaseOrders: purchaseOrdersWithDetails,
       party: partyRow,
+      dxbKwiParty: dxbKwiPartyRow,
       partnerParty: partnerPartyRow,
       packingParty: packingPartyRow,
       payment: null,
+      dxbKwiPayment: null,
       partnerPayment: null,
       packingPayment: null,
       lineItems: createdLineItems,

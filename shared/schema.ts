@@ -1231,9 +1231,13 @@ export const landedCostVouchers = pgTable("landed_cost_vouchers", {
   // Packing party (for packing charges - fixed 0.210 KWD per unit)
   packingPartyId: integer("packing_party_id").references(() => suppliers.id),
   
-  // Freight payable status (logistics company)
+  // Freight payable status for HK→DXB (logistics company)
   payableStatus: text("payable_status").default("pending"), // pending, paid
   paymentId: integer("payment_id").references(() => payments.id),
+  
+  // Freight payable status for DXB→KWI (logistics company - may be different from HK→DXB)
+  dxbKwiPayableStatus: text("dxb_kwi_payable_status").default("pending"), // pending, paid
+  dxbKwiPaymentId: integer("dxb_kwi_payment_id").references(() => payments.id),
   
   // Partner profit payable status (partner company - monthly settlement)
   partnerPayableStatus: text("partner_payable_status").default("pending"), // pending, paid
@@ -1283,6 +1287,11 @@ export const landedCostVouchersRelations = relations(landedCostVouchers, ({ one,
     fields: [landedCostVouchers.paymentId],
     references: [payments.id],
     relationName: "freightPayment",
+  }),
+  dxbKwiPayment: one(payments, {
+    fields: [landedCostVouchers.dxbKwiPaymentId],
+    references: [payments.id],
+    relationName: "dxbKwiFreightPayment",
   }),
   partnerPayment: one(payments, {
     fields: [landedCostVouchers.partnerPaymentId],
@@ -1373,10 +1382,12 @@ export type LandedCostVoucherPurchaseOrder = typeof landedCostVoucherPurchaseOrd
 export type LandedCostVoucherWithDetails = LandedCostVoucher & {
   purchaseOrder: PurchaseOrder | null; // Legacy single PO (deprecated, kept for backward compat)
   purchaseOrders: PurchaseOrderWithDetails[]; // New multi-PO support
-  party: Supplier | null;
+  party: Supplier | null; // HK→DXB logistics party
+  dxbKwiParty: Supplier | null; // DXB→KWI logistics party
   partnerParty: Supplier | null;
   packingParty: Supplier | null;
-  payment: Payment | null;
+  payment: Payment | null; // HK→DXB freight payment
+  dxbKwiPayment: Payment | null; // DXB→KWI freight payment
   partnerPayment: Payment | null;
   packingPayment: Payment | null;
   lineItems: LandedCostLineItem[];
