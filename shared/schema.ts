@@ -94,6 +94,9 @@ export const ITEM_CATEGORIES = [
   "Samsung",
   "Buds",
   "Charger",
+  "Logistic Co.",
+  "Packing Co.",
+  "Partner",
 ] as const;
 
 export type ItemCategory = typeof ITEM_CATEGORIES[number];
