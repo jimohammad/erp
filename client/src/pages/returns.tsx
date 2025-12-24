@@ -122,6 +122,7 @@ export default function ReturnsPage() {
   const [newImei, setNewImei] = useState("");
   const [imeiError, setImeiError] = useState("");
   const [shouldPrintAfterSave, setShouldPrintAfterSave] = useState(false);
+  const [viewReturn, setViewReturn] = useState<ReturnWithDetails | null>(null);
 
   const { data: returnsResponse, isLoading } = useQuery<{ data: ReturnWithDetails[]; total: number }>({
     queryKey: ["/api/returns"],
@@ -1207,6 +1208,83 @@ export default function ReturnsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* View Return Dialog */}
+      <Dialog open={!!viewReturn} onOpenChange={() => setViewReturn(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5" />
+              Return Voucher Details
+            </DialogTitle>
+          </DialogHeader>
+          {viewReturn && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Date:</span>{" "}
+                  {format(new Date(viewReturn.returnDate), "dd/MM/yyyy")}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Return #:</span>{" "}
+                  {viewReturn.returnNumber || "-"}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">
+                    {viewReturn.returnType === "sale_return" ? "Customer:" : "Supplier:"}
+                  </span>{" "}
+                  {viewReturn.returnType === "sale_return"
+                    ? viewReturn.customer?.name || "-"
+                    : viewReturn.supplier?.name || "-"}
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Total KWD:</span>{" "}
+                  <span className="font-medium">
+                    {parseFloat(viewReturn.totalKwd || "0").toFixed(3)}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <h4 className="font-medium mb-2">Line Items</h4>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      <TableHead className="text-center">Qty</TableHead>
+                      <TableHead className="text-right">Unit Price</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                      <TableHead>IMEI Numbers</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {viewReturn.lineItems?.map((item, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell>{item.itemName}</TableCell>
+                        <TableCell className="text-center">{item.quantity}</TableCell>
+                        <TableCell className="text-right">
+                          {parseFloat(item.priceKwd || "0").toFixed(3)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {parseFloat(item.totalKwd || "0").toFixed(3)}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-xs">
+                          {item.imeiNumbers?.length ? (
+                            <div className="space-y-0.5">
+                              {item.imeiNumbers.map((imei, imeiIdx) => (
+                                <div key={imeiIdx} className="font-mono">{imei}</div>
+                              ))}
+                            </div>
+                          ) : "-"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1234,7 +1312,15 @@ export default function ReturnsPage() {
                 {filteredReturns.map((ret) => (
                   <TableRow key={ret.id} data-testid={`row-return-${ret.id}`}>
                     <TableCell className="py-2">{format(new Date(ret.returnDate), "dd/MM/yyyy")}</TableCell>
-                    <TableCell className="py-2 font-medium">{ret.returnNumber}</TableCell>
+                    <TableCell className="py-2 font-medium">
+                      <button
+                        onClick={() => setViewReturn(ret)}
+                        className="text-primary hover:underline cursor-pointer"
+                        data-testid={`link-return-${ret.id}`}
+                      >
+                        {ret.returnNumber}
+                      </button>
+                    </TableCell>
                     <TableCell className="py-2">
                       {ret.returnType === "sale_return" 
                         ? ret.customer?.name || "-"
