@@ -513,6 +513,35 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
     },
   });
 
+  // Set default parties for new vouchers based on party type and name
+  useEffect(() => {
+    if (isEditing || suppliers.length === 0) return;
+    
+    // DXB→KWI: default to "hiiq party" (logistic type)
+    if (!dxbKwiPartyId) {
+      const hiiqParty = suppliers.find(s => 
+        s.partyType === "logistic" && s.name.toLowerCase().includes("hiiq")
+      );
+      if (hiiqParty) setDxbKwiPartyId(hiiqParty.id);
+    }
+    
+    // Partner: default to "Muhammad Faisal" (partner type)
+    if (!partnerPartyId) {
+      const faisalParty = suppliers.find(s => 
+        s.partyType === "partner" && s.name.toLowerCase().includes("faisal")
+      );
+      if (faisalParty) setPartnerPartyId(faisalParty.id);
+    }
+    
+    // Packing Co.: default to "Union Logistics Fzco" (packing type)
+    if (!packingPartyId) {
+      const unionParty = suppliers.find(s => 
+        s.partyType === "packing" && s.name.toLowerCase().includes("union")
+      );
+      if (unionParty) setPackingPartyId(unionParty.id);
+    }
+  }, [suppliers, isEditing, dxbKwiPartyId, partnerPartyId, packingPartyId]);
+
   const itemCategoryMap = useMemo(() => {
     const map: Record<string, string> = {};
     items.forEach(item => {
