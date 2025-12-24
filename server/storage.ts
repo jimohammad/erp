@@ -5022,37 +5022,44 @@ export class DatabaseStorage implements IStorage {
     lineItems: Omit<InsertLandedCostLineItem, 'voucherId'>[],
     purchaseOrderIds?: number[]
   ): Promise<LandedCostVoucherWithDetails> {
-    const [newVoucher] = await db.insert(landedCostVouchers).values(voucher).returning();
+    // Use transaction to ensure atomic operations - voucher, line items, PO links, and item cost updates all succeed or fail together
+    const result = await db.transaction(async (tx) => {
+      const [newVoucher] = await tx.insert(landedCostVouchers).values(voucher).returning();
 
-    // Insert links to purchase orders in junction table
-    const poIds = purchaseOrderIds && purchaseOrderIds.length > 0 
-      ? purchaseOrderIds 
-      : (voucher.purchaseOrderId ? [voucher.purchaseOrderId] : []);
-    
-    for (let i = 0; i < poIds.length; i++) {
-      await db.insert(landedCostVoucherPurchaseOrders).values({
-        voucherId: newVoucher.id,
-        purchaseOrderId: poIds[i],
-        sortOrder: i,
-      });
-    }
-
-    const createdLineItems: LandedCostLineItem[] = [];
-    for (const li of lineItems) {
-      const [newItem] = await db.insert(landedCostLineItems)
-        .values({ ...li, voucherId: newVoucher.id })
-        .returning();
-      createdLineItems.push(newItem);
+      // Insert links to purchase orders in junction table
+      const poIds = purchaseOrderIds && purchaseOrderIds.length > 0 
+        ? purchaseOrderIds 
+        : (voucher.purchaseOrderId ? [voucher.purchaseOrderId] : []);
       
-      // Update item's landed cost (allow zero values)
-      if (li.itemName && li.landedCostPerUnitKwd !== undefined && li.landedCostPerUnitKwd !== null) {
-        await db.update(items)
-          .set({ landedCostKwd: li.landedCostPerUnitKwd })
-          .where(eq(items.name, li.itemName));
+      for (let i = 0; i < poIds.length; i++) {
+        await tx.insert(landedCostVoucherPurchaseOrders).values({
+          voucherId: newVoucher.id,
+          purchaseOrderId: poIds[i],
+          sortOrder: i,
+        });
       }
-    }
 
-    // Get the related purchase order and party (legacy single PO)
+      const createdLineItems: LandedCostLineItem[] = [];
+      for (const li of lineItems) {
+        const [newItem] = await tx.insert(landedCostLineItems)
+          .values({ ...li, voucherId: newVoucher.id })
+          .returning();
+        createdLineItems.push(newItem);
+        
+        // Update item's landed cost (allow zero values)
+        if (li.itemName && li.landedCostPerUnitKwd !== undefined && li.landedCostPerUnitKwd !== null) {
+          await tx.update(items)
+            .set({ landedCostKwd: li.landedCostPerUnitKwd })
+            .where(eq(items.name, li.itemName));
+        }
+      }
+
+      return { newVoucher, poIds, createdLineItems };
+    });
+
+    const { newVoucher, poIds, createdLineItems } = result;
+
+    // Fetch related data outside transaction (read-only operations)
     let poRow = null;
     if (newVoucher.purchaseOrderId) {
       const [row] = await db.select().from(purchaseOrders).where(eq(purchaseOrders.id, newVoucher.purchaseOrderId));
@@ -5116,42 +5123,48 @@ export class DatabaseStorage implements IStorage {
     lineItems?: Omit<InsertLandedCostLineItem, 'voucherId'>[],
     purchaseOrderIds?: number[]
   ): Promise<LandedCostVoucherWithDetails | undefined> {
-    const [updated] = await db.update(landedCostVouchers)
-      .set({ ...voucher, updatedAt: new Date() })
-      .where(eq(landedCostVouchers.id, id))
-      .returning();
+    // Use transaction to ensure atomic operations - voucher update, line items, PO links, and item cost updates all succeed or fail together
+    const updated = await db.transaction(async (tx) => {
+      const [updatedVoucher] = await tx.update(landedCostVouchers)
+        .set({ ...voucher, updatedAt: new Date() })
+        .where(eq(landedCostVouchers.id, id))
+        .returning();
 
-    if (!updated) return undefined;
+      if (!updatedVoucher) return null;
 
-    // If purchase order IDs provided, replace junction table entries
-    if (purchaseOrderIds !== undefined) {
-      await db.delete(landedCostVoucherPurchaseOrders).where(eq(landedCostVoucherPurchaseOrders.voucherId, id));
-      for (let i = 0; i < purchaseOrderIds.length; i++) {
-        await db.insert(landedCostVoucherPurchaseOrders).values({
-          voucherId: id,
-          purchaseOrderId: purchaseOrderIds[i],
-          sortOrder: i,
-        });
-      }
-    }
-
-    // If line items provided, replace them and update item costs
-    if (lineItems) {
-      await db.delete(landedCostLineItems).where(eq(landedCostLineItems.voucherId, id));
-      
-      for (const li of lineItems) {
-        await db.insert(landedCostLineItems)
-          .values({ ...li, voucherId: id });
-        
-        // Update item's landed cost (allow zero values)
-        if (li.itemName && li.landedCostPerUnitKwd !== undefined && li.landedCostPerUnitKwd !== null) {
-          await db.update(items)
-            .set({ landedCostKwd: li.landedCostPerUnitKwd })
-            .where(eq(items.name, li.itemName));
+      // If purchase order IDs provided, replace junction table entries
+      if (purchaseOrderIds !== undefined) {
+        await tx.delete(landedCostVoucherPurchaseOrders).where(eq(landedCostVoucherPurchaseOrders.voucherId, id));
+        for (let i = 0; i < purchaseOrderIds.length; i++) {
+          await tx.insert(landedCostVoucherPurchaseOrders).values({
+            voucherId: id,
+            purchaseOrderId: purchaseOrderIds[i],
+            sortOrder: i,
+          });
         }
       }
-    }
 
+      // If line items provided, replace them and update item costs
+      if (lineItems) {
+        await tx.delete(landedCostLineItems).where(eq(landedCostLineItems.voucherId, id));
+        
+        for (const li of lineItems) {
+          await tx.insert(landedCostLineItems)
+            .values({ ...li, voucherId: id });
+          
+          // Update item's landed cost (allow zero values)
+          if (li.itemName && li.landedCostPerUnitKwd !== undefined && li.landedCostPerUnitKwd !== null) {
+            await tx.update(items)
+              .set({ landedCostKwd: li.landedCostPerUnitKwd })
+              .where(eq(items.name, li.itemName));
+          }
+        }
+      }
+
+      return updatedVoucher;
+    });
+
+    if (!updated) return undefined;
     return this.getLandedCostVoucher(id);
   }
 
@@ -5259,22 +5272,30 @@ export class DatabaseStorage implements IStorage {
   }
 
   async markPartnerProfitPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
+    // Idempotency check: only update if still pending
     const [updated] = await db.update(landedCostVouchers)
       .set({ partnerPayableStatus: "paid", partnerPaymentId: paymentId, updatedAt: new Date() })
-      .where(eq(landedCostVouchers.id, voucherId))
+      .where(and(
+        eq(landedCostVouchers.id, voucherId),
+        eq(landedCostVouchers.partnerPayableStatus, "pending")
+      ))
       .returning();
 
-    if (!updated) return undefined;
+    // If no update (already paid or not found), just return current state
     return this.getLandedCostVoucher(voucherId);
   }
 
   async markPackingPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
+    // Idempotency check: only update if still pending
     const [updated] = await db.update(landedCostVouchers)
       .set({ packingPayableStatus: "paid", packingPaymentId: paymentId, updatedAt: new Date() })
-      .where(eq(landedCostVouchers.id, voucherId))
+      .where(and(
+        eq(landedCostVouchers.id, voucherId),
+        eq(landedCostVouchers.packingPayableStatus, "pending")
+      ))
       .returning();
 
-    if (!updated) return undefined;
+    // If no update (already paid or not found), just return current state
     return this.getLandedCostVoucher(voucherId);
   }
 
@@ -5541,15 +5562,128 @@ export class DatabaseStorage implements IStorage {
     return this.getPartySettlement(created.id) as Promise<PartySettlementWithDetails>;
   }
 
+  async atomicFinalizeSettlement(
+    id: number, 
+    accountId: number, 
+    notes?: string
+  ): Promise<{ settlement: PartySettlementWithDetails; payment: Payment; expense: Expense } | undefined> {
+    // Get the settlement first
+    const settlement = await this.getPartySettlement(id);
+    if (!settlement) return undefined;
+
+    // Idempotency check: if already paid, return error state
+    if (settlement.status === "paid") {
+      console.log(`[Settlement] Settlement ${id} already paid, cannot finalize again`);
+      return undefined;
+    }
+
+    // Execute all operations in a single transaction
+    const result = await db.transaction(async (tx) => {
+      // Create outgoing payment
+      const [payment] = await tx.insert(payments).values({
+        partyId: settlement.partyId,
+        amount: settlement.totalAmountKwd,
+        direction: "OUT",
+        accountId,
+        paymentDate: new Date().toISOString().split("T")[0],
+        notes: notes || `Monthly settlement ${settlement.settlementNumber} for ${settlement.partyType} - ${settlement.settlementPeriod}`,
+        branchId: 1,
+      }).returning();
+
+      // Create expense record
+      const expenseDescription = settlement.partyType === "partner" 
+        ? "Partner Profit" 
+        : settlement.partyType === "packing" 
+          ? "Packing Charges" 
+          : "Freight Charges";
+      const [expense] = await tx.insert(expenses).values({
+        date: new Date().toISOString().split("T")[0],
+        categoryId: null,
+        description: `${expenseDescription} Settlement - ${settlement.settlementPeriod}`,
+        amount: settlement.totalAmountKwd,
+        accountId,
+        branchId: 1,
+      }).returning();
+
+      // Update settlement status
+      await tx.update(partySettlements)
+        .set({ 
+          status: "paid", 
+          paymentId: payment.id, 
+          expenseId: expense.id 
+        })
+        .where(and(
+          eq(partySettlements.id, id),
+          eq(partySettlements.status, "pending")
+        ));
+
+      // Parse voucher IDs
+      const voucherIds: number[] = JSON.parse(settlement.voucherIds);
+
+      // Mark vouchers as paid based on party type (with idempotency)
+      for (const voucherId of voucherIds) {
+        if (settlement.partyType === "partner") {
+          await tx.update(landedCostVouchers)
+            .set({ partnerPayableStatus: "paid", partnerPaymentId: payment.id })
+            .where(and(
+              eq(landedCostVouchers.id, voucherId),
+              eq(landedCostVouchers.partnerPayableStatus, "pending")
+            ));
+        } else if (settlement.partyType === "packing") {
+          await tx.update(landedCostVouchers)
+            .set({ packingPayableStatus: "paid", packingPaymentId: payment.id })
+            .where(and(
+              eq(landedCostVouchers.id, voucherId),
+              eq(landedCostVouchers.packingPayableStatus, "pending")
+            ));
+        } else if (settlement.partyType === "logistic") {
+          // Mark both freight legs if they belong to this party (with idempotency)
+          await tx.update(landedCostVouchers)
+            .set({ payableStatus: "paid", paymentId: payment.id })
+            .where(and(
+              eq(landedCostVouchers.id, voucherId),
+              eq(landedCostVouchers.partyId, settlement.partyId),
+              eq(landedCostVouchers.payableStatus, "pending")
+            ));
+          await tx.update(landedCostVouchers)
+            .set({ dxbKwiPayableStatus: "paid", dxbKwiPaymentId: payment.id })
+            .where(and(
+              eq(landedCostVouchers.id, voucherId),
+              eq(landedCostVouchers.dxbKwiPartyId, settlement.partyId),
+              eq(landedCostVouchers.dxbKwiPayableStatus, "pending")
+            ));
+        }
+      }
+
+      return { payment, expense };
+    });
+
+    // Return finalized settlement with payment and expense
+    const finalizedSettlement = await this.getPartySettlement(id);
+    if (!finalizedSettlement) return undefined;
+
+    return { 
+      settlement: finalizedSettlement, 
+      payment: result.payment, 
+      expense: result.expense 
+    };
+  }
+
   async finalizePartySettlement(id: number, paymentId: number, expenseId: number): Promise<PartySettlementWithDetails | undefined> {
     // Get the settlement to get voucher IDs
     const settlement = await this.getPartySettlement(id);
     if (!settlement) return undefined;
 
+    // Idempotency check: if already paid, return current state without making changes
+    if (settlement.status === "paid") {
+      console.log(`[Settlement] Settlement ${id} already paid, skipping finalization`);
+      return settlement;
+    }
+
     // Parse the voucher IDs
     const voucherIds: number[] = JSON.parse(settlement.voucherIds);
 
-    // Mark all vouchers as paid based on party type
+    // Mark all vouchers as paid based on party type (each function has its own idempotency guards)
     for (const voucherId of voucherIds) {
       if (settlement.partyType === "partner") {
         await this.markPartnerProfitPaid(voucherId, paymentId);
@@ -5561,45 +5695,44 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // Update settlement with payment and expense IDs
+    // Update settlement with payment and expense IDs - only if still pending (idempotency)
     const [updated] = await db.update(partySettlements)
       .set({ 
         status: "paid", 
         paymentId, 
         expenseId 
       })
-      .where(eq(partySettlements.id, id))
+      .where(and(
+        eq(partySettlements.id, id),
+        eq(partySettlements.status, "pending")
+      ))
       .returning();
 
-    if (!updated) return undefined;
+    // Return current state regardless of whether update happened
     return this.getPartySettlement(id);
   }
 
   async markFreightPaidForParty(voucherId: number, partyId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
-    // Get the voucher to check which legs belong to this party
-    const voucher = await this.getLandedCostVoucher(voucherId);
-    if (!voucher) return undefined;
-
-    // Only mark the legs that belong to this party as paid
-    const updates: any = {};
-    
-    // Check if HK→DXB leg belongs to this party and is pending
-    if (voucher.partyId === partyId && voucher.payableStatus === "pending") {
-      updates.payableStatus = "paid";
-      updates.paymentId = paymentId;
-    }
-    
-    // Check if DXB→KWI leg belongs to this party and is pending
-    if (voucher.dxbKwiPartyId === partyId && voucher.dxbKwiPayableStatus === "pending") {
-      updates.dxbKwiPayableStatus = "paid";
-      updates.dxbKwiPaymentId = paymentId;
-    }
-
-    if (Object.keys(updates).length > 0) {
-      await db.update(landedCostVouchers)
-        .set(updates)
-        .where(eq(landedCostVouchers.id, voucherId));
-    }
+    // Use transaction with idempotency checks - only update legs that are still pending and belong to this party
+    await db.transaction(async (tx) => {
+      // Check if HK→DXB leg belongs to this party and is pending - use conditional update
+      await tx.update(landedCostVouchers)
+        .set({ payableStatus: "paid", paymentId: paymentId })
+        .where(and(
+          eq(landedCostVouchers.id, voucherId),
+          eq(landedCostVouchers.partyId, partyId),
+          eq(landedCostVouchers.payableStatus, "pending")
+        ));
+      
+      // Check if DXB→KWI leg belongs to this party and is pending - use conditional update
+      await tx.update(landedCostVouchers)
+        .set({ dxbKwiPayableStatus: "paid", dxbKwiPaymentId: paymentId })
+        .where(and(
+          eq(landedCostVouchers.id, voucherId),
+          eq(landedCostVouchers.dxbKwiPartyId, partyId),
+          eq(landedCostVouchers.dxbKwiPayableStatus, "pending")
+        ));
+    });
     
     return this.getLandedCostVoucher(voucherId);
   }

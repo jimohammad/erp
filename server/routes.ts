@@ -3279,7 +3279,7 @@ export async function registerRoutes(
     }
   });
 
-  // Finalize a settlement with payment and expense
+  // Finalize a settlement with payment and expense (atomic transaction)
   app.post("/api/party-settlements/:id/finalize", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -3292,46 +3292,14 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Account ID required" });
       }
 
-      // Get the settlement
-      const settlement = await storage.getPartySettlement(id);
-      if (!settlement) {
-        return res.status(404).json({ error: "Settlement not found" });
-      }
-
-      if (settlement.status === "paid") {
-        return res.status(400).json({ error: "Settlement already paid" });
-      }
-
-      // Create outgoing payment
-      const payment = await storage.createPayment({
-        partyId: settlement.partyId,
-        amount: settlement.totalAmountKwd,
-        direction: "OUT",
-        accountId,
-        paymentDate: new Date().toISOString().split("T")[0],
-        notes: notes || `Monthly settlement ${settlement.settlementNumber} for ${settlement.partyType} - ${settlement.settlementPeriod}`,
-        branchId: 1,
-      }, []);
-
-      // Create expense record
-      const expenseDescription = settlement.partyType === "partner" 
-        ? "Partner Profit" 
-        : settlement.partyType === "packing" 
-          ? "Packing Charges" 
-          : "Freight Charges";
-      const expense = await storage.createExpense({
-        date: new Date().toISOString().split("T")[0],
-        categoryId: null,
-        description: `${expenseDescription} Settlement - ${settlement.settlementPeriod}`,
-        amount: settlement.totalAmountKwd,
-        accountId,
-        branchId: 1,
-      });
-
-      // Finalize the settlement
-      const finalized = await storage.finalizePartySettlement(id, payment.id, expense.id);
+      // Use atomic finalization - creates payment, expense, and marks vouchers as paid in single transaction
+      const result = await storage.atomicFinalizeSettlement(id, accountId, notes);
       
-      res.json(finalized);
+      if (!result) {
+        return res.status(400).json({ error: "Settlement not found or already paid" });
+      }
+      
+      res.json(result.settlement);
     } catch (error) {
       console.error("Error finalizing party settlement:", error);
       res.status(500).json({ error: "Failed to finalize settlement" });
