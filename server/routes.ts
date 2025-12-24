@@ -3226,6 +3226,131 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== PARTY SETTLEMENTS ====================
+  // Monthly settlement system for Partner and Packing Co. payments
+
+  // Get all settlements with optional filters
+  app.get("/api/party-settlements", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const partyType = req.query.partyType as string | undefined;
+      const status = req.query.status as string | undefined;
+      const settlements = await storage.getPartySettlements({ partyType, status });
+      res.json(settlements);
+    } catch (error) {
+      console.error("Error fetching party settlements:", error);
+      res.status(500).json({ error: "Failed to fetch settlements" });
+    }
+  });
+
+  // Get pending dues grouped by party for a party type
+  app.get("/api/party-settlements/pending/:partyType", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const partyType = req.params.partyType;
+      if (!["partner", "packing"].includes(partyType)) {
+        return res.status(400).json({ error: "Invalid party type. Use 'partner' or 'packing'" });
+      }
+      const pending = await storage.getPendingSettlementsByParty(partyType);
+      res.json(pending);
+    } catch (error) {
+      console.error("Error fetching pending settlements:", error);
+      res.status(500).json({ error: "Failed to fetch pending settlements" });
+    }
+  });
+
+  // Get next settlement number
+  app.get("/api/party-settlements/next-number", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const number = await storage.getNextSettlementNumber();
+      res.json({ number });
+    } catch (error) {
+      console.error("Error getting next settlement number:", error);
+      res.status(500).json({ error: "Failed to get next settlement number" });
+    }
+  });
+
+  // Create a new settlement (pending status)
+  app.post("/api/party-settlements", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const settlement = await storage.createPartySettlement(req.body);
+      res.status(201).json(settlement);
+    } catch (error) {
+      console.error("Error creating party settlement:", error);
+      res.status(500).json({ error: "Failed to create settlement" });
+    }
+  });
+
+  // Finalize a settlement with payment and expense
+  app.post("/api/party-settlements/:id/finalize", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid settlement ID" });
+      }
+      
+      const { accountId, notes } = req.body;
+      if (!accountId) {
+        return res.status(400).json({ error: "Account ID required" });
+      }
+
+      // Get the settlement
+      const settlement = await storage.getPartySettlement(id);
+      if (!settlement) {
+        return res.status(404).json({ error: "Settlement not found" });
+      }
+
+      if (settlement.status === "paid") {
+        return res.status(400).json({ error: "Settlement already paid" });
+      }
+
+      // Create outgoing payment
+      const payment = await storage.createPayment({
+        partyId: settlement.partyId,
+        amount: settlement.totalAmountKwd,
+        direction: "OUT",
+        accountId,
+        paymentDate: new Date().toISOString().split("T")[0],
+        notes: notes || `Monthly settlement ${settlement.settlementNumber} for ${settlement.partyType} - ${settlement.settlementPeriod}`,
+        branchId: 1,
+      }, []);
+
+      // Create expense record
+      const expense = await storage.createExpense({
+        date: new Date().toISOString().split("T")[0],
+        categoryId: null,
+        description: `${settlement.partyType === "partner" ? "Partner Profit" : "Packing Charges"} Settlement - ${settlement.settlementPeriod}`,
+        amount: settlement.totalAmountKwd,
+        accountId,
+        branchId: 1,
+      });
+
+      // Finalize the settlement
+      const finalized = await storage.finalizePartySettlement(id, payment.id, expense.id);
+      
+      res.json(finalized);
+    } catch (error) {
+      console.error("Error finalizing party settlement:", error);
+      res.status(500).json({ error: "Failed to finalize settlement" });
+    }
+  });
+
+  // Get a specific settlement
+  app.get("/api/party-settlements/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid settlement ID" });
+      }
+      const settlement = await storage.getPartySettlement(id);
+      if (!settlement) {
+        return res.status(404).json({ error: "Settlement not found" });
+      }
+      res.json(settlement);
+    } catch (error) {
+      console.error("Error fetching party settlement:", error);
+      res.status(500).json({ error: "Failed to fetch settlement" });
+    }
+  });
+
   // ==================== IMEI TRACKING ====================
 
   app.get("/api/imei/search", isAuthenticated, async (req, res) => {
