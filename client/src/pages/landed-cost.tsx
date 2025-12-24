@@ -1536,16 +1536,6 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
                   <div className="text-xs text-muted-foreground p-2 bg-blue-50 dark:bg-blue-950/30 rounded-md">
                     This will create an outgoing payment and expense record, then mark all {selectedParty.voucherCount} vouchers as paid.
                   </div>
-
-                  <Button
-                    className="w-full"
-                    onClick={handleSettle}
-                    disabled={settleMutation.isPending || !accountId}
-                    data-testid="button-finalize-settlement"
-                  >
-                    {settleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
-                    Pay {selectedParty.totalAmountKwd.toFixed(3)} KWD
-                  </Button>
                 </CardContent>
               </Card>
             )}
@@ -1584,8 +1574,18 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
           </div>
         </ScrollArea>
 
-        <DialogFooter className="mt-4">
+        <DialogFooter className="mt-4 gap-2">
           <Button variant="outline" onClick={onClose}>Close</Button>
+          {selectedParty && (
+            <Button
+              onClick={handleSettle}
+              disabled={settleMutation.isPending || !accountId}
+              data-testid="button-finalize-settlement"
+            >
+              {settleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
+              Pay {selectedParty.totalAmountKwd.toFixed(3)} KWD
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
