@@ -831,7 +831,7 @@ Thank you for your business!`;
       </Card>
 
       <Dialog open={!!selectedSO} onOpenChange={() => setSelectedSO(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader className="flex flex-row items-center justify-between gap-4">
             <DialogTitle className="flex items-center gap-2">
               <ShoppingBag className="h-5 w-5" />
@@ -905,8 +905,14 @@ Thank you for your business!`;
                         <TableCell>{item.itemName}</TableCell>
                         <TableCell className="text-center">{item.quantity}</TableCell>
                         <TableCell className="text-right">{formatCurrency(item.priceKwd)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {item.imeiNumbers?.length ? item.imeiNumbers.join(", ") : "-"}
+                        <TableCell className="text-xs text-muted-foreground max-w-xs">
+                          {item.imeiNumbers?.length ? (
+                            <div className="space-y-0.5">
+                              {item.imeiNumbers.map((imei, idx) => (
+                                <div key={idx} className="font-mono">{imei}</div>
+                              ))}
+                            </div>
+                          ) : "-"}
                         </TableCell>
                       </TableRow>
                     ))}
