@@ -1381,3 +1381,69 @@ export type LandedCostVoucherWithDetails = LandedCostVoucher & {
   packingPayment: Payment | null;
   lineItems: LandedCostLineItem[];
 };
+
+// Party Settlements - Monthly settlement for Partner and Packing Co. payments
+export const partySettlements = pgTable("party_settlements", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  settlementNumber: text("settlement_number").notNull().unique(),
+  partyId: integer("party_id").references(() => suppliers.id).notNull(),
+  partyType: text("party_type").notNull(), // "partner" or "packing"
+  settlementPeriod: text("settlement_period").notNull(), // Format: "YYYY-MM" e.g. "2025-01"
+  settlementDate: date("settlement_date").notNull(),
+  totalAmountKwd: numeric("total_amount_kwd", { precision: 12, scale: 3 }).notNull(),
+  voucherIds: text("voucher_ids").notNull(), // JSON array of voucher IDs included in this settlement
+  voucherCount: integer("voucher_count").default(0),
+  status: text("status").default("pending"), // pending, paid
+  paymentId: integer("payment_id").references(() => payments.id),
+  expenseId: integer("expense_id").references(() => expenses.id),
+  accountId: integer("account_id").references(() => accounts.id),
+  notes: text("notes"),
+  branchId: integer("branch_id").references(() => branches.id),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_settlement_party").on(table.partyId),
+  index("idx_settlement_period").on(table.settlementPeriod),
+  index("idx_settlement_status").on(table.status),
+]);
+
+export const partySettlementsRelations = relations(partySettlements, ({ one }) => ({
+  party: one(suppliers, {
+    fields: [partySettlements.partyId],
+    references: [suppliers.id],
+  }),
+  payment: one(payments, {
+    fields: [partySettlements.paymentId],
+    references: [payments.id],
+  }),
+  expense: one(expenses, {
+    fields: [partySettlements.expenseId],
+    references: [expenses.id],
+  }),
+  account: one(accounts, {
+    fields: [partySettlements.accountId],
+    references: [accounts.id],
+  }),
+  branch: one(branches, {
+    fields: [partySettlements.branchId],
+    references: [branches.id],
+  }),
+  createdByUser: one(users, {
+    fields: [partySettlements.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const insertPartySettlementSchema = createInsertSchema(partySettlements).omit({ 
+  id: true, 
+  createdAt: true,
+});
+export type InsertPartySettlement = z.infer<typeof insertPartySettlementSchema>;
+export type PartySettlement = typeof partySettlements.$inferSelect;
+
+export type PartySettlementWithDetails = PartySettlement & {
+  party: Supplier | null;
+  payment: Payment | null;
+  expense: ExpenseWithDetails | null;
+  account: Account | null;
+};
