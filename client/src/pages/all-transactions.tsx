@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { format } from "date-fns";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import type { AllTransaction, Branch, Supplier } from "@shared/schema";
 
 const PAGE_SIZE = 50;
@@ -303,8 +303,7 @@ export default function AllTransactionsPage() {
                     <TableRow 
                       key={tx.id} 
                       data-testid={`row-transaction-${tx.id}`}
-                      className="cursor-pointer hover-elevate"
-                      onClick={() => navigate(getTransactionRoute(tx))}
+                      className="hover-elevate"
                     >
                       <TableCell className="whitespace-nowrap">
                         {tx.transactionDate ? format(new Date(tx.transactionDate), "dd/MM/yyyy") : "-"}
@@ -315,7 +314,13 @@ export default function AllTransactionsPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-sm">
-                        {tx.reference}
+                        <Link 
+                          href={getTransactionRoute(tx)}
+                          className="text-primary hover:underline cursor-pointer"
+                          data-testid={`link-transaction-${tx.id}`}
+                        >
+                          {tx.reference}
+                        </Link>
                       </TableCell>
                       <TableCell>
                         {tx.partyName || <span className="text-muted-foreground">-</span>}
