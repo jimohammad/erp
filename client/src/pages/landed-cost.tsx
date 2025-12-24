@@ -1010,13 +1010,60 @@ function PayLandedCostDialog({ voucher, onClose }: PayLandedCostDialogProps) {
 
   const [accountId, setAccountId] = useState<number | null>(null);
 
+  // Build list of payable targets (freight, partner, packing) that are still pending
+  const paymentTargets = useMemo(() => {
+    const targets: { type: "freight" | "partner" | "packing"; label: string; partyName: string; amount: string; color: string }[] = [];
+    
+    // Freight (logistics company)
+    if (voucher.partyId && voucher.payableStatus === "pending" && parseFloat(voucher.totalFreightKwd || "0") > 0) {
+      targets.push({
+        type: "freight",
+        label: "Freight",
+        partyName: voucher.party?.name || "Logistics Company",
+        amount: voucher.totalFreightKwd || "0",
+        color: "text-blue-600"
+      });
+    }
+    
+    // Partner profit
+    if (voucher.partnerPartyId && voucher.partnerPayableStatus === "pending" && parseFloat(voucher.totalPartnerProfitKwd || "0") > 0) {
+      targets.push({
+        type: "partner",
+        label: "Partner",
+        partyName: voucher.partnerParty?.name || "Partner Company",
+        amount: voucher.totalPartnerProfitKwd || "0",
+        color: "text-purple-600"
+      });
+    }
+    
+    // Packing charges
+    if (voucher.packingPartyId && voucher.packingPayableStatus === "pending" && parseFloat(voucher.packingChargesKwd || "0") > 0) {
+      targets.push({
+        type: "packing",
+        label: "Packing",
+        partyName: voucher.packingParty?.name || "Packing Company",
+        amount: voucher.packingChargesKwd || "0",
+        color: "text-green-600"
+      });
+    }
+    
+    return targets;
+  }, [voucher]);
+
+  const [selectedTarget, setSelectedTarget] = useState<"freight" | "partner" | "packing">(
+    paymentTargets[0]?.type || "freight"
+  );
+
+  const currentTarget = paymentTargets.find(t => t.type === selectedTarget) || paymentTargets[0];
+
   const payMutation = useMutation({
     mutationFn: async (data: any) => {
       return apiRequest("POST", `/api/landed-cost-vouchers/${voucher.id}/pay`, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/landed-cost-vouchers"] });
-      toast({ title: "Payment Recorded", description: "Freight payment has been recorded." });
+      const targetLabel = currentTarget?.label || "Payment";
+      toast({ title: "Payment Recorded", description: `${targetLabel} payment has been recorded.` });
       onClose();
     },
     onError: (err: any) => {
@@ -1030,8 +1077,27 @@ function PayLandedCostDialog({ voucher, onClose }: PayLandedCostDialogProps) {
       paymentType,
       paymentReference: paymentReference || null,
       accountId: accountId || null,
+      paymentTarget: selectedTarget,
     });
   };
+
+  if (paymentTargets.length === 0) {
+    return (
+      <Dialog open onOpenChange={onClose}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>No Pending Payments</DialogTitle>
+          </DialogHeader>
+          <div className="p-4 text-center text-muted-foreground">
+            All payments for this voucher have been completed.
+          </div>
+          <DialogFooter>
+            <Button onClick={onClose}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open onOpenChange={onClose}>
@@ -1040,14 +1106,40 @@ function PayLandedCostDialog({ voucher, onClose }: PayLandedCostDialogProps) {
           <DialogTitle>Record Payment</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          {/* Payment Target Selection */}
+          {paymentTargets.length > 1 && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Payment For</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {paymentTargets.map(target => (
+                  <Button
+                    key={target.type}
+                    variant={selectedTarget === target.type ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedTarget(target.type)}
+                    className="text-xs"
+                    data-testid={`button-target-${target.type}`}
+                  >
+                    {target.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Payment Details */}
           <div className="p-3 bg-muted rounded-md">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Pay To:</span>
-              <span className="font-medium">{voucher.party?.name}</span>
+              <span className={`font-medium ${currentTarget?.color}`}>{currentTarget?.partyName}</span>
             </div>
             <div className="flex justify-between text-sm mt-1">
               <span className="text-muted-foreground">Amount:</span>
-              <span className="font-mono font-semibold">{formatCurrency(voucher.totalFreightKwd)} KWD</span>
+              <span className="font-mono font-semibold">{formatCurrency(currentTarget?.amount || "0")} KWD</span>
+            </div>
+            <div className="flex justify-between text-sm mt-1">
+              <span className="text-muted-foreground">Type:</span>
+              <Badge variant="outline" className={currentTarget?.color}>{currentTarget?.label}</Badge>
             </div>
           </div>
 

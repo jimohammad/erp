@@ -3110,25 +3110,85 @@ export async function registerRoutes(
     }
   });
 
-  // Mark landed cost voucher as paid (link to payment)
+  // Mark landed cost voucher as paid (unified endpoint for freight, partner, packing)
   app.post("/api/landed-cost-vouchers/:id/pay", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const voucherId = parseInt(req.params.id);
       if (isNaN(voucherId)) {
         return res.status(400).json({ error: "Invalid voucher ID" });
       }
-      const { paymentId } = req.body;
-      if (!paymentId) {
-        return res.status(400).json({ error: "Payment ID required" });
+      
+      const { paymentId, paymentTarget, paymentDate, paymentType, paymentReference, accountId } = req.body;
+      
+      // If paymentId is provided, use the legacy flow (link existing payment)
+      if (paymentId) {
+        const updated = await storage.markLandedCostVoucherPaid(voucherId, paymentId);
+        if (!updated) {
+          return res.status(404).json({ error: "Voucher not found" });
+        }
+        return res.json(updated);
       }
-      const updated = await storage.markLandedCostVoucherPaid(voucherId, paymentId);
-      if (!updated) {
+      
+      // New flow: create payment and link it
+      const voucher = await storage.getLandedCostVoucher(voucherId);
+      if (!voucher) {
         return res.status(404).json({ error: "Voucher not found" });
       }
+      
+      const target = paymentTarget || "freight";
+      let partyId: number | null = null;
+      let amount = "0";
+      let description = "";
+      
+      if (target === "freight") {
+        partyId = voucher.partyId;
+        amount = voucher.totalFreightKwd || "0";
+        description = `Freight payment for LC-${voucher.voucherNumber}`;
+      } else if (target === "partner") {
+        partyId = voucher.partnerPartyId;
+        amount = voucher.totalPartnerProfitKwd || "0";
+        description = `Partner profit for LC-${voucher.voucherNumber}`;
+      } else if (target === "packing") {
+        partyId = voucher.packingPartyId;
+        amount = voucher.packingChargesKwd || "0";
+        description = `Packing charges for LC-${voucher.voucherNumber}`;
+      }
+      
+      if (!partyId || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Invalid payment target or amount" });
+      }
+      
+      // Create the payment record
+      const payment = await storage.createPayment({
+        paymentDate: paymentDate || new Date().toISOString().split("T")[0],
+        paymentType: paymentType || "cash",
+        amount,
+        direction: "out",
+        partyId,
+        reference: paymentReference || null,
+        accountId: accountId || null,
+        notes: description,
+        createdBy: (req as any).user?.id || null,
+      });
+      
+      // Link payment to voucher
+      let updated;
+      if (target === "freight") {
+        updated = await storage.markLandedCostVoucherPaid(voucherId, payment.id);
+      } else if (target === "partner") {
+        updated = await storage.markPartnerProfitPaid(voucherId, payment.id);
+      } else if (target === "packing") {
+        updated = await storage.markPackingPaid(voucherId, payment.id);
+      }
+      
+      if (!updated) {
+        return res.status(500).json({ error: "Failed to link payment" });
+      }
+      
       res.json(updated);
     } catch (error) {
-      console.error("Error marking voucher as paid:", error);
-      res.status(500).json({ error: "Failed to mark voucher as paid" });
+      console.error("Error processing voucher payment:", error);
+      res.status(500).json({ error: "Failed to process payment" });
     }
   });
 

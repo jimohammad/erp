@@ -378,6 +378,7 @@ export interface IStorage {
   markLandedCostVoucherPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined>;
   getPendingPartnerProfitPayables(): Promise<LandedCostVoucherWithDetails[]>;
   markPartnerProfitPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined>;
+  markPackingPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5195,6 +5196,16 @@ export class DatabaseStorage implements IStorage {
   async markPartnerProfitPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
     const [updated] = await db.update(landedCostVouchers)
       .set({ partnerPayableStatus: "paid", partnerPaymentId: paymentId, updatedAt: new Date() })
+      .where(eq(landedCostVouchers.id, voucherId))
+      .returning();
+
+    if (!updated) return undefined;
+    return this.getLandedCostVoucher(voucherId);
+  }
+
+  async markPackingPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
+    const [updated] = await db.update(landedCostVouchers)
+      .set({ packingPayableStatus: "paid", packingPaymentId: paymentId, updatedAt: new Date() })
       .where(eq(landedCostVouchers.id, voucherId))
       .returning();
 
