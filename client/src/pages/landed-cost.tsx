@@ -1462,82 +1462,66 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
             </div>
 
             {selectedParty && (
-              <Card>
-                <CardHeader className="py-3">
-                  <CardTitle className="text-base">Settle {selectedParty.partyName}</CardTitle>
-                  <CardDescription>
-                    Pay all {selectedParty.voucherCount} pending vouchers as a single monthly settlement
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="p-3 bg-muted rounded-md">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Total Due:</span>
-                      <span className="font-mono font-bold">{selectedParty.totalAmountKwd.toFixed(3)} KWD</span>
-                    </div>
-                    <div className="flex justify-between text-sm mt-1">
-                      <span className="text-muted-foreground">Vouchers:</span>
-                      <span>{selectedParty.voucherCount}</span>
-                    </div>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-primary/5 dark:bg-primary/10 rounded-lg border border-primary/20">
+                  <div>
+                    <h3 className="font-semibold text-lg">{selectedParty.partyName}</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedParty.voucherCount} voucher{selectedParty.voucherCount > 1 ? "s" : ""} to settle
+                    </p>
                   </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold font-mono text-primary">
+                      {selectedParty.totalAmountKwd.toFixed(3)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">KWD</div>
+                  </div>
+                </div>
 
-                  <div className="border rounded-md overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="py-2">Voucher</TableHead>
-                          <TableHead className="py-2">Date</TableHead>
-                          <TableHead className="py-2 text-right">{amountLabel}</TableHead>
+                <div className="border rounded-md">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="py-2 text-xs font-semibold">Voucher #</TableHead>
+                        <TableHead className="py-2 text-xs font-semibold">Date</TableHead>
+                        <TableHead className="py-2 text-xs font-semibold text-right">Amount</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(selectedParty.vouchers ?? []).map(v => (
+                        <TableRow key={v.id}>
+                          <TableCell className="py-2 font-medium">{v.voucherNumber}</TableCell>
+                          <TableCell className="py-2 text-muted-foreground">{format(new Date(v.voucherDate), "dd/MM/yyyy")}</TableCell>
+                          <TableCell className="py-2 text-right font-mono">
+                            {partyType === "partner" 
+                              ? formatCurrency(v.totalPartnerProfitKwd || "0")
+                              : formatCurrency(v.packingChargesKwd || "0")
+                            }
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {(selectedParty.vouchers ?? []).map(v => (
-                          <TableRow key={v.id}>
-                            <TableCell className="py-1.5 font-medium">{v.voucherNumber}</TableCell>
-                            <TableCell className="py-1.5">{format(new Date(v.voucherDate), "dd/MM/yyyy")}</TableCell>
-                            <TableCell className="py-1.5 text-right font-mono">
-                              {partyType === "partner" 
-                                ? formatCurrency(v.totalPartnerProfitKwd || "0")
-                                : formatCurrency(v.packingChargesKwd || "0")
-                              } KWD
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                      ))}
+                      <TableRow className="bg-muted/30 font-semibold">
+                        <TableCell colSpan={2} className="py-2">Total</TableCell>
+                        <TableCell className="py-2 text-right font-mono">{selectedParty.totalAmountKwd.toFixed(3)} KWD</TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
 
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Payment Account</Label>
-                    <Select value={accountId?.toString() || ""} onValueChange={(v) => setAccountId(v ? parseInt(v) : null)}>
-                      <SelectTrigger data-testid="select-settlement-account">
-                        <SelectValue placeholder="Select account..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {accounts.map(acc => (
-                          <SelectItem key={acc.id} value={acc.id.toString()}>{acc.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Notes (Optional)</Label>
-                    <Textarea
-                      placeholder="Settlement notes..."
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value)}
-                      className="resize-none"
-                      rows={2}
-                      data-testid="input-settlement-notes"
-                    />
-                  </div>
-
-                  <div className="text-xs text-muted-foreground p-2 bg-blue-50 dark:bg-blue-950/30 rounded-md">
-                    This will create an outgoing payment and expense record, then mark all {selectedParty.voucherCount} vouchers as paid.
-                  </div>
-                </CardContent>
-              </Card>
+                <div className="flex items-center gap-3">
+                  <Label className="text-sm font-medium whitespace-nowrap">Pay from:</Label>
+                  <Select value={accountId?.toString() || ""} onValueChange={(v) => setAccountId(v ? parseInt(v) : null)}>
+                    <SelectTrigger className="flex-1" data-testid="select-settlement-account">
+                      <SelectValue placeholder="Select payment account..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {accounts.map(acc => (
+                        <SelectItem key={acc.id} value={acc.id.toString()}>{acc.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
             )}
 
             {settlements.length > 0 && (
