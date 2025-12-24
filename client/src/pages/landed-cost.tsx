@@ -77,6 +77,7 @@ export default function LandedCostPage() {
   const [selectedVoucher, setSelectedVoucher] = useState<LandedCostVoucherWithDetails | null>(null);
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showPartnerSettlements, setShowPartnerSettlements] = useState(false);
+  const [showMonthlySettlements, setShowMonthlySettlements] = useState(false);
   const [payVoucher, setPayVoucher] = useState<LandedCostVoucherWithDetails | null>(null);
 
   const { data: vouchers = [], isLoading } = useQuery<LandedCostVoucherWithDetails[]>({
@@ -162,6 +163,10 @@ export default function LandedCostPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" onClick={() => setShowMonthlySettlements(true)} data-testid="button-monthly-settlements">
+            <Calculator className="h-4 w-4 mr-2" />
+            Monthly Settlements
+          </Button>
           <Button variant="outline" onClick={() => setShowPartnerSettlements(true)} data-testid="button-partner-settlements">
             <HandCoins className="h-4 w-4 mr-2" />
             Partner Settlements
@@ -292,6 +297,12 @@ export default function LandedCostPage() {
       {showPartnerSettlements && (
         <PartnerSettlementsDialog
           onClose={() => setShowPartnerSettlements(false)}
+        />
+      )}
+
+      {showMonthlySettlements && (
+        <MonthlySettlementsDialog
+          onClose={() => setShowMonthlySettlements(false)}
         />
       )}
     </div>
@@ -1530,6 +1541,309 @@ function PartnerSettlementsDialog({ onClose }: PartnerSettlementsDialogProps) {
                   </Button>
                 </CardContent>
               </Card>
+            )}
+          </div>
+        </ScrollArea>
+
+        <DialogFooter className="mt-4">
+          <Button variant="outline" onClick={onClose}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface MonthlySettlementsDialogProps {
+  onClose: () => void;
+}
+
+interface PendingPartyDues {
+  partyId: number;
+  partyName: string;
+  voucherCount: number;
+  totalAmountKwd: number;
+  vouchers: LandedCostVoucherWithDetails[];
+}
+
+interface PartySettlementRecord {
+  id: number;
+  settlementNumber: string;
+  partyType: string;
+  partyId: number;
+  settlementPeriod: string;
+  settlementDate: string;
+  totalAmountKwd: string;
+  voucherIds: string;
+  status: string;
+  party: Supplier | null;
+}
+
+function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
+  const { toast } = useToast();
+  const [partyType, setPartyType] = useState<"partner" | "packing">("partner");
+  const [selectedParty, setSelectedParty] = useState<PendingPartyDues | null>(null);
+  const [accountId, setAccountId] = useState<number | null>(null);
+  const [notes, setNotes] = useState("");
+
+  const { data: pendingDues = [], isLoading: loadingDues, refetch: refetchPending } = useQuery<PendingPartyDues[]>({
+    queryKey: ["/api/party-settlements/pending", partyType],
+    queryFn: async () => {
+      const res = await fetch(`/api/party-settlements/pending/${partyType}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch pending dues");
+      return res.json();
+    },
+  });
+
+  const { data: settlements = [], isLoading: loadingSettlements, refetch: refetchSettlements } = useQuery<PartySettlementRecord[]>({
+    queryKey: ["/api/party-settlements", partyType],
+    queryFn: async () => {
+      const res = await fetch(`/api/party-settlements?partyType=${partyType}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch settlements");
+      return res.json();
+    },
+  });
+
+  const { data: accounts = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ["/api/accounts"],
+    queryFn: async () => {
+      const res = await fetch("/api/accounts", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
+
+  const settleMutation = useMutation({
+    mutationFn: async (data: { partyId: number; voucherIds: number[]; totalAmount: number; period: string }) => {
+      // First get the next settlement number from the backend
+      const numberRes = await fetch("/api/party-settlements/next-number", { credentials: "include" });
+      if (!numberRes.ok) throw new Error("Failed to get settlement number");
+      const { number: settlementNumber } = await numberRes.json();
+      
+      const createRes = await apiRequest("POST", "/api/party-settlements", {
+        settlementNumber,
+        partyType,
+        partyId: data.partyId,
+        settlementPeriod: data.period,
+        settlementDate: new Date().toISOString().split("T")[0],
+        totalAmountKwd: data.totalAmount.toFixed(3),
+        voucherIds: JSON.stringify(data.voucherIds),
+        accountId,
+        status: "pending",
+      });
+      
+      const settlement = await createRes.json();
+      
+      const finalizeRes = await apiRequest("POST", `/api/party-settlements/${settlement.id}/finalize`, {
+        accountId,
+        notes,
+      });
+      
+      return finalizeRes.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/party-settlements"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/landed-cost-vouchers"] });
+      refetchPending();
+      refetchSettlements();
+      toast({ title: "Settlement Complete", description: "Monthly settlement has been processed and vouchers marked as paid." });
+      setSelectedParty(null);
+      setAccountId(null);
+      setNotes("");
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message || "Failed to process settlement.", variant: "destructive" });
+    },
+  });
+
+  const handleSettle = () => {
+    if (!selectedParty || !accountId) {
+      toast({ title: "Missing Information", description: "Please select a party and payment account.", variant: "destructive" });
+      return;
+    }
+
+    const now = new Date();
+    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+    settleMutation.mutate({
+      partyId: selectedParty.partyId,
+      voucherIds: selectedParty.vouchers.map(v => v.id),
+      totalAmount: selectedParty.totalAmountKwd,
+      period,
+    });
+  };
+
+  const partyTypeLabel = partyType === "partner" ? "Partner" : "Packing Co.";
+  const amountLabel = partyType === "partner" ? "Partner Profit" : "Packing Charges";
+
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Calculator className="h-5 w-5" />
+            Monthly Settlements
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex gap-2 mb-4">
+          <Button
+            variant={partyType === "partner" ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setPartyType("partner"); setSelectedParty(null); }}
+            data-testid="button-type-partner"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Partner
+          </Button>
+          <Button
+            variant={partyType === "packing" ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setPartyType("packing"); setSelectedParty(null); }}
+            data-testid="button-type-packing"
+          >
+            <Package className="h-4 w-4 mr-2" />
+            Packing Co.
+          </Button>
+        </div>
+
+        <ScrollArea className="flex-1">
+          <div className="space-y-4">
+            <div>
+              <h3 className="text-sm font-medium mb-2">Pending {partyTypeLabel} Dues</h3>
+              {loadingDues ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : pendingDues.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm border rounded-md">
+                  No pending dues for {partyTypeLabel}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {pendingDues.map(party => (
+                    <Card
+                      key={party.partyId}
+                      className={`cursor-pointer hover-elevate ${selectedParty?.partyId === party.partyId ? "ring-2 ring-primary" : ""}`}
+                      onClick={() => setSelectedParty(party)}
+                      data-testid={`card-party-${party.partyId}`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="font-medium">{party.partyName}</div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {party.voucherCount} voucher(s) pending
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-mono font-semibold text-lg">
+                              {party.totalAmountKwd.toFixed(3)} KWD
+                            </div>
+                            <Badge variant="secondary" className="text-xs">
+                              {amountLabel}
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {selectedParty && (
+              <Card>
+                <CardHeader className="py-3">
+                  <CardTitle className="text-base">Settle {selectedParty.partyName}</CardTitle>
+                  <CardDescription>
+                    Pay all {selectedParty.voucherCount} pending vouchers as a single monthly settlement
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-3 bg-muted rounded-md">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Total Due:</span>
+                      <span className="font-mono font-bold">{selectedParty.totalAmountKwd.toFixed(3)} KWD</span>
+                    </div>
+                    <div className="flex justify-between text-sm mt-1">
+                      <span className="text-muted-foreground">Vouchers:</span>
+                      <span>{selectedParty.voucherCount}</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Payment Account</Label>
+                    <Select value={accountId?.toString() || ""} onValueChange={(v) => setAccountId(v ? parseInt(v) : null)}>
+                      <SelectTrigger data-testid="select-settlement-account">
+                        <SelectValue placeholder="Select account..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map(acc => (
+                          <SelectItem key={acc.id} value={acc.id.toString()}>{acc.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Notes (Optional)</Label>
+                    <Textarea
+                      placeholder="Settlement notes..."
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      className="resize-none"
+                      rows={2}
+                      data-testid="input-settlement-notes"
+                    />
+                  </div>
+
+                  <div className="text-xs text-muted-foreground p-2 bg-blue-50 dark:bg-blue-950/30 rounded-md">
+                    This will create an outgoing payment and expense record, then mark all {selectedParty.voucherCount} vouchers as paid.
+                  </div>
+
+                  <Button
+                    className="w-full"
+                    onClick={handleSettle}
+                    disabled={settleMutation.isPending || !accountId}
+                    data-testid="button-finalize-settlement"
+                  >
+                    {settleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
+                    Pay {selectedParty.totalAmountKwd.toFixed(3)} KWD
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {settlements.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium mb-2">Past Settlements</h3>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="py-2">Settlement #</TableHead>
+                      <TableHead className="py-2">Party</TableHead>
+                      <TableHead className="py-2">Period</TableHead>
+                      <TableHead className="py-2 text-right">Amount</TableHead>
+                      <TableHead className="py-2">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {settlements.slice(0, 10).map(s => (
+                      <TableRow key={s.id}>
+                        <TableCell className="py-2 font-medium">{s.settlementNumber}</TableCell>
+                        <TableCell className="py-2">{s.party?.name || "Unknown"}</TableCell>
+                        <TableCell className="py-2">{s.settlementPeriod}</TableCell>
+                        <TableCell className="py-2 text-right font-mono">{formatCurrency(s.totalAmountKwd)} KWD</TableCell>
+                        <TableCell className="py-2">
+                          <Badge variant={s.status === "paid" ? "default" : "secondary"}>
+                            {s.status === "paid" ? "Paid" : "Pending"}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
           </div>
         </ScrollArea>
