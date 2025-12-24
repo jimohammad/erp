@@ -5,11 +5,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2, Pencil, Building2 } from "lucide-react";
 import type { Supplier } from "@shared/schema";
+import { SUPPLIER_CATEGORIES } from "@shared/schema";
 
 interface SupplierFormData {
   name: string;
+  category: string;
   country: string;
   email: string;
   phone: string;
@@ -23,6 +26,7 @@ interface SupplierFormData {
 
 const emptyFormData: SupplierFormData = {
   name: "",
+  category: "",
   country: "",
   email: "",
   phone: "",
@@ -85,6 +89,7 @@ export function SupplierDialog({
       const supplier = suppliers.find(s => s.id === editingId);
       onUpdate(editingId, {
         name: editingName.trim(),
+        category: supplier?.category || "",
         country: supplier?.country || "",
         email: supplier?.email || "",
         phone: supplier?.phone || "",
@@ -133,6 +138,25 @@ export function SupplierDialog({
                   />
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="supplier-category">Category</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => updateField("category", value)}
+                  >
+                    <SelectTrigger id="supplier-category" data-testid="select-supplier-category">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SUPPLIER_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <Label htmlFor="supplier-country">Country</Label>
                   <Input
                     id="supplier-country"
@@ -140,6 +164,16 @@ export function SupplierDialog({
                     placeholder="Enter country"
                     value={formData.country}
                     onChange={(e) => updateField("country", e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-phone">Phone</Label>
+                  <Input
+                    id="supplier-phone"
+                    data-testid="input-supplier-phone"
+                    placeholder="Enter phone number"
+                    value={formData.phone}
+                    onChange={(e) => updateField("phone", e.target.value)}
                   />
                 </div>
               </div>
@@ -157,26 +191,15 @@ export function SupplierDialog({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="supplier-phone">Phone</Label>
+                  <Label htmlFor="supplier-address">Address</Label>
                   <Input
-                    id="supplier-phone"
-                    data-testid="input-supplier-phone"
-                    placeholder="Enter phone number"
-                    value={formData.phone}
-                    onChange={(e) => updateField("phone", e.target.value)}
+                    id="supplier-address"
+                    data-testid="input-supplier-address"
+                    placeholder="Enter address"
+                    value={formData.address}
+                    onChange={(e) => updateField("address", e.target.value)}
                   />
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="supplier-address">Address</Label>
-                <Input
-                  id="supplier-address"
-                  data-testid="input-supplier-address"
-                  placeholder="Enter address"
-                  value={formData.address}
-                  onChange={(e) => updateField("address", e.target.value)}
-                />
               </div>
 
               <Card className="mt-4">

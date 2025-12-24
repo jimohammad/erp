@@ -55,6 +55,7 @@ export const suppliers = pgTable("suppliers", {
   address: text("address"),
   phone: text("phone"),
   partyType: text("party_type").default("supplier").notNull(),
+  category: text("category"),
   creditLimit: numeric("credit_limit", { precision: 12, scale: 3 }),
   area: text("area"),
   lastStockCheckDate: text("last_stock_check_date"),
@@ -72,6 +73,7 @@ export const suppliers = pgTable("suppliers", {
   index("idx_supplier_party_type").on(table.partyType),
   index("idx_supplier_area").on(table.area),
   index("idx_supplier_statement_token").on(table.statementToken),
+  index("idx_supplier_category").on(table.category),
 ]);
 
 export const suppliersRelations = relations(suppliers, ({ many }) => ({
@@ -84,6 +86,14 @@ export type Supplier = typeof suppliers.$inferSelect;
 
 export type PartyType = "supplier" | "customer" | "salesman";
 
+export const SUPPLIER_CATEGORIES = [
+  "Logistic Co.",
+  "Packing Co.",
+  "Partner",
+] as const;
+
+export type SupplierCategory = typeof SUPPLIER_CATEGORIES[number];
+
 export const ITEM_CATEGORIES = [
   "Apple",
   "Honor", 
@@ -94,9 +104,6 @@ export const ITEM_CATEGORIES = [
   "Samsung",
   "Buds",
   "Charger",
-  "Logistic Co.",
-  "Packing Co.",
-  "Partner",
 ] as const;
 
 export type ItemCategory = typeof ITEM_CATEGORIES[number];
