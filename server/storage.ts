@@ -151,6 +151,10 @@ import {
   type LandedCostLineItem,
   type InsertLandedCostLineItem,
   type LandedCostVoucherWithDetails,
+  partySettlements,
+  type PartySettlement,
+  type InsertPartySettlement,
+  type PartySettlementWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql, or, isNull, isNotNull, asc, inArray, ne } from "drizzle-orm";
@@ -379,6 +383,14 @@ export interface IStorage {
   getPendingPartnerProfitPayables(): Promise<LandedCostVoucherWithDetails[]>;
   markPartnerProfitPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined>;
   markPackingPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined>;
+
+  // Party Settlements - Monthly settlement for Partner and Packing Co. payments
+  getPartySettlements(options?: { partyType?: string; status?: string }): Promise<PartySettlementWithDetails[]>;
+  getPartySettlement(id: number): Promise<PartySettlementWithDetails | undefined>;
+  getPendingSettlementsByParty(partyType: string): Promise<{ partyId: number; partyName: string; voucherCount: number; totalAmountKwd: number; vouchers: LandedCostVoucherWithDetails[] }[]>;
+  createPartySettlement(settlement: InsertPartySettlement): Promise<PartySettlementWithDetails>;
+  finalizePartySettlement(id: number, paymentId: number, expenseId: number): Promise<PartySettlementWithDetails | undefined>;
+  getNextSettlementNumber(): Promise<string>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -5211,6 +5223,180 @@ export class DatabaseStorage implements IStorage {
 
     if (!updated) return undefined;
     return this.getLandedCostVoucher(voucherId);
+  }
+
+  // ============================================================
+  // PARTY SETTLEMENTS - Monthly settlement for Partner and Packing Co.
+  // ============================================================
+
+  async getPartySettlements(options?: { partyType?: string; status?: string }): Promise<PartySettlementWithDetails[]> {
+    let query = db.select()
+      .from(partySettlements)
+      .leftJoin(suppliers, eq(partySettlements.partyId, suppliers.id))
+      .leftJoin(payments, eq(partySettlements.paymentId, payments.id))
+      .leftJoin(expenses, eq(partySettlements.expenseId, expenses.id))
+      .leftJoin(accounts, eq(partySettlements.accountId, accounts.id))
+      .orderBy(desc(partySettlements.settlementDate));
+
+    const rows = await query;
+    
+    return rows
+      .filter(row => {
+        if (options?.partyType && row.party_settlements.partyType !== options.partyType) return false;
+        if (options?.status && row.party_settlements.status !== options.status) return false;
+        return true;
+      })
+      .map(row => ({
+        ...row.party_settlements,
+        party: row.suppliers || null,
+        payment: row.payments || null,
+        expense: row.expenses ? { ...row.expenses, category: null, account: null, branch: null, createdByUser: null } : null,
+        account: row.accounts || null,
+      }));
+  }
+
+  async getPartySettlement(id: number): Promise<PartySettlementWithDetails | undefined> {
+    const rows = await db.select()
+      .from(partySettlements)
+      .leftJoin(suppliers, eq(partySettlements.partyId, suppliers.id))
+      .leftJoin(payments, eq(partySettlements.paymentId, payments.id))
+      .leftJoin(expenses, eq(partySettlements.expenseId, expenses.id))
+      .leftJoin(accounts, eq(partySettlements.accountId, accounts.id))
+      .where(eq(partySettlements.id, id));
+
+    if (rows.length === 0) return undefined;
+    const row = rows[0];
+    return {
+      ...row.party_settlements,
+      party: row.suppliers || null,
+      payment: row.payments || null,
+      expense: row.expenses ? { ...row.expenses, category: null, account: null, branch: null, createdByUser: null } : null,
+      account: row.accounts || null,
+    };
+  }
+
+  async getPendingSettlementsByParty(partyType: string): Promise<{ partyId: number; partyName: string; voucherCount: number; totalAmountKwd: number; vouchers: LandedCostVoucherWithDetails[] }[]> {
+    // Get all pending vouchers for the given party type
+    const statusField = partyType === "partner" ? landedCostVouchers.partnerPayableStatus : landedCostVouchers.packingPayableStatus;
+    const partyIdField = partyType === "partner" ? landedCostVouchers.partnerPartyId : landedCostVouchers.packingPartyId;
+    const amountField = partyType === "partner" ? landedCostVouchers.totalPartnerProfitKwd : landedCostVouchers.packingChargesKwd;
+
+    const pendingVouchers = await db.select()
+      .from(landedCostVouchers)
+      .leftJoin(suppliers, eq(partyIdField, suppliers.id))
+      .where(and(
+        eq(statusField, "pending"),
+        isNotNull(partyIdField)
+      ))
+      .orderBy(desc(landedCostVouchers.voucherDate));
+
+    // Group by party
+    const groupedMap = new Map<number, { partyName: string; vouchers: typeof pendingVouchers; totalKwd: number }>();
+    
+    for (const row of pendingVouchers) {
+      const partyId = partyType === "partner" 
+        ? row.landed_cost_vouchers.partnerPartyId 
+        : row.landed_cost_vouchers.packingPartyId;
+      if (!partyId) continue;
+
+      const amount = parseFloat(
+        (partyType === "partner" 
+          ? row.landed_cost_vouchers.totalPartnerProfitKwd 
+          : row.landed_cost_vouchers.packingChargesKwd) || "0"
+      );
+
+      if (!groupedMap.has(partyId)) {
+        groupedMap.set(partyId, {
+          partyName: row.suppliers?.name || "Unknown",
+          vouchers: [],
+          totalKwd: 0
+        });
+      }
+      const group = groupedMap.get(partyId)!;
+      group.vouchers.push(row);
+      group.totalKwd += amount;
+    }
+
+    // Convert to result format
+    const result: { partyId: number; partyName: string; voucherCount: number; totalAmountKwd: number; vouchers: LandedCostVoucherWithDetails[] }[] = [];
+    
+    for (const [partyId, group] of groupedMap.entries()) {
+      const vouchersWithDetails: LandedCostVoucherWithDetails[] = [];
+      for (const v of group.vouchers) {
+        const lineItemsList = await db.select()
+          .from(landedCostLineItems)
+          .where(eq(landedCostLineItems.voucherId, v.landed_cost_vouchers.id));
+        
+        vouchersWithDetails.push({
+          ...v.landed_cost_vouchers,
+          purchaseOrder: null,
+          purchaseOrders: [],
+          party: null,
+          partnerParty: partyType === "partner" ? v.suppliers || null : null,
+          packingParty: partyType === "packing" ? v.suppliers || null : null,
+          payment: null,
+          partnerPayment: null,
+          packingPayment: null,
+          lineItems: lineItemsList,
+        });
+      }
+      
+      result.push({
+        partyId,
+        partyName: group.partyName,
+        voucherCount: group.vouchers.length,
+        totalAmountKwd: group.totalKwd,
+        vouchers: vouchersWithDetails,
+      });
+    }
+
+    return result;
+  }
+
+  async createPartySettlement(settlement: InsertPartySettlement): Promise<PartySettlementWithDetails> {
+    const [created] = await db.insert(partySettlements).values(settlement).returning();
+    return this.getPartySettlement(created.id) as Promise<PartySettlementWithDetails>;
+  }
+
+  async finalizePartySettlement(id: number, paymentId: number, expenseId: number): Promise<PartySettlementWithDetails | undefined> {
+    // Get the settlement to get voucher IDs
+    const settlement = await this.getPartySettlement(id);
+    if (!settlement) return undefined;
+
+    // Parse the voucher IDs
+    const voucherIds: number[] = JSON.parse(settlement.voucherIds);
+
+    // Mark all vouchers as paid
+    for (const voucherId of voucherIds) {
+      if (settlement.partyType === "partner") {
+        await this.markPartnerProfitPaid(voucherId, paymentId);
+      } else if (settlement.partyType === "packing") {
+        await this.markPackingPaid(voucherId, paymentId);
+      }
+    }
+
+    // Update settlement with payment and expense IDs
+    const [updated] = await db.update(partySettlements)
+      .set({ 
+        status: "paid", 
+        paymentId, 
+        expenseId 
+      })
+      .where(eq(partySettlements.id, id))
+      .returning();
+
+    if (!updated) return undefined;
+    return this.getPartySettlement(id);
+  }
+
+  async getNextSettlementNumber(): Promise<string> {
+    const year = new Date().getFullYear();
+    const [result] = await db.select({ count: sql<number>`count(*)` })
+      .from(partySettlements)
+      .where(sql`EXTRACT(YEAR FROM ${partySettlements.createdAt}) = ${year}`);
+    
+    const count = (result?.count || 0) + 1;
+    return `SETTLE-${year}-${count.toString().padStart(5, "0")}`;
   }
 }
 
