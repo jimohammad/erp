@@ -34,6 +34,7 @@ import {
 import { Pencil, Trash2, Loader2, Users, RotateCcw, Save, ClipboardCheck, AlertTriangle, Building2, Link, Copy, Check } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Supplier, PartyType } from "@shared/schema";
+import { SUPPLIER_CATEGORIES } from "@shared/schema";
 
 export default function PartyMaster() {
   const { toast } = useToast();
@@ -45,6 +46,7 @@ export default function PartyMaster() {
   const [partyAddress, setPartyAddress] = useState("");
   const [partyPhone, setPartyPhone] = useState("");
   const [partyType, setPartyType] = useState<PartyType>("salesman");
+  const [partyCategory, setPartyCategory] = useState("");
   const [partyArea, setPartyArea] = useState("");
   const [creditLimit, setCreditLimit] = useState("");
   const [openingBalance, setOpeningBalance] = useState("");
@@ -106,6 +108,7 @@ export default function PartyMaster() {
     setPartyAddress("");
     setPartyPhone("");
     setPartyType("salesman");
+    setPartyCategory("");
     setCreditLimit("");
     setOpeningBalance("");
     setPartyArea("");
@@ -124,6 +127,7 @@ export default function PartyMaster() {
       setPartyAddress(editingParty.address || "");
       setPartyPhone(editingParty.phone || "");
       setPartyType((editingParty.partyType as PartyType) || "supplier");
+      setPartyCategory(editingParty.category || "");
       setCreditLimit(editingParty.creditLimit || "");
       setOpeningBalance(editingParty.openingBalance || "");
       setPartyArea(editingParty.area || "");
@@ -142,6 +146,7 @@ export default function PartyMaster() {
     address: string | null;
     phone: string | null;
     partyType: PartyType;
+    category: string | null;
     creditLimit: string | null;
     openingBalance: string | null;
     area: string | null;
@@ -274,6 +279,7 @@ export default function PartyMaster() {
       address: partyAddress.trim() || null,
       phone: partyPhone.trim() || null,
       partyType,
+      category: partyType === "supplier" && partyCategory && partyCategory !== "general" ? partyCategory : null,
       creditLimit: (partyType === "customer" || partyType === "salesman") && creditLimit.trim() ? creditLimit.trim() : null,
       openingBalance: partyType === "salesman" && openingBalance.trim() ? openingBalance.trim() : null,
       area: (partyType === "customer" || partyType === "salesman") && partyArea.trim() ? partyArea.trim() : null,
@@ -355,6 +361,31 @@ export default function PartyMaster() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {partyType === "supplier" && (
+                <div className="flex items-center justify-between p-3 border rounded-md bg-purple-100 dark:bg-purple-900/30">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="partyCategory" className="text-base">Supplier Category</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {partyCategory ? partyCategory : "General supplier"}
+                    </p>
+                  </div>
+                  <Select
+                    value={partyCategory}
+                    onValueChange={(value) => setPartyCategory(value)}
+                  >
+                    <SelectTrigger className="w-[180px]" data-testid="select-party-category">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="general">General</SelectItem>
+                      {SUPPLIER_CATEGORIES.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
