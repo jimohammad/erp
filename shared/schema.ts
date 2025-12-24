@@ -84,7 +84,16 @@ export const insertSupplierSchema = createInsertSchema(suppliers).omit({ id: tru
 export type InsertSupplier = z.infer<typeof insertSupplierSchema>;
 export type Supplier = typeof suppliers.$inferSelect;
 
-export type PartyType = "supplier" | "customer" | "salesman";
+export type PartyType = "supplier" | "customer" | "salesman" | "logistic" | "packing" | "partner";
+
+export const PARTY_TYPE_LABELS: Record<PartyType, string> = {
+  supplier: "Supplier",
+  customer: "Customer", 
+  salesman: "Salesman",
+  logistic: "Logistic Co.",
+  packing: "Packing Co.",
+  partner: "Partner",
+};
 
 export const SUPPLIER_CATEGORIES = [
   "Logistic Co.",
