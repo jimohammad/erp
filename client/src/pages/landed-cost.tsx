@@ -929,6 +929,7 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
                 </PopoverContent>
               </Popover>
             </div>
+            </div>
           </div>
 
           {/* Section: Cost Breakdown */}
