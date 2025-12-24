@@ -5107,18 +5107,14 @@ export class DatabaseStorage implements IStorage {
 
   async getNextLandedCostVoucherNumber(): Promise<string> {
     const result = await db.execute(sql`
-      SELECT voucher_number FROM landed_cost_vouchers 
-      ORDER BY id DESC LIMIT 1
+      SELECT MAX(CAST(SUBSTRING(voucher_number FROM 5) AS INTEGER)) as max_num 
+      FROM landed_cost_vouchers 
+      WHERE voucher_number LIKE 'LCV-%'
     `);
     
-    const rows = result.rows as { voucher_number: string }[];
-    if (rows.length === 0) {
-      return "LCV-0001";
-    }
-    
-    const lastNumber = rows[0].voucher_number;
-    const numPart = parseInt(lastNumber.replace("LCV-", ""), 10);
-    const nextNum = (numPart + 1).toString().padStart(4, "0");
+    const rows = result.rows as { max_num: number | null }[];
+    const maxNum = rows[0]?.max_num || 0;
+    const nextNum = (maxNum + 1).toString().padStart(4, "0");
     return `LCV-${nextNum}`;
   }
 
