@@ -3053,14 +3053,15 @@ export async function registerRoutes(
   app.post("/api/landed-cost-vouchers", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const { voucher, lineItems, purchaseOrderIds } = req.body;
+      console.log("[LandedCost] Creating voucher:", JSON.stringify({ voucher, lineItems: lineItems?.length, purchaseOrderIds }));
       if (!voucher || !lineItems) {
         return res.status(400).json({ error: "Voucher and line items are required" });
       }
       const newVoucher = await storage.createLandedCostVoucher(voucher, lineItems, purchaseOrderIds);
       res.status(201).json(newVoucher);
-    } catch (error) {
-      console.error("Error creating landed cost voucher:", error);
-      res.status(500).json({ error: "Failed to create landed cost voucher" });
+    } catch (error: any) {
+      console.error("Error creating landed cost voucher:", error?.message, error?.stack);
+      res.status(500).json({ error: "Failed to create landed cost voucher", details: error?.message });
     }
   });
 
