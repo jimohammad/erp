@@ -5272,16 +5272,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPendingSettlementsByParty(partyType: string): Promise<{ partyId: number; partyName: string; voucherCount: number; totalAmountKwd: number; vouchers: LandedCostVoucherWithDetails[] }[]> {
-    // For logistic type, we need to aggregate both HK→DXB and DXB→KWI freight
+    // For logistic type, we need to aggregate both HK→DXB and DXB→KWI freight per logistics company
     if (partyType === "logistic") {
-      // Get all vouchers with pending freight payments
-      const allVouchers = await db.select()
+      // Get all vouchers with pending HK→DXB freight (where partyId is the logistic company)
+      const hkDxbVouchers = await db.select()
         .from(landedCostVouchers)
         .leftJoin(suppliers, eq(landedCostVouchers.partyId, suppliers.id))
-        .where(eq(landedCostVouchers.payableStatus, "pending"))
+        .where(and(
+          eq(landedCostVouchers.payableStatus, "pending"),
+          isNotNull(landedCostVouchers.partyId)
+        ))
         .orderBy(desc(landedCostVouchers.voucherDate));
 
-      // Also get vouchers with DXB→KWI pending
+      // Get all vouchers with pending DXB→KWI freight (where dxbKwiPartyId is the logistic company)
       const dxbKwiVouchers = await db.select()
         .from(landedCostVouchers)
         .leftJoin(suppliers, eq(landedCostVouchers.dxbKwiPartyId, suppliers.id))
@@ -5292,10 +5295,15 @@ export class DatabaseStorage implements IStorage {
         .orderBy(desc(landedCostVouchers.voucherDate));
 
       // Group by party - track which vouchers and amounts per party
-      const groupedMap = new Map<number, { partyName: string; voucherSet: Set<number>; voucherData: Map<number, { voucher: any; hkDxb: number; dxbKwi: number }>; totalKwd: number }>();
+      // Key: partyId, Value: { partyName, voucherId -> { voucher, hkDxbPending, dxbKwiPending, amounts } }
+      const groupedMap = new Map<number, { 
+        partyName: string; 
+        voucherData: Map<number, { voucher: any; hkDxbAmount: number; dxbKwiAmount: number; hkDxbPending: boolean; dxbKwiPending: boolean }>; 
+        totalKwd: number 
+      }>();
 
-      // Process HK→DXB freight
-      for (const row of allVouchers) {
+      // Process HK→DXB pending freight
+      for (const row of hkDxbVouchers) {
         const partyId = row.landed_cost_vouchers.partyId;
         if (!partyId) continue;
         const amount = parseFloat(row.landed_cost_vouchers.hkToDxbKwd || "0");
@@ -5304,21 +5312,27 @@ export class DatabaseStorage implements IStorage {
         if (!groupedMap.has(partyId)) {
           groupedMap.set(partyId, {
             partyName: row.suppliers?.name || "Unknown",
-            voucherSet: new Set(),
             voucherData: new Map(),
             totalKwd: 0
           });
         }
         const group = groupedMap.get(partyId)!;
-        group.voucherSet.add(row.landed_cost_vouchers.id);
         if (!group.voucherData.has(row.landed_cost_vouchers.id)) {
-          group.voucherData.set(row.landed_cost_vouchers.id, { voucher: row.landed_cost_vouchers, hkDxb: 0, dxbKwi: 0 });
+          group.voucherData.set(row.landed_cost_vouchers.id, { 
+            voucher: row.landed_cost_vouchers, 
+            hkDxbAmount: 0, 
+            dxbKwiAmount: 0, 
+            hkDxbPending: false, 
+            dxbKwiPending: false 
+          });
         }
-        group.voucherData.get(row.landed_cost_vouchers.id)!.hkDxb = amount;
+        const vData = group.voucherData.get(row.landed_cost_vouchers.id)!;
+        vData.hkDxbAmount = amount;
+        vData.hkDxbPending = true;
         group.totalKwd += amount;
       }
 
-      // Process DXB→KWI freight
+      // Process DXB→KWI pending freight
       for (const row of dxbKwiVouchers) {
         const partyId = row.landed_cost_vouchers.dxbKwiPartyId;
         if (!partyId) continue;
@@ -5328,17 +5342,23 @@ export class DatabaseStorage implements IStorage {
         if (!groupedMap.has(partyId)) {
           groupedMap.set(partyId, {
             partyName: row.suppliers?.name || "Unknown",
-            voucherSet: new Set(),
             voucherData: new Map(),
             totalKwd: 0
           });
         }
         const group = groupedMap.get(partyId)!;
-        group.voucherSet.add(row.landed_cost_vouchers.id);
         if (!group.voucherData.has(row.landed_cost_vouchers.id)) {
-          group.voucherData.set(row.landed_cost_vouchers.id, { voucher: row.landed_cost_vouchers, hkDxb: 0, dxbKwi: 0 });
+          group.voucherData.set(row.landed_cost_vouchers.id, { 
+            voucher: row.landed_cost_vouchers, 
+            hkDxbAmount: 0, 
+            dxbKwiAmount: 0, 
+            hkDxbPending: false, 
+            dxbKwiPending: false 
+          });
         }
-        group.voucherData.get(row.landed_cost_vouchers.id)!.dxbKwi = amount;
+        const vData = group.voucherData.get(row.landed_cost_vouchers.id)!;
+        vData.dxbKwiAmount = amount;
+        vData.dxbKwiPending = true;
         group.totalKwd += amount;
       }
 
@@ -5363,16 +5383,18 @@ export class DatabaseStorage implements IStorage {
             partnerPayment: null,
             packingPayment: null,
             lineItems: lineItemsList,
-            // Store the freight amounts for display
-            _hkDxbAmount: data.hkDxb,
-            _dxbKwiAmount: data.dxbKwi,
+            // Store the freight amounts and pending flags for display and settlement
+            _hkDxbAmount: data.hkDxbPending ? data.hkDxbAmount : 0,
+            _dxbKwiAmount: data.dxbKwiPending ? data.dxbKwiAmount : 0,
+            _hkDxbPending: data.hkDxbPending,
+            _dxbKwiPending: data.dxbKwiPending,
           } as any);
         }
 
         result.push({
           partyId,
           partyName: group.partyName,
-          voucherCount: group.voucherSet.size,
+          voucherCount: group.voucherData.size,
           totalAmountKwd: group.totalKwd,
           vouchers: vouchersWithDetails,
         });
@@ -5477,8 +5499,8 @@ export class DatabaseStorage implements IStorage {
       } else if (settlement.partyType === "packing") {
         await this.markPackingPaid(voucherId, paymentId);
       } else if (settlement.partyType === "logistic") {
-        // Mark both freight legs as paid for logistic settlements
-        await this.markFreightPaid(voucherId, paymentId);
+        // Mark only the freight legs that belong to this party as paid
+        await this.markFreightPaidForParty(voucherId, settlement.partyId, paymentId);
       }
     }
 
@@ -5496,16 +5518,31 @@ export class DatabaseStorage implements IStorage {
     return this.getPartySettlement(id);
   }
 
-  async markFreightPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
-    // Mark both HK→DXB and DXB→KWI as paid
-    await db.update(landedCostVouchers)
-      .set({ 
-        payableStatus: "paid",
-        paymentId,
-        dxbKwiPayableStatus: "paid",
-        dxbKwiPaymentId: paymentId,
-      })
-      .where(eq(landedCostVouchers.id, voucherId));
+  async markFreightPaidForParty(voucherId: number, partyId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
+    // Get the voucher to check which legs belong to this party
+    const voucher = await this.getLandedCostVoucher(voucherId);
+    if (!voucher) return undefined;
+
+    // Only mark the legs that belong to this party as paid
+    const updates: any = {};
+    
+    // Check if HK→DXB leg belongs to this party and is pending
+    if (voucher.partyId === partyId && voucher.payableStatus === "pending") {
+      updates.payableStatus = "paid";
+      updates.paymentId = paymentId;
+    }
+    
+    // Check if DXB→KWI leg belongs to this party and is pending
+    if (voucher.dxbKwiPartyId === partyId && voucher.dxbKwiPayableStatus === "pending") {
+      updates.dxbKwiPayableStatus = "paid";
+      updates.dxbKwiPaymentId = paymentId;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await db.update(landedCostVouchers)
+        .set(updates)
+        .where(eq(landedCostVouchers.id, voucherId));
+    }
     
     return this.getLandedCostVoucher(voucherId);
   }
