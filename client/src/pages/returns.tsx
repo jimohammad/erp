@@ -1233,15 +1233,15 @@ export default function ReturnsPage() {
               <TableBody>
                 {filteredReturns.map((ret) => (
                   <TableRow key={ret.id} data-testid={`row-return-${ret.id}`}>
-                    <TableCell>{format(new Date(ret.returnDate), "dd/MM/yyyy")}</TableCell>
-                    <TableCell className="font-medium">{ret.returnNumber}</TableCell>
-                    <TableCell>
+                    <TableCell className="py-2">{format(new Date(ret.returnDate), "dd/MM/yyyy")}</TableCell>
+                    <TableCell className="py-2 font-medium">{ret.returnNumber}</TableCell>
+                    <TableCell className="py-2">
                       {ret.returnType === "sale_return" 
                         ? ret.customer?.name || "-"
                         : ret.supplier?.name || "-"}
                     </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
+                    <TableCell className="py-2">
+                      <div className="space-y-0.5">
                         {ret.lineItems?.map((item, idx) => (
                           <div key={idx} className="text-sm">
                             {item.itemName} x{item.quantity}
@@ -1249,7 +1249,7 @@ export default function ReturnsPage() {
                         ))}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="py-2 text-right">
                       <div className="flex items-center justify-end gap-1">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
