@@ -738,7 +738,18 @@ Thank you for your business!`;
                         {format(new Date(so.saleDate), "dd/MM/yyyy")}
                       </TableCell>
                       <TableCell>
-                        {so.invoiceNumber || <span className="text-muted-foreground">-</span>}
+                        {so.invoiceNumber ? (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedSO(so)}
+                            className="text-primary hover:underline font-medium cursor-pointer"
+                            data-testid={`link-invoice-${so.id}`}
+                          >
+                            {so.invoiceNumber}
+                          </button>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell>{so.customer?.name || "-"}</TableCell>
                       <TableCell>
