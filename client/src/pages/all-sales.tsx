@@ -832,10 +832,10 @@ Thank you for your business!`;
 
       <Dialog open={!!selectedSO} onOpenChange={() => setSelectedSO(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="flex flex-row items-center justify-between gap-4">
-            <DialogTitle className="flex items-center gap-2">
-              <ShoppingBag className="h-5 w-5" />
-              Sales Invoice Details
+          <DialogHeader className="flex flex-row items-center justify-between gap-4 pb-2">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <ShoppingBag className="h-5 w-5 text-primary" />
+              Sales Invoice
             </DialogTitle>
             <div className="flex gap-2">
               <Button
@@ -869,55 +869,124 @@ Thank you for your business!`;
             </div>
           </DialogHeader>
           {selectedSO && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Date:</span>{" "}
-                  {format(new Date(selectedSO.saleDate), "dd/MM/yyyy")}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Invoice #:</span>{" "}
-                  {selectedSO.invoiceNumber || "-"}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Customer:</span>{" "}
-                  {selectedSO.customer?.name || "-"}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Total KWD:</span>{" "}
-                  <span className="font-medium">{formatCurrency(selectedSO.totalKwd)}</span>
+            <div className="space-y-6">
+              {/* Header Summary Card */}
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Column - Invoice Details */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs uppercase tracking-wide">
+                        Credit Invoice
+                      </Badge>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-sm w-24">Invoice #:</span>
+                        <span className="font-mono font-semibold text-primary">{selectedSO.invoiceNumber || "-"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-sm w-24">Date:</span>
+                        <span className="font-medium">{format(new Date(selectedSO.saleDate), "dd MMM yyyy")}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-sm w-24">Customer:</span>
+                        <span className="font-medium">{selectedSO.customer?.name || "-"}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Right Column - Total Amount */}
+                  <div className="flex flex-col items-end justify-center">
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
+                      <p className="text-3xl font-bold tabular-nums text-primary">
+                        {formatCurrency(selectedSO.totalKwd)}
+                      </p>
+                      <p className="text-sm text-muted-foreground">KWD</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div>
-                <h4 className="font-medium mb-2">Line Items</h4>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead className="text-center">Qty</TableHead>
-                      <TableHead className="text-right">Unit Price</TableHead>
-                      <TableHead>IMEI Numbers</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedSO.lineItems.map((item) => (
-                      <TableRow key={item.id}>
-                        <TableCell>{item.itemName}</TableCell>
-                        <TableCell className="text-center">{item.quantity}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(item.priceKwd)}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-xs">
-                          {item.imeiNumbers?.length ? (
-                            <div className="space-y-0.5">
-                              {item.imeiNumbers.map((imei, idx) => (
-                                <div key={idx} className="font-mono">{imei}</div>
-                              ))}
-                            </div>
-                          ) : "-"}
-                        </TableCell>
+              
+              {/* Summary Badges */}
+              <div className="flex flex-wrap gap-3">
+                <Badge variant="secondary" className="text-xs px-3 py-1">
+                  {selectedSO.lineItems.length} Item{selectedSO.lineItems.length !== 1 ? "s" : ""}
+                </Badge>
+                <Badge variant="secondary" className="text-xs px-3 py-1">
+                  Total Qty: {selectedSO.lineItems.reduce((sum, item) => sum + (item.quantity || 0), 0)}
+                </Badge>
+                {selectedSO.lineItems.some(item => (item.imeiNumbers?.length || 0) > 0) && (
+                  <Badge variant="outline" className="text-xs px-3 py-1">
+                    {selectedSO.lineItems.reduce((sum, item) => sum + (item.imeiNumbers?.length || 0), 0)} IMEI Tracked
+                  </Badge>
+                )}
+              </div>
+
+              {/* Line Items Table */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Line Items</h4>
+                <div className="rounded-lg border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="font-semibold">Item</TableHead>
+                        <TableHead className="text-center font-semibold w-20">Qty</TableHead>
+                        <TableHead className="text-right font-semibold w-28">Unit Price</TableHead>
+                        <TableHead className="text-right font-semibold w-28">Total</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {selectedSO.lineItems.map((item, idx) => (
+                        <TableRow key={item.id} className={idx % 2 === 0 ? "" : "bg-muted/20"}>
+                          <TableCell className="py-3">
+                            <div className="space-y-2">
+                              <span className="font-medium">{item.itemName}</span>
+                              {(item.imeiNumbers?.length || 0) > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs text-muted-foreground mb-1.5">
+                                    IMEI Numbers ({item.imeiNumbers?.length || 0}):
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                                    {item.imeiNumbers?.map((imei, imeiIdx) => (
+                                      <Badge
+                                        key={imeiIdx}
+                                        variant="outline"
+                                        className="font-mono text-xs px-2 py-0.5 bg-background"
+                                      >
+                                        {imei}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center font-medium tabular-nums">
+                            {item.quantity}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatCurrency(item.priceKwd)}
+                          </TableCell>
+                          <TableCell className="text-right font-medium tabular-nums">
+                            {formatCurrency(((item.quantity || 0) * parseFloat(item.priceKwd || "0")).toFixed(3))}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {/* Footer with Total */}
+              <div className="flex justify-end pt-2 border-t">
+                <div className="text-right">
+                  <span className="text-sm text-muted-foreground mr-4">Grand Total:</span>
+                  <span className="text-xl font-bold tabular-nums">
+                    KWD {formatCurrency(selectedSO.totalKwd)}
+                  </span>
+                </div>
               </div>
             </div>
           )}
