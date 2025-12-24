@@ -44,7 +44,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, Truck, Pencil, Users, Banknote, HandCoins, X, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import type { LandedCostVoucherWithDetails, PurchaseOrderWithDetails, Item, Supplier } from "@shared/schema";
@@ -707,349 +706,272 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
           </Button>
         </div>
       </CardHeader>
-      <CardContent className="flex-1 overflow-auto p-0">
-        <Tabs defaultValue="basics" className="h-full flex flex-col">
-          <TabsList className="w-full justify-start rounded-none border-b bg-transparent p-0 flex-wrap">
-            <TabsTrigger 
-              value="basics" 
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2"
-              data-testid="tab-basics"
-            >
-              Basics
-            </TabsTrigger>
-            <TabsTrigger 
-              value="freight" 
-              disabled={!isEditing && selectedPOIds.length === 0}
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2 disabled:opacity-50"
-              data-testid="tab-freight"
-            >
-              <Truck className="h-3 w-3 mr-1" />
-              Freight
-            </TabsTrigger>
-            <TabsTrigger 
-              value="partner" 
-              disabled={!isEditing && selectedPOIds.length === 0}
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2 disabled:opacity-50"
-              data-testid="tab-partner"
-            >
-              <Users className="h-3 w-3 mr-1" />
-              Partner
-            </TabsTrigger>
-            <TabsTrigger 
-              value="packing" 
-              disabled={!isEditing && selectedPOIds.length === 0}
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2 disabled:opacity-50"
-              data-testid="tab-packing"
-            >
-              <Package className="h-3 w-3 mr-1" />
-              Packing
-            </TabsTrigger>
-            <TabsTrigger 
-              value="summary" 
-              disabled={!isEditing && selectedPOIds.length === 0}
-              className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent px-4 py-2 disabled:opacity-50"
-              data-testid="tab-summary"
-            >
-              Summary
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Basics Tab */}
-          <TabsContent value="basics" className="flex-1 p-4 m-0">
-            <div className="space-y-4">
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Voucher #</Label>
-                  <Input
-                    value={isEditing ? voucher.voucherNumber : (nextNumber?.voucherNumber || "LCV-0001")}
-                    disabled
-                    className="h-8"
-                    data-testid="input-voucher-number"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Date</Label>
-                  <Input
-                    type="date"
-                    value={voucherDate}
-                    onChange={(e) => setVoucherDate(e.target.value)}
-                    className="h-8"
-                    data-testid="input-voucher-date"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Purchase Orders ({selectedPOIds.length} selected)</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button 
-                      variant="outline" 
-                      className="w-full h-8 justify-start font-normal" 
-                      data-testid="button-select-purchase-orders"
-                    >
-                      {selectedPOIds.length === 0 
-                        ? "Select PO(s)..." 
-                        : selectedPOIds.length === 1 
-                          ? purchases.find(p => p.id === selectedPOIds[0])?.invoiceNumber || `PO #${selectedPOIds[0]}`
-                          : `${selectedPOIds.length} POs selected`}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-80 p-0" align="start">
-                    <ScrollArea className="h-64 p-2">
-                      <div className="space-y-1">
-                        {purchases.map(po => (
-                          <div 
-                            key={po.id} 
-                            className={`flex items-center gap-2 p-2 rounded-md cursor-pointer hover-elevate ${selectedPOIds.includes(po.id) ? 'bg-accent' : ''}`}
-                            onClick={() => {
-                              setSelectedPOIds(prev => 
-                                prev.includes(po.id) 
-                                  ? prev.filter(id => id !== po.id)
-                                  : [...prev, po.id]
-                              );
-                            }}
-                            data-testid={`checkbox-po-${po.id}`}
-                          >
-                            <Checkbox checked={selectedPOIds.includes(po.id)} />
-                            <div className="flex-1 text-sm">
-                              <div className="font-medium">{po.invoiceNumber || `PO #${po.id}`}</div>
-                              <div className="text-xs text-muted-foreground">
-                                {po.supplier?.name} - {po.lineItems?.reduce((sum, li) => sum + (li.quantity || 0), 0)} units
-                              </div>
+      <CardContent className="flex-1 overflow-auto p-4">
+        <div className="space-y-4">
+          {/* Row 1: Basic Info - Voucher #, Date, PO Selection */}
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Voucher #</Label>
+              <Input
+                value={isEditing ? voucher.voucherNumber : (nextNumber?.voucherNumber || "LCV-0001")}
+                disabled
+                className="h-8 text-sm"
+                data-testid="input-voucher-number"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Date</Label>
+              <Input
+                type="date"
+                value={voucherDate}
+                onChange={(e) => setVoucherDate(e.target.value)}
+                className="h-8 text-sm"
+                data-testid="input-voucher-date"
+              />
+            </div>
+            <div className="space-y-1 col-span-2">
+              <Label className="text-xs text-muted-foreground">Purchase Orders ({selectedPOIds.length})</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="w-full h-8 justify-start font-normal text-sm" 
+                    data-testid="button-select-purchase-orders"
+                  >
+                    {selectedPOIds.length === 0 
+                      ? "Select PO(s)..." 
+                      : selectedPOIds.length === 1 
+                        ? purchases.find(p => p.id === selectedPOIds[0])?.invoiceNumber || `PO #${selectedPOIds[0]}`
+                        : `${selectedPOIds.length} POs selected`}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 p-0" align="start">
+                  <ScrollArea className="h-64 p-2">
+                    <div className="space-y-1">
+                      {purchases.map(po => (
+                        <div 
+                          key={po.id} 
+                          className={`flex items-center gap-2 p-2 rounded-md cursor-pointer hover-elevate ${selectedPOIds.includes(po.id) ? 'bg-accent' : ''}`}
+                          onClick={() => {
+                            setSelectedPOIds(prev => 
+                              prev.includes(po.id) 
+                                ? prev.filter(id => id !== po.id)
+                                : [...prev, po.id]
+                            );
+                          }}
+                          data-testid={`checkbox-po-${po.id}`}
+                        >
+                          <Checkbox checked={selectedPOIds.includes(po.id)} />
+                          <div className="flex-1 text-sm">
+                            <div className="font-medium">{po.invoiceNumber || `PO #${po.id}`}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {po.supplier?.name} - {po.lineItems?.reduce((sum, li) => sum + (li.quantity || 0), 0)} units
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  </PopoverContent>
-                </Popover>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Notes (Optional)</Label>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Notes about this shipment..."
-                  rows={2}
-                  data-testid="input-notes"
-                />
-              </div>
-              {selectedPOIds.length === 0 && (
-                <div className="p-4 bg-muted rounded-md text-center text-sm text-muted-foreground">
-                  Select at least one Purchase Order to enter cost details
-                </div>
-              )}
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
             </div>
-          </TabsContent>
+          </div>
 
-          {/* Freight Tab */}
-          <TabsContent value="freight" className="flex-1 p-4 m-0">
-            <div className="space-y-4">
-              <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-md space-y-4">
-                <div className="text-sm font-medium flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                  <Truck className="h-4 w-4" /> Freight Costs (KWD)
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">HK to Dubai</Label>
+          {/* Row 2: Three Cost Cards Side by Side */}
+          <div className="grid gap-3 md:grid-cols-3">
+            {/* Freight Card */}
+            <div className="p-3 border rounded-md bg-blue-50/50 dark:bg-blue-950/20 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300">
+                <Truck className="h-3 w-3" /> Freight
+              </div>
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">HK→DXB</Label>
                     <Input
                       type="number"
                       step="0.001"
                       placeholder="0.000"
                       value={hkToDxbAmount}
                       onChange={(e) => setHkToDxbAmount(e.target.value)}
-                      className="h-9"
+                      className="h-7 text-xs"
                       data-testid="input-hk-dxb-amount"
                     />
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Dubai to Kuwait</Label>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground">DXB→KWI</Label>
                     <Input
                       type="number"
                       step="0.001"
                       placeholder="0.000"
                       value={dxbToKwiAmount}
                       onChange={(e) => setDxbToKwiAmount(e.target.value)}
-                      className="h-9"
+                      className="h-7 text-xs"
                       data-testid="input-dxb-kwi-amount"
                     />
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Logistics Company</Label>
-                  <Select value={partyId?.toString() || ""} onValueChange={(v) => setPartyId(v ? parseInt(v) : null)}>
-                    <SelectTrigger className="h-9" data-testid="select-party">
-                      <SelectValue placeholder="Select logistics company..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {suppliers.map(s => (
-                        <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="pt-2 border-t border-blue-200 dark:border-blue-800">
-                  <div className="flex justify-between items-center text-sm font-medium">
-                    <span>Total Freight:</span>
-                    <span className="font-mono text-blue-700 dark:text-blue-300">{formatCurrency(totalFreightKwd)} KWD</span>
-                  </div>
-                </div>
+                <Select value={partyId?.toString() || ""} onValueChange={(v) => setPartyId(v ? parseInt(v) : null)}>
+                  <SelectTrigger className="h-7 text-xs" data-testid="select-party">
+                    <SelectValue placeholder="Logistics Co." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map(s => (
+                      <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="pt-2 border-t border-blue-200 dark:border-blue-800 flex justify-between text-xs font-medium">
+                <span>Total:</span>
+                <span className="font-mono text-blue-700 dark:text-blue-300">{formatCurrency(totalFreightKwd)}</span>
               </div>
             </div>
-          </TabsContent>
 
-          {/* Partner Tab */}
-          <TabsContent value="partner" className="flex-1 p-4 m-0">
-            <div className="space-y-4">
-              <div className="p-4 bg-purple-50 dark:bg-purple-950/30 rounded-md space-y-4">
-                <div className="text-sm font-medium flex items-center gap-2 text-purple-700 dark:text-purple-300">
-                  <Users className="h-4 w-4" /> Partner Profit (KWD)
+            {/* Partner Card */}
+            <div className="p-3 border rounded-md bg-purple-50/50 dark:bg-purple-950/20 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-purple-700 dark:text-purple-300">
+                <Users className="h-3 w-3" /> Partner
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">Profit (KWD)</Label>
+                  <Input
+                    type="number"
+                    step="0.001"
+                    placeholder="0.000"
+                    value={partnerProfitAmount}
+                    onChange={(e) => setPartnerProfitAmount(e.target.value)}
+                    className="h-7 text-xs"
+                    data-testid="input-partner-profit"
+                  />
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Profit Amount</Label>
-                    <Input
-                      type="number"
-                      step="0.001"
-                      placeholder="0.000"
-                      value={partnerProfitAmount}
-                      onChange={(e) => setPartnerProfitAmount(e.target.value)}
-                      className="h-9"
-                      data-testid="input-partner-profit"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Partner Company</Label>
-                    <Select value={partnerPartyId?.toString() || ""} onValueChange={(v) => setPartnerPartyId(v ? parseInt(v) : null)}>
-                      <SelectTrigger className="h-9" data-testid="select-partner-party">
-                        <SelectValue placeholder="Select partner..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map(s => (
-                          <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
-                  <div className="flex justify-between items-center text-sm font-medium">
-                    <span>Partner Total:</span>
-                    <span className="font-mono text-purple-700 dark:text-purple-300">{formatCurrency(partnerProfitKwd)} KWD</span>
-                  </div>
-                </div>
+                <Select value={partnerPartyId?.toString() || ""} onValueChange={(v) => setPartnerPartyId(v ? parseInt(v) : null)}>
+                  <SelectTrigger className="h-7 text-xs" data-testid="select-partner-party">
+                    <SelectValue placeholder="Partner Co." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map(s => (
+                      <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="pt-2 border-t border-purple-200 dark:border-purple-800 flex justify-between text-xs font-medium">
+                <span>Total:</span>
+                <span className="font-mono text-purple-700 dark:text-purple-300">{formatCurrency(partnerProfitKwd)}</span>
               </div>
             </div>
-          </TabsContent>
 
-          {/* Packing Tab */}
-          <TabsContent value="packing" className="flex-1 p-4 m-0">
-            <div className="space-y-4">
-              <div className="p-4 bg-green-50 dark:bg-green-950/30 rounded-md space-y-4">
-                <div className="text-sm font-medium flex items-center gap-2 text-green-700 dark:text-green-300">
-                  <Package className="h-4 w-4" /> Packing Charges (KWD)
+            {/* Packing Card */}
+            <div className="p-3 border rounded-md bg-green-50/50 dark:bg-green-950/20 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-green-700 dark:text-green-300">
+                <Package className="h-3 w-3" /> Packing
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">Charges (KWD)</Label>
+                  <Input
+                    type="number"
+                    step="0.001"
+                    placeholder="0.000"
+                    value={packingAmount}
+                    onChange={(e) => setPackingAmount(e.target.value)}
+                    className="h-7 text-xs"
+                    data-testid="input-packing-amount"
+                  />
                 </div>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Packing Amount</Label>
-                    <Input
-                      type="number"
-                      step="0.001"
-                      placeholder="0.000"
-                      value={packingAmount}
-                      onChange={(e) => setPackingAmount(e.target.value)}
-                      className="h-9"
-                      data-testid="input-packing-amount"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Packing Company</Label>
-                    <Select value={packingPartyId?.toString() || ""} onValueChange={(v) => setPackingPartyId(v ? parseInt(v) : null)}>
-                      <SelectTrigger className="h-9" data-testid="select-packing-party">
-                        <SelectValue placeholder="Select packing company..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {suppliers.map(s => (
-                          <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="pt-2 border-t border-green-200 dark:border-green-800">
-                  <div className="flex justify-between items-center text-sm font-medium">
-                    <span>Packing Total:</span>
-                    <span className="font-mono text-green-700 dark:text-green-300">{formatCurrency(packingChargesKwd)} KWD</span>
-                  </div>
-                </div>
+                <Select value={packingPartyId?.toString() || ""} onValueChange={(v) => setPackingPartyId(v ? parseInt(v) : null)}>
+                  <SelectTrigger className="h-7 text-xs" data-testid="select-packing-party">
+                    <SelectValue placeholder="Packing Co." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map(s => (
+                      <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="pt-2 border-t border-green-200 dark:border-green-800 flex justify-between text-xs font-medium">
+                <span>Total:</span>
+                <span className="font-mono text-green-700 dark:text-green-300">{formatCurrency(packingChargesKwd)}</span>
               </div>
             </div>
-          </TabsContent>
+          </div>
 
-          {/* Summary Tab */}
-          <TabsContent value="summary" className="flex-1 p-4 m-0">
-            <div className="space-y-4">
-              {/* Cost Summary */}
-              <div className="p-4 bg-muted rounded-md space-y-2">
-                <div className="text-sm font-medium mb-3">Cost Breakdown</div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="flex items-center gap-2">
-                    <Truck className="h-3 w-3 text-blue-600" />
-                    Total Freight:
-                  </span>
-                  <span className="font-mono">{formatCurrency(totalFreightKwd)} KWD</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="flex items-center gap-2">
-                    <Users className="h-3 w-3 text-purple-600" />
-                    Partner Profit:
-                  </span>
-                  <span className="font-mono">{formatCurrency(partnerProfitKwd)} KWD</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="flex items-center gap-2">
-                    <Package className="h-3 w-3 text-green-600" />
-                    Packing:
-                  </span>
-                  <span className="font-mono">{formatCurrency(packingChargesKwd)} KWD</span>
-                </div>
-                <div className="flex justify-between items-center font-bold text-lg border-t mt-3 pt-3">
-                  <span>Grand Total:</span>
-                  <span className="font-mono">{formatCurrency(grandTotalKwd)} KWD</span>
-                </div>
-              </div>
+          {/* Row 3: Notes (optional, compact) */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Notes (optional)</Label>
+            <Input
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Notes about this shipment..."
+              className="h-8 text-sm"
+              data-testid="input-notes"
+            />
+          </div>
 
-              {/* Items Table */}
-              {allocatedLineItems.length > 0 && (
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">Items ({totalQuantity} units)</div>
-                  <div className="border rounded-md overflow-hidden">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="py-1.5 text-xs">Item</TableHead>
-                          <TableHead className="py-1.5 text-xs text-right">Qty</TableHead>
-                          <TableHead className="py-1.5 text-xs text-right">Unit Price</TableHead>
-                          <TableHead className="py-1.5 text-xs text-right">Landed/Unit</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {allocatedLineItems.map((li, idx) => (
-                          <TableRow key={idx}>
-                            <TableCell className="py-1 text-xs">{li.itemName}</TableCell>
-                            <TableCell className="py-1 text-xs text-right font-mono">{li.quantity}</TableCell>
-                            <TableCell className="py-1 text-xs text-right font-mono">{li.unitPriceKwd}</TableCell>
-                            <TableCell className="py-1 text-xs text-right font-mono font-semibold">{li.landedCostPerUnitKwd}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
+          {/* Row 4: Grand Total Banner */}
+          <div className="p-3 bg-muted rounded-md flex items-center justify-between">
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-muted-foreground">
+                <Truck className="h-3 w-3 inline mr-1" />{formatCurrency(totalFreightKwd)}
+              </span>
+              <span className="text-muted-foreground">+</span>
+              <span className="text-muted-foreground">
+                <Users className="h-3 w-3 inline mr-1" />{formatCurrency(partnerProfitKwd)}
+              </span>
+              <span className="text-muted-foreground">+</span>
+              <span className="text-muted-foreground">
+                <Package className="h-3 w-3 inline mr-1" />{formatCurrency(packingChargesKwd)}
+              </span>
             </div>
-          </TabsContent>
-        </Tabs>
+            <div className="text-lg font-bold">
+              = {formatCurrency(grandTotalKwd)} KWD
+            </div>
+          </div>
+
+          {/* Row 5: Items Table */}
+          {allocatedLineItems.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-sm font-medium">Items ({totalQuantity} units)</div>
+              <div className="border rounded-md overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="py-1.5 text-xs">Item</TableHead>
+                      <TableHead className="py-1.5 text-xs text-right">Qty</TableHead>
+                      <TableHead className="py-1.5 text-xs text-right">Unit</TableHead>
+                      <TableHead className="py-1.5 text-xs text-right text-blue-600 dark:text-blue-400">Freight</TableHead>
+                      <TableHead className="py-1.5 text-xs text-right text-purple-600 dark:text-purple-400">Partner</TableHead>
+                      <TableHead className="py-1.5 text-xs text-right text-green-600 dark:text-green-400">Pack</TableHead>
+                      <TableHead className="py-1.5 text-xs text-right font-semibold">Landed</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {allocatedLineItems.map((li, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="py-1 text-xs">{li.itemName}</TableCell>
+                        <TableCell className="py-1 text-xs text-right font-mono">{li.quantity}</TableCell>
+                        <TableCell className="py-1 text-xs text-right font-mono">{li.unitPriceKwd}</TableCell>
+                        <TableCell className="py-1 text-xs text-right font-mono text-blue-600">{li.freightPerUnitKwd}</TableCell>
+                        <TableCell className="py-1 text-xs text-right font-mono text-purple-600">{li.partnerProfitPerUnitKwd}</TableCell>
+                        <TableCell className="py-1 text-xs text-right font-mono text-green-600">{li.packingPerUnitKwd}</TableCell>
+                        <TableCell className="py-1 text-xs text-right font-mono font-semibold">{li.landedCostPerUnitKwd}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
+          {selectedPOIds.length === 0 && !isEditing && (
+            <div className="p-4 bg-muted/50 rounded-md text-center text-sm text-muted-foreground">
+              Select at least one Purchase Order above to calculate landed costs
+            </div>
+          )}
+        </div>
       </CardContent>
 
       {/* Footer */}
