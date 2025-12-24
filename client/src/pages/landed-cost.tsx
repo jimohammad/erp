@@ -98,6 +98,7 @@ export default function LandedCostPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/landed-cost-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/landed-cost/pending-dues"] });
       toast({ title: "Voucher Deleted", description: "Landed cost voucher has been deleted." });
       setDeleteId(null);
       if (selectedVoucher?.id === deleteId) {
@@ -645,6 +646,7 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/landed-cost-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/landed-cost/pending-dues"] });
       toast({ title: "Voucher Created", description: "Landed cost voucher has been saved." });
       onSuccess();
     },
@@ -663,6 +665,7 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/landed-cost-vouchers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/landed-cost/pending-dues"] });
       toast({ title: "Voucher Updated", description: "Landed cost voucher has been updated." });
       onSuccess();
     },
