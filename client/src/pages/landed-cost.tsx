@@ -1384,25 +1384,21 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
+      <DialogContent className="max-w-xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Calculator className="h-4 w-4" />
             Party Settlements
           </DialogTitle>
-          <DialogDescription>
-            Settle pending dues for Partner and Packing Co. parties
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-3">
           <Button
             variant={partyType === "partner" ? "default" : "outline"}
             size="sm"
             onClick={() => { setPartyType("partner"); setSelectedParty(null); }}
             data-testid="button-type-partner"
           >
-            <Users className="h-4 w-4 mr-2" />
             Partner
           </Button>
           <Button
@@ -1411,85 +1407,58 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
             onClick={() => { setPartyType("packing"); setSelectedParty(null); }}
             data-testid="button-type-packing"
           >
-            <Package className="h-4 w-4 mr-2" />
             Packing Co.
           </Button>
         </div>
 
-        <ScrollArea className="flex-1">
-          <div className="space-y-4">
-            <div>
-              <h3 className="text-sm font-medium mb-2">Pending {partyTypeLabel} Dues</h3>
-              {loadingDues ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin" />
-                </div>
-              ) : pendingDues.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground text-sm border rounded-md">
-                  No pending dues for {partyTypeLabel}
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {pendingDues.map(party => (
-                    <Card
-                      key={party.partyId}
-                      className={`cursor-pointer hover-elevate ${selectedParty?.partyId === party.partyId ? "ring-2 ring-primary" : ""}`}
-                      onClick={() => setSelectedParty(party)}
-                      data-testid={`card-party-${party.partyId}`}
-                    >
-                      <CardContent className="p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <div className="font-medium truncate">{party.partyName}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {party.voucherCount} pending
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="font-mono font-semibold">
-                              {party.totalAmountKwd.toFixed(3)} KWD
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-            </div>
+        <ScrollArea className="flex-1 -mx-6 px-6">
+          <div className="space-y-3">
+            {loadingDues ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+            ) : pendingDues.length === 0 ? (
+              <div className="text-center py-6 text-muted-foreground text-sm border rounded-md">
+                No pending dues
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {pendingDues.map(party => (
+                  <div
+                    key={party.partyId}
+                    className={`p-3 border rounded-md cursor-pointer hover-elevate ${selectedParty?.partyId === party.partyId ? "ring-2 ring-primary bg-primary/5" : ""}`}
+                    onClick={() => setSelectedParty(party)}
+                    data-testid={`card-party-${party.partyId}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-medium text-sm truncate">{party.partyName}</div>
+                        <div className="text-xs text-muted-foreground">{party.voucherCount} pending</div>
+                      </div>
+                      <div className="font-mono font-semibold text-sm">{party.totalAmountKwd.toFixed(3)} KWD</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {selectedParty && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-primary/5 dark:bg-primary/10 rounded-lg border border-primary/20">
-                  <div>
-                    <h3 className="font-semibold text-lg">{selectedParty.partyName}</h3>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedParty.voucherCount} voucher{selectedParty.voucherCount > 1 ? "s" : ""} to settle
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold font-mono text-primary">
-                      {selectedParty.totalAmountKwd.toFixed(3)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">KWD</div>
-                  </div>
-                </div>
-
-                <div className="border rounded-md">
+              <div className="space-y-3 pt-2 border-t">
+                <div className="border rounded-md overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-muted/50">
-                        <TableHead className="py-2 text-xs font-semibold">Voucher #</TableHead>
-                        <TableHead className="py-2 text-xs font-semibold">Date</TableHead>
-                        <TableHead className="py-2 text-xs font-semibold text-right">Amount</TableHead>
+                        <TableHead className="py-1.5 text-xs">Voucher</TableHead>
+                        <TableHead className="py-1.5 text-xs">Date</TableHead>
+                        <TableHead className="py-1.5 text-xs text-right">Amount</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {(selectedParty.vouchers ?? []).map(v => (
                         <TableRow key={v.id}>
-                          <TableCell className="py-2 font-medium">{v.voucherNumber}</TableCell>
-                          <TableCell className="py-2 text-muted-foreground">{format(new Date(v.voucherDate), "dd/MM/yyyy")}</TableCell>
-                          <TableCell className="py-2 text-right font-mono">
+                          <TableCell className="py-1.5 text-sm">{v.voucherNumber}</TableCell>
+                          <TableCell className="py-1.5 text-sm text-muted-foreground">{format(new Date(v.voucherDate), "dd/MM/yy")}</TableCell>
+                          <TableCell className="py-1.5 text-sm text-right font-mono">
                             {partyType === "partner" 
                               ? formatCurrency(v.totalPartnerProfitKwd || "0")
                               : formatCurrency(v.packingChargesKwd || "0")
@@ -1497,16 +1466,16 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
                           </TableCell>
                         </TableRow>
                       ))}
-                      <TableRow className="bg-muted/30 font-semibold">
-                        <TableCell colSpan={2} className="py-2">Total</TableCell>
-                        <TableCell className="py-2 text-right font-mono">{selectedParty.totalAmountKwd.toFixed(3)} KWD</TableCell>
+                      <TableRow className="bg-muted/30">
+                        <TableCell colSpan={2} className="py-1.5 text-sm font-semibold">Total</TableCell>
+                        <TableCell className="py-1.5 text-sm text-right font-mono font-semibold">{selectedParty.totalAmountKwd.toFixed(3)} KWD</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <Label className="text-sm font-medium whitespace-nowrap">Pay from:</Label>
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm whitespace-nowrap">Pay from:</Label>
                   <Select value={accountId?.toString() || ""} onValueChange={(v) => setAccountId(v ? parseInt(v) : null)}>
                     <SelectTrigger className="flex-1" data-testid="select-settlement-account">
                       <SelectValue placeholder="Select payment account..." />
@@ -1521,49 +1490,19 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
               </div>
             )}
 
-            {settlements.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium mb-2">Past Settlements</h3>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="py-2">Settlement #</TableHead>
-                      <TableHead className="py-2">Party</TableHead>
-                      <TableHead className="py-2">Period</TableHead>
-                      <TableHead className="py-2 text-right">Amount</TableHead>
-                      <TableHead className="py-2">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {settlements.slice(0, 10).map(s => (
-                      <TableRow key={s.id}>
-                        <TableCell className="py-2 font-medium">{s.settlementNumber}</TableCell>
-                        <TableCell className="py-2">{s.party?.name || "Unknown"}</TableCell>
-                        <TableCell className="py-2">{s.settlementPeriod}</TableCell>
-                        <TableCell className="py-2 text-right font-mono">{formatCurrency(s.totalAmountKwd)} KWD</TableCell>
-                        <TableCell className="py-2">
-                          <Badge variant={s.status === "paid" ? "default" : "secondary"}>
-                            {s.status === "paid" ? "Paid" : "Pending"}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
           </div>
         </ScrollArea>
 
-        <DialogFooter className="mt-4 gap-2">
-          <Button variant="outline" onClick={onClose}>Close</Button>
+        <DialogFooter className="pt-3 border-t gap-2">
+          <Button variant="outline" size="sm" onClick={onClose}>Close</Button>
           {selectedParty && (
             <Button
+              size="sm"
               onClick={handleSettle}
               disabled={settleMutation.isPending || !accountId}
               data-testid="button-finalize-settlement"
             >
-              {settleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Banknote className="h-4 w-4 mr-2" />}
+              {settleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Pay {selectedParty.totalAmountKwd.toFixed(3)} KWD
             </Button>
           )}
