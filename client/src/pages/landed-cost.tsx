@@ -460,7 +460,8 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
 
   const [selectedPOIds, setSelectedPOIds] = useState<number[]>(getInitialPOIds);
   const [voucherDate, setVoucherDate] = useState(voucher?.voucherDate || new Date().toISOString().split("T")[0]);
-  const [partyId, setPartyId] = useState<number | null>(voucher?.partyId || null);
+  const [hkDxbPartyId, setHkDxbPartyId] = useState<number | null>(voucher?.partyId || null);
+  const [dxbKwiPartyId, setDxbKwiPartyId] = useState<number | null>(voucher?.dxbKwiPartyId || null);
   const [partnerPartyId, setPartnerPartyId] = useState<number | null>(voucher?.partnerPartyId || null);
   const [packingPartyId, setPackingPartyId] = useState<number | null>(voucher?.packingPartyId || null);
   const [notes, setNotes] = useState(voucher?.notes || "");
@@ -473,7 +474,8 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
   useEffect(() => {
     setSelectedPOIds(getInitialPOIds());
     setVoucherDate(voucher?.voucherDate || new Date().toISOString().split("T")[0]);
-    setPartyId(voucher?.partyId || null);
+    setHkDxbPartyId(voucher?.partyId || null);
+    setDxbKwiPartyId(voucher?.dxbKwiPartyId || null);
     setPartnerPartyId(voucher?.partnerPartyId || null);
     setPackingPartyId(voucher?.packingPartyId || null);
     setNotes(voucher?.notes || "");
@@ -665,7 +667,8 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
       totalChargesKwd: packingChargesKwd.toFixed(3),
       grandTotalKwd: grandTotalKwd.toFixed(3),
       allocationMethod: "quantity",
-      partyId: partyId || null,
+      partyId: hkDxbPartyId || null,
+      dxbKwiPartyId: dxbKwiPartyId || null,
       partnerPartyId: partnerPartyId || null,
       packingPartyId: packingPartyId || null,
       payableStatus: "pending",
@@ -777,42 +780,28 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
             </div>
           </div>
 
-          {/* Row 2: Three Cost Cards Side by Side */}
-          <div className="grid gap-3 md:grid-cols-3">
-            {/* Freight Card */}
+          {/* Row 2: Four Cost Cards Side by Side */}
+          <div className="grid gap-3 md:grid-cols-4">
+            {/* HK→DXB Freight Card */}
             <div className="p-3 border rounded-md bg-blue-50/50 dark:bg-blue-950/20 space-y-2">
               <div className="flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300">
-                <Truck className="h-3 w-3" /> Freight
+                <Truck className="h-3 w-3" /> HK → DXB
               </div>
               <div className="space-y-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">HK→DXB</Label>
-                    <Input
-                      type="number"
-                      step="0.001"
-                      placeholder="0.000"
-                      value={hkToDxbAmount}
-                      onChange={(e) => setHkToDxbAmount(e.target.value)}
-                      className="h-7 text-xs"
-                      data-testid="input-hk-dxb-amount"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-[10px] text-muted-foreground">DXB→KWI</Label>
-                    <Input
-                      type="number"
-                      step="0.001"
-                      placeholder="0.000"
-                      value={dxbToKwiAmount}
-                      onChange={(e) => setDxbToKwiAmount(e.target.value)}
-                      className="h-7 text-xs"
-                      data-testid="input-dxb-kwi-amount"
-                    />
-                  </div>
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">Amount (KWD)</Label>
+                  <Input
+                    type="number"
+                    step="0.001"
+                    placeholder="0.000"
+                    value={hkToDxbAmount}
+                    onChange={(e) => setHkToDxbAmount(e.target.value)}
+                    className="h-7 text-xs"
+                    data-testid="input-hk-dxb-amount"
+                  />
                 </div>
-                <Select value={partyId?.toString() || ""} onValueChange={(v) => setPartyId(v ? parseInt(v) : null)}>
-                  <SelectTrigger className="h-7 text-xs" data-testid="select-party">
+                <Select value={hkDxbPartyId?.toString() || ""} onValueChange={(v) => setHkDxbPartyId(v ? parseInt(v) : null)}>
+                  <SelectTrigger className="h-7 text-xs" data-testid="select-hk-dxb-party">
                     <SelectValue placeholder="Logistics Co." />
                   </SelectTrigger>
                   <SelectContent>
@@ -824,7 +813,42 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
               </div>
               <div className="pt-2 border-t border-blue-200 dark:border-blue-800 flex justify-between text-xs font-medium">
                 <span>Total:</span>
-                <span className="font-mono text-blue-700 dark:text-blue-300">{formatCurrency(totalFreightKwd)}</span>
+                <span className="font-mono text-blue-700 dark:text-blue-300">{formatCurrency(hkToDxbKwd)}</span>
+              </div>
+            </div>
+
+            {/* DXB→KWI Freight Card */}
+            <div className="p-3 border rounded-md bg-cyan-50/50 dark:bg-cyan-950/20 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-cyan-700 dark:text-cyan-300">
+                <Truck className="h-3 w-3" /> DXB → KWI
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <Label className="text-[10px] text-muted-foreground">Amount (KWD)</Label>
+                  <Input
+                    type="number"
+                    step="0.001"
+                    placeholder="0.000"
+                    value={dxbToKwiAmount}
+                    onChange={(e) => setDxbToKwiAmount(e.target.value)}
+                    className="h-7 text-xs"
+                    data-testid="input-dxb-kwi-amount"
+                  />
+                </div>
+                <Select value={dxbKwiPartyId?.toString() || ""} onValueChange={(v) => setDxbKwiPartyId(v ? parseInt(v) : null)}>
+                  <SelectTrigger className="h-7 text-xs" data-testid="select-dxb-kwi-party">
+                    <SelectValue placeholder="Logistics Co." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {suppliers.map(s => (
+                      <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="pt-2 border-t border-cyan-200 dark:border-cyan-800 flex justify-between text-xs font-medium">
+                <span>Total:</span>
+                <span className="font-mono text-cyan-700 dark:text-cyan-300">{formatCurrency(dxbToKwiKwd)}</span>
               </div>
             </div>
 

@@ -1210,8 +1210,11 @@ export const landedCostVouchers = pgTable("landed_cost_vouchers", {
   // Allocation method: "quantity" or "value"
   allocationMethod: text("allocation_method").default("quantity"),
   
-  // Logistics party (for freight costs - paid per shipment)
+  // Logistics party for HK to DXB (paid per shipment)
   partyId: integer("party_id").references(() => suppliers.id),
+  
+  // Logistics party for DXB to KWI (paid per shipment)
+  dxbKwiPartyId: integer("dxb_kwi_party_id").references(() => suppliers.id),
   
   // Partner party (for partner profit - paid monthly)
   partnerPartyId: integer("partner_party_id").references(() => suppliers.id),
@@ -1250,7 +1253,12 @@ export const landedCostVouchersRelations = relations(landedCostVouchers, ({ one,
   party: one(suppliers, {
     fields: [landedCostVouchers.partyId],
     references: [suppliers.id],
-    relationName: "logisticsParty",
+    relationName: "hkDxbLogisticsParty",
+  }),
+  dxbKwiParty: one(suppliers, {
+    fields: [landedCostVouchers.dxbKwiPartyId],
+    references: [suppliers.id],
+    relationName: "dxbKwiLogisticsParty",
   }),
   partnerParty: one(suppliers, {
     fields: [landedCostVouchers.partnerPartyId],
