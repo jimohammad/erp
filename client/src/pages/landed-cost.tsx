@@ -19,6 +19,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -1387,8 +1388,11 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Calculator className="h-5 w-5" />
-            Monthly Settlements
+            Party Settlements
           </DialogTitle>
+          <DialogDescription>
+            Settle pending dues for Partner and Packing Co. parties
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex gap-2 mb-4">
@@ -1475,6 +1479,32 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
                       <span className="text-muted-foreground">Vouchers:</span>
                       <span>{selectedParty.voucherCount}</span>
                     </div>
+                  </div>
+
+                  <div className="border rounded-md overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="py-2">Voucher</TableHead>
+                          <TableHead className="py-2">Date</TableHead>
+                          <TableHead className="py-2 text-right">{amountLabel}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedParty.vouchers.map(v => (
+                          <TableRow key={v.id}>
+                            <TableCell className="py-1.5 font-medium">{v.voucherNumber}</TableCell>
+                            <TableCell className="py-1.5">{format(new Date(v.voucherDate), "dd/MM/yyyy")}</TableCell>
+                            <TableCell className="py-1.5 text-right font-mono">
+                              {partyType === "partner" 
+                                ? formatCurrency(v.totalPartnerProfitKwd || "0")
+                                : formatCurrency(v.packingChargesKwd || "0")
+                              } KWD
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
 
                   <div className="space-y-1.5">
