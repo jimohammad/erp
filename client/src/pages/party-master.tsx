@@ -663,7 +663,6 @@ export default function PartyMaster() {
                     <TableHead className="w-16 py-2">ID</TableHead>
                     <TableHead className="py-2">Party Name</TableHead>
                     <TableHead className="w-28 py-2">Type</TableHead>
-                    <TableHead className="py-2">Address</TableHead>
                     <TableHead className="w-28 py-2">Area</TableHead>
                     <TableHead className="w-36 py-2">Phone</TableHead>
                     <TableHead className="w-32 text-right py-2">Credit/Commission</TableHead>
@@ -686,9 +685,6 @@ export default function PartyMaster() {
                         >
                           {party.partyType || "supplier"}
                         </Badge>
-                      </TableCell>
-                      <TableCell className="py-2 text-sm text-muted-foreground" data-testid={`text-party-address-${party.id}`}>
-                        {party.address || "-"}
                       </TableCell>
                       <TableCell className="py-2 text-sm text-muted-foreground" data-testid={`text-party-area-${party.id}`}>
                         {party.area || "-"}
