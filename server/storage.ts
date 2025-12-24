@@ -5030,7 +5030,21 @@ export class DatabaseStorage implements IStorage {
   ): Promise<LandedCostVoucherWithDetails> {
     // Use transaction to ensure atomic operations - voucher, line items, PO links, and item cost updates all succeed or fail together
     const result = await db.transaction(async (tx) => {
-      const [newVoucher] = await tx.insert(landedCostVouchers).values(voucher).returning();
+      // Generate voucher number atomically inside transaction to avoid duplicates
+      const maxNumResult = await tx.execute(sql`
+        SELECT MAX(CAST(SUBSTRING(voucher_number FROM 5) AS INTEGER)) as max_num 
+        FROM landed_cost_vouchers 
+        WHERE voucher_number LIKE 'LCV-%'
+        FOR UPDATE
+      `);
+      const maxNumRows = maxNumResult.rows as { max_num: number | null }[];
+      const maxNum = maxNumRows[0]?.max_num || 0;
+      const voucherNumber = `LCV-${(maxNum + 1).toString().padStart(4, "0")}`;
+      
+      const [newVoucher] = await tx.insert(landedCostVouchers).values({
+        ...voucher,
+        voucherNumber, // Override with transaction-safe generated number
+      }).returning();
 
       // Insert links to purchase orders in junction table
       const poIds = purchaseOrderIds && purchaseOrderIds.length > 0 
