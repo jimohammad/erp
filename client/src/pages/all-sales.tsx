@@ -734,10 +734,10 @@ Thank you for your business!`;
                 ) : (
                   filteredOrders.map((so) => (
                     <TableRow key={so.id} data-testid={`row-sale-${so.id}`}>
-                      <TableCell>
+                      <TableCell className="py-2">
                         {format(new Date(so.saleDate), "dd/MM/yyyy")}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="py-2">
                         {so.invoiceNumber ? (
                           <button
                             type="button"
@@ -751,16 +751,16 @@ Thank you for your business!`;
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
-                      <TableCell>{so.customer?.name || "-"}</TableCell>
-                      <TableCell>
+                      <TableCell className="py-2">{so.customer?.name || "-"}</TableCell>
+                      <TableCell className="py-2">
                         <Badge variant="secondary" className="text-xs">
                           {so.lineItems.length} items
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right font-medium">
+                      <TableCell className="py-2 text-right font-medium">
                         {formatCurrency(so.totalKwd)}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="py-2 text-right">
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             size="icon"
