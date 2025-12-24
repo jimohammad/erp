@@ -1290,7 +1290,7 @@ interface PartySettlementRecord {
 
 function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
   const { toast } = useToast();
-  const [partyType, setPartyType] = useState<"partner" | "packing">("partner");
+  const [partyType, setPartyType] = useState<"partner" | "packing" | "logistic">("partner");
   const [selectedParty, setSelectedParty] = useState<PendingPartyDues | null>(null);
   const [accountId, setAccountId] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
@@ -1382,8 +1382,8 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
     });
   };
 
-  const partyTypeLabel = partyType === "partner" ? "Partner" : "Packing Co.";
-  const amountLabel = partyType === "partner" ? "Partner Profit" : "Packing Charges";
+  const partyTypeLabel = partyType === "partner" ? "Partner" : partyType === "packing" ? "Packing Co." : "Logistic Co.";
+  const amountLabel = partyType === "partner" ? "Partner Profit" : partyType === "packing" ? "Packing Charges" : "Freight";
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -1411,6 +1411,14 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
             data-testid="button-type-packing"
           >
             Packing Co.
+          </Button>
+          <Button
+            variant={partyType === "logistic" ? "default" : "outline"}
+            size="sm"
+            onClick={() => { setPartyType("logistic"); setSelectedParty(null); }}
+            data-testid="button-type-logistic"
+          >
+            Logistic Co.
           </Button>
         </div>
 
@@ -1464,7 +1472,9 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
                           <TableCell className="py-1.5 text-sm text-right font-mono">
                             {partyType === "partner" 
                               ? formatCurrency(v.totalPartnerProfitKwd || "0")
-                              : formatCurrency(v.packingChargesKwd || "0")
+                              : partyType === "packing"
+                                ? formatCurrency(v.packingChargesKwd || "0")
+                                : formatCurrency(((v as any)._hkDxbAmount || 0) + ((v as any)._dxbKwiAmount || 0))
                             }
                           </TableCell>
                         </TableRow>

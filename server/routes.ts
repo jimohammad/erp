@@ -3246,8 +3246,8 @@ export async function registerRoutes(
   app.get("/api/party-settlements/pending/:partyType", isAuthenticated, isAdmin, async (req, res) => {
     try {
       const partyType = req.params.partyType;
-      if (!["partner", "packing"].includes(partyType)) {
-        return res.status(400).json({ error: "Invalid party type. Use 'partner' or 'packing'" });
+      if (!["partner", "packing", "logistic"].includes(partyType)) {
+        return res.status(400).json({ error: "Invalid party type. Use 'partner', 'packing', or 'logistic'" });
       }
       const pending = await storage.getPendingSettlementsByParty(partyType);
       res.json(pending);
@@ -3314,10 +3314,15 @@ export async function registerRoutes(
       }, []);
 
       // Create expense record
+      const expenseDescription = settlement.partyType === "partner" 
+        ? "Partner Profit" 
+        : settlement.partyType === "packing" 
+          ? "Packing Charges" 
+          : "Freight Charges";
       const expense = await storage.createExpense({
         date: new Date().toISOString().split("T")[0],
         categoryId: null,
-        description: `${settlement.partyType === "partner" ? "Partner Profit" : "Packing Charges"} Settlement - ${settlement.settlementPeriod}`,
+        description: `${expenseDescription} Settlement - ${settlement.settlementPeriod}`,
         amount: settlement.totalAmountKwd,
         accountId,
         branchId: 1,

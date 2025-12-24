@@ -5272,10 +5272,118 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPendingSettlementsByParty(partyType: string): Promise<{ partyId: number; partyName: string; voucherCount: number; totalAmountKwd: number; vouchers: LandedCostVoucherWithDetails[] }[]> {
-    // Get all pending vouchers for the given party type
+    // For logistic type, we need to aggregate both HK→DXB and DXB→KWI freight
+    if (partyType === "logistic") {
+      // Get all vouchers with pending freight payments
+      const allVouchers = await db.select()
+        .from(landedCostVouchers)
+        .leftJoin(suppliers, eq(landedCostVouchers.partyId, suppliers.id))
+        .where(eq(landedCostVouchers.payableStatus, "pending"))
+        .orderBy(desc(landedCostVouchers.voucherDate));
+
+      // Also get vouchers with DXB→KWI pending
+      const dxbKwiVouchers = await db.select()
+        .from(landedCostVouchers)
+        .leftJoin(suppliers, eq(landedCostVouchers.dxbKwiPartyId, suppliers.id))
+        .where(and(
+          eq(landedCostVouchers.dxbKwiPayableStatus, "pending"),
+          isNotNull(landedCostVouchers.dxbKwiPartyId)
+        ))
+        .orderBy(desc(landedCostVouchers.voucherDate));
+
+      // Group by party - track which vouchers and amounts per party
+      const groupedMap = new Map<number, { partyName: string; voucherSet: Set<number>; voucherData: Map<number, { voucher: any; hkDxb: number; dxbKwi: number }>; totalKwd: number }>();
+
+      // Process HK→DXB freight
+      for (const row of allVouchers) {
+        const partyId = row.landed_cost_vouchers.partyId;
+        if (!partyId) continue;
+        const amount = parseFloat(row.landed_cost_vouchers.hkToDxbKwd || "0");
+        if (amount <= 0) continue;
+
+        if (!groupedMap.has(partyId)) {
+          groupedMap.set(partyId, {
+            partyName: row.suppliers?.name || "Unknown",
+            voucherSet: new Set(),
+            voucherData: new Map(),
+            totalKwd: 0
+          });
+        }
+        const group = groupedMap.get(partyId)!;
+        group.voucherSet.add(row.landed_cost_vouchers.id);
+        if (!group.voucherData.has(row.landed_cost_vouchers.id)) {
+          group.voucherData.set(row.landed_cost_vouchers.id, { voucher: row.landed_cost_vouchers, hkDxb: 0, dxbKwi: 0 });
+        }
+        group.voucherData.get(row.landed_cost_vouchers.id)!.hkDxb = amount;
+        group.totalKwd += amount;
+      }
+
+      // Process DXB→KWI freight
+      for (const row of dxbKwiVouchers) {
+        const partyId = row.landed_cost_vouchers.dxbKwiPartyId;
+        if (!partyId) continue;
+        const amount = parseFloat(row.landed_cost_vouchers.dxbToKwiKwd || "0");
+        if (amount <= 0) continue;
+
+        if (!groupedMap.has(partyId)) {
+          groupedMap.set(partyId, {
+            partyName: row.suppliers?.name || "Unknown",
+            voucherSet: new Set(),
+            voucherData: new Map(),
+            totalKwd: 0
+          });
+        }
+        const group = groupedMap.get(partyId)!;
+        group.voucherSet.add(row.landed_cost_vouchers.id);
+        if (!group.voucherData.has(row.landed_cost_vouchers.id)) {
+          group.voucherData.set(row.landed_cost_vouchers.id, { voucher: row.landed_cost_vouchers, hkDxb: 0, dxbKwi: 0 });
+        }
+        group.voucherData.get(row.landed_cost_vouchers.id)!.dxbKwi = amount;
+        group.totalKwd += amount;
+      }
+
+      // Convert to result format
+      const result: { partyId: number; partyName: string; voucherCount: number; totalAmountKwd: number; vouchers: LandedCostVoucherWithDetails[] }[] = [];
+
+      for (const [partyId, group] of groupedMap.entries()) {
+        const vouchersWithDetails: LandedCostVoucherWithDetails[] = [];
+        for (const [voucherId, data] of group.voucherData.entries()) {
+          const lineItemsList = await db.select()
+            .from(landedCostLineItems)
+            .where(eq(landedCostLineItems.voucherId, voucherId));
+
+          vouchersWithDetails.push({
+            ...data.voucher,
+            purchaseOrder: null,
+            purchaseOrders: [],
+            party: null,
+            partnerParty: null,
+            packingParty: null,
+            payment: null,
+            partnerPayment: null,
+            packingPayment: null,
+            lineItems: lineItemsList,
+            // Store the freight amounts for display
+            _hkDxbAmount: data.hkDxb,
+            _dxbKwiAmount: data.dxbKwi,
+          } as any);
+        }
+
+        result.push({
+          partyId,
+          partyName: group.partyName,
+          voucherCount: group.voucherSet.size,
+          totalAmountKwd: group.totalKwd,
+          vouchers: vouchersWithDetails,
+        });
+      }
+
+      return result;
+    }
+
+    // Original logic for partner and packing
     const statusField = partyType === "partner" ? landedCostVouchers.partnerPayableStatus : landedCostVouchers.packingPayableStatus;
     const partyIdField = partyType === "partner" ? landedCostVouchers.partnerPartyId : landedCostVouchers.packingPartyId;
-    const amountField = partyType === "partner" ? landedCostVouchers.totalPartnerProfitKwd : landedCostVouchers.packingChargesKwd;
 
     const pendingVouchers = await db.select()
       .from(landedCostVouchers)
@@ -5362,12 +5470,15 @@ export class DatabaseStorage implements IStorage {
     // Parse the voucher IDs
     const voucherIds: number[] = JSON.parse(settlement.voucherIds);
 
-    // Mark all vouchers as paid
+    // Mark all vouchers as paid based on party type
     for (const voucherId of voucherIds) {
       if (settlement.partyType === "partner") {
         await this.markPartnerProfitPaid(voucherId, paymentId);
       } else if (settlement.partyType === "packing") {
         await this.markPackingPaid(voucherId, paymentId);
+      } else if (settlement.partyType === "logistic") {
+        // Mark both freight legs as paid for logistic settlements
+        await this.markFreightPaid(voucherId, paymentId);
       }
     }
 
@@ -5383,6 +5494,20 @@ export class DatabaseStorage implements IStorage {
 
     if (!updated) return undefined;
     return this.getPartySettlement(id);
+  }
+
+  async markFreightPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
+    // Mark both HK→DXB and DXB→KWI as paid
+    await db.update(landedCostVouchers)
+      .set({ 
+        payableStatus: "paid",
+        paymentId,
+        dxbKwiPayableStatus: "paid",
+        dxbKwiPaymentId: paymentId,
+      })
+      .where(eq(landedCostVouchers.id, voucherId));
+    
+    return this.getLandedCostVoucher(voucherId);
   }
 
   async getNextSettlementNumber(): Promise<string> {
