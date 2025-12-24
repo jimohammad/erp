@@ -45,7 +45,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, Truck, Pencil, Users, Banknote, X, ChevronRight } from "lucide-react";
+import { Loader2, Search, Eye, Trash2, Plus, Calculator, Package, Truck, Pencil, Users, Banknote, X, ChevronRight, ChevronDown, FileText, CreditCard } from "lucide-react";
 import { format } from "date-fns";
 import type { LandedCostVoucherWithDetails, PurchaseOrderWithDetails, Item, Supplier } from "@shared/schema";
 
@@ -198,43 +198,62 @@ export default function LandedCostPage() {
                     No vouchers found
                   </div>
                 ) : (
-                  filteredVouchers.map((v) => (
-                    <div
-                      key={v.id}
-                      className={`p-3 rounded-md cursor-pointer hover-elevate border ${
-                        selectedVoucher?.id === v.id ? "bg-accent border-accent" : "border-transparent"
-                      }`}
-                      onClick={() => handleViewVoucher(v)}
-                      data-testid={`row-voucher-${v.id}`}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0 flex-1">
-                          <div className="font-medium text-sm">{v.voucherNumber}</div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            {format(new Date(v.voucherDate), "dd/MM/yyyy")}
+                  filteredVouchers.map((v) => {
+                    const itemCount = v.lineItems?.length || 0;
+                    const unitCount = v.lineItems?.reduce((sum, li) => sum + (li.quantity || 0), 0) || 0;
+                    const isPaid = v.payableStatus === "paid";
+                    
+                    return (
+                      <div
+                        key={v.id}
+                        className={`p-3 rounded-lg cursor-pointer hover-elevate border transition-all ${
+                          selectedVoucher?.id === v.id 
+                            ? "bg-accent border-primary/30 ring-1 ring-primary/20" 
+                            : "border-muted"
+                        }`}
+                        onClick={() => handleViewVoucher(v)}
+                        data-testid={`row-voucher-${v.id}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-semibold text-sm text-primary">{v.voucherNumber}</span>
+                              <Badge 
+                                variant={isPaid ? "default" : "outline"} 
+                                className={`text-[10px] px-1.5 py-0 ${isPaid ? "" : "border-amber-400 text-amber-600 dark:text-amber-400"}`}
+                              >
+                                {isPaid ? "Paid" : "Pending"}
+                              </Badge>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">
+                              {format(new Date(v.voucherDate), "dd MMM yyyy")}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                              {v.purchaseOrders && v.purchaseOrders.length > 0
+                                ? v.purchaseOrders.length > 1
+                                  ? `${v.purchaseOrders.length} POs linked`
+                                  : v.purchaseOrders[0].invoiceNumber || `PO #${v.purchaseOrders[0].id}`
+                                : v.purchaseOrder?.invoiceNumber || `PO #${v.purchaseOrderId}`}
+                            </div>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                {itemCount} items
+                              </span>
+                              <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                                {unitCount} units
+                              </span>
+                            </div>
                           </div>
-                          <div className="text-xs text-muted-foreground mt-0.5">
-                            {v.purchaseOrders && v.purchaseOrders.length > 0
-                              ? v.purchaseOrders.length > 1
-                                ? `${v.purchaseOrders.length} POs`
-                                : v.purchaseOrders[0].invoiceNumber || `PO #${v.purchaseOrders[0].id}`
-                              : v.purchaseOrder?.invoiceNumber || `PO #${v.purchaseOrderId}`}
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-mono text-base font-bold tabular-nums">
+                              {formatCurrency(v.grandTotalKwd)}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">KWD</div>
                           </div>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <div className="font-mono text-sm font-semibold">
-                            {formatCurrency(v.grandTotalKwd)}
-                          </div>
-                          <Badge 
-                            variant={v.payableStatus === "paid" ? "default" : "secondary"} 
-                            className="text-xs mt-1"
-                          >
-                            {v.payableStatus === "paid" ? "Paid" : "Pending"}
-                          </Badge>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </ScrollArea>
@@ -309,23 +328,28 @@ interface VoucherViewPanelProps {
 }
 
 function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: VoucherViewPanelProps) {
+  const totalUnits = voucher.lineItems?.reduce((sum, li) => sum + (li.quantity || 0), 0) || 0;
+  const freightTotal = parseDecimal(voucher.hkToDxbKwd) + parseDecimal(voucher.dxbToKwiKwd);
+  
   return (
     <>
       <CardHeader className="py-3 flex-shrink-0 border-b">
         <div className="flex items-center justify-between gap-2">
-          <div>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Eye className="h-4 w-4" />
-              {voucher.voucherNumber}
-            </CardTitle>
-            <CardDescription className="text-xs mt-1">
-              {format(new Date(voucher.voucherDate), "dd MMMM yyyy")}
-            </CardDescription>
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <FileText className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-bold">{voucher.voucherNumber}</CardTitle>
+              <CardDescription className="text-xs">
+                {format(new Date(voucher.voucherDate), "dd MMM yyyy")}
+              </CardDescription>
+            </div>
           </div>
           <div className="flex items-center gap-1">
             {voucher.payableStatus === "pending" && voucher.party && (
               <Button size="sm" variant="outline" onClick={onPay} data-testid="button-pay">
-                <Banknote className="h-4 w-4 mr-1" />
+                <CreditCard className="h-4 w-4 mr-1" />
                 Pay
               </Button>
             )}
@@ -333,7 +357,7 @@ function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: Voucher
               <Pencil className="h-4 w-4 mr-1" />
               Edit
             </Button>
-            <Button size="sm" variant="ghost" onClick={onDelete} data-testid="button-delete">
+            <Button size="icon" variant="ghost" onClick={onDelete} data-testid="button-delete">
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
             <Button size="icon" variant="ghost" onClick={onClose}>
@@ -343,85 +367,152 @@ function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: Voucher
         </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-auto p-4">
-        <div className="space-y-4">
-          {/* PO Reference */}
-          <div className="p-3 bg-muted/50 rounded-md">
-            <div className="text-xs text-muted-foreground mb-1">Purchase Orders</div>
-            <div className="font-medium text-sm">
-              {voucher.purchaseOrders && voucher.purchaseOrders.length > 0
-                ? voucher.purchaseOrders.map(po => po.invoiceNumber || `PO #${po.id}`).join(", ")
-                : voucher.purchaseOrder?.invoiceNumber || `PO #${voucher.purchaseOrderId}`}
+        <div className="space-y-5">
+          {/* Summary Card Header */}
+          <div className="rounded-lg border bg-muted/30 p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Left - PO Reference & Details */}
+              <div className="space-y-3">
+                <div>
+                  <span className="text-xs text-muted-foreground">Purchase Orders</span>
+                  <div className="font-medium text-sm mt-0.5">
+                    {voucher.purchaseOrders && voucher.purchaseOrders.length > 0
+                      ? voucher.purchaseOrders.map(po => po.invoiceNumber || `PO #${po.id}`).join(", ")
+                      : voucher.purchaseOrder?.invoiceNumber || `PO #${voucher.purchaseOrderId}`}
+                  </div>
+                </div>
+                {/* Quick Status Badges */}
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={voucher.payableStatus === "paid" ? "default" : "secondary"} className="text-xs">
+                    Freight: {voucher.payableStatus === "paid" ? "Paid" : "Pending"}
+                  </Badge>
+                  {voucher.partnerParty && parseDecimal(voucher.totalPartnerProfitKwd) > 0 && (
+                    <Badge variant={voucher.partnerPayableStatus === "paid" ? "default" : "secondary"} className="text-xs">
+                      Partner: {voucher.partnerPayableStatus === "paid" ? "Paid" : "Pending"}
+                    </Badge>
+                  )}
+                  {voucher.packingParty && parseDecimal(voucher.packingChargesKwd) > 0 && (
+                    <Badge variant={voucher.packingPayableStatus === "paid" ? "default" : "secondary"} className="text-xs">
+                      Packing: {voucher.packingPayableStatus === "paid" ? "Paid" : "Pending"}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              {/* Right - Grand Total */}
+              <div className="flex flex-col items-end justify-center">
+                <div className="text-right">
+                  <p className="text-sm text-muted-foreground mb-1">Grand Total</p>
+                  <p className="text-3xl font-bold tabular-nums text-primary">
+                    {formatCurrency(voucher.grandTotalKwd)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">KWD</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Cost Breakdown */}
-          <div className="space-y-2">
-            <div className="text-sm font-medium">Cost Breakdown</div>
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="p-2 rounded-md bg-blue-50 dark:bg-blue-950/30">
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Truck className="h-3 w-3" /> HK to Dubai
-                </div>
-                <div className="font-mono font-medium">{formatCurrency(voucher.hkToDxbKwd)} KWD</div>
-              </div>
-              <div className="p-2 rounded-md bg-blue-50 dark:bg-blue-950/30">
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Truck className="h-3 w-3" /> Dubai to Kuwait
-                </div>
-                <div className="font-mono font-medium">{formatCurrency(voucher.dxbToKwiKwd)} KWD</div>
-              </div>
-              <div className="p-2 rounded-md bg-purple-50 dark:bg-purple-950/30">
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Users className="h-3 w-3" /> Partner Profit
-                </div>
-                <div className="font-mono font-medium">{formatCurrency(voucher.totalPartnerProfitKwd)} KWD</div>
-              </div>
-              <div className="p-2 rounded-md bg-green-50 dark:bg-green-950/30">
-                <div className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Package className="h-3 w-3" /> Packing
-                </div>
-                <div className="font-mono font-medium">{formatCurrency(voucher.packingChargesKwd)} KWD</div>
-              </div>
-            </div>
-            <div className="p-3 bg-muted rounded-md flex justify-between items-center">
-              <span className="font-medium">Grand Total</span>
-              <span className="font-mono font-bold text-lg">{formatCurrency(voucher.grandTotalKwd)} KWD</span>
-            </div>
-          </div>
-
-          {/* Status */}
-          <div className="flex gap-2">
-            <Badge variant={voucher.payableStatus === "paid" ? "default" : "secondary"}>
-              Freight: {voucher.payableStatus === "paid" ? "Paid" : "Pending"}
+          {/* KPI Badges Row */}
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="secondary" className="text-xs px-3 py-1">
+              {voucher.lineItems?.length || 0} Item{(voucher.lineItems?.length || 0) !== 1 ? "s" : ""}
             </Badge>
-            {voucher.partnerParty && parseFloat(voucher.totalPartnerProfitKwd || "0") > 0 && (
-              <Badge variant={voucher.partnerPayableStatus === "paid" ? "default" : "secondary"}>
-                Partner: {voucher.partnerPayableStatus === "paid" ? "Paid" : "Pending"}
-              </Badge>
-            )}
+            <Badge variant="secondary" className="text-xs px-3 py-1">
+              {totalUnits} Units
+            </Badge>
+            <Badge variant="outline" className="text-xs px-3 py-1">
+              Freight: {formatCurrency(freightTotal)} KWD
+            </Badge>
           </div>
 
-          {/* Line Items */}
-          {voucher.lineItems && voucher.lineItems.length > 0 && (
-            <div className="space-y-2">
-              <div className="text-sm font-medium">
-                Items ({voucher.lineItems.length})
+          {/* Cost Breakdown - Visual Cards */}
+          <div className="space-y-3">
+            <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Cost Breakdown</h4>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {/* HK→DXB */}
+              <div className="p-3 rounded-lg border bg-blue-50/50 dark:bg-blue-950/20 border-blue-200/50 dark:border-blue-800/50">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Truck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                  <span className="text-xs font-medium text-blue-700 dark:text-blue-300">HK → DXB</span>
+                </div>
+                <div className="font-mono font-bold text-lg text-blue-700 dark:text-blue-300">
+                  {formatCurrency(voucher.hkToDxbKwd)}
+                </div>
+                {voucher.party && (
+                  <div className="text-xs text-muted-foreground mt-1 truncate">{voucher.party.name}</div>
+                )}
               </div>
-              <div className="border rounded-md overflow-hidden">
+              
+              {/* DXB→KWI */}
+              <div className="p-3 rounded-lg border bg-cyan-50/50 dark:bg-cyan-950/20 border-cyan-200/50 dark:border-cyan-800/50">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Truck className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
+                  <span className="text-xs font-medium text-cyan-700 dark:text-cyan-300">DXB → KWI</span>
+                </div>
+                <div className="font-mono font-bold text-lg text-cyan-700 dark:text-cyan-300">
+                  {formatCurrency(voucher.dxbToKwiKwd)}
+                </div>
+                {voucher.dxbKwiParty && (
+                  <div className="text-xs text-muted-foreground mt-1 truncate">{voucher.dxbKwiParty.name}</div>
+                )}
+              </div>
+              
+              {/* Partner */}
+              <div className="p-3 rounded-lg border bg-purple-50/50 dark:bg-purple-950/20 border-purple-200/50 dark:border-purple-800/50">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Users className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                  <span className="text-xs font-medium text-purple-700 dark:text-purple-300">Partner</span>
+                </div>
+                <div className="font-mono font-bold text-lg text-purple-700 dark:text-purple-300">
+                  {formatCurrency(voucher.totalPartnerProfitKwd)}
+                </div>
+                {voucher.partnerParty && (
+                  <div className="text-xs text-muted-foreground mt-1 truncate">{voucher.partnerParty.name}</div>
+                )}
+              </div>
+              
+              {/* Packing */}
+              <div className="p-3 rounded-lg border bg-green-50/50 dark:bg-green-950/20 border-green-200/50 dark:border-green-800/50">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <Package className="h-3.5 w-3.5 text-green-600 dark:text-green-400" />
+                  <span className="text-xs font-medium text-green-700 dark:text-green-300">Packing</span>
+                </div>
+                <div className="font-mono font-bold text-lg text-green-700 dark:text-green-300">
+                  {formatCurrency(voucher.packingChargesKwd)}
+                </div>
+                {voucher.packingParty && (
+                  <div className="text-xs text-muted-foreground mt-1 truncate">{voucher.packingParty.name}</div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Line Items Table */}
+          {voucher.lineItems && voucher.lineItems.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">
+                Line Items ({voucher.lineItems.length})
+              </h4>
+              <div className="rounded-lg border overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead className="py-2 text-xs">Item</TableHead>
-                      <TableHead className="py-2 text-xs text-right">Qty</TableHead>
-                      <TableHead className="py-2 text-xs text-right">Landed/Unit</TableHead>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="py-2 text-xs font-semibold">Item</TableHead>
+                      <TableHead className="py-2 text-xs text-center font-semibold w-16">Qty</TableHead>
+                      <TableHead className="py-2 text-xs text-right font-semibold w-24">Unit Price</TableHead>
+                      <TableHead className="py-2 text-xs text-right font-semibold w-24">Landed/Unit</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {voucher.lineItems.map((li, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell className="py-1 text-xs">{li.itemName}</TableCell>
-                        <TableCell className="py-1 text-xs text-right font-mono">{li.quantity}</TableCell>
-                        <TableCell className="py-1 text-xs text-right font-mono">{li.landedCostPerUnitKwd}</TableCell>
+                      <TableRow key={idx} className={idx % 2 === 1 ? "bg-muted/20" : ""}>
+                        <TableCell className="py-2 text-sm font-medium">{li.itemName}</TableCell>
+                        <TableCell className="py-2 text-sm text-center font-mono tabular-nums">{li.quantity}</TableCell>
+                        <TableCell className="py-2 text-sm text-right font-mono tabular-nums text-muted-foreground">
+                          {formatCurrency(li.unitPriceKwd)}
+                        </TableCell>
+                        <TableCell className="py-2 text-sm text-right font-mono tabular-nums font-semibold text-primary">
+                          {formatCurrency(li.landedCostPerUnitKwd)}
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -430,9 +521,10 @@ function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: Voucher
             </div>
           )}
 
+          {/* Notes */}
           {voucher.notes && (
-            <div className="p-3 bg-muted/50 rounded-md">
-              <div className="text-xs text-muted-foreground mb-1">Notes</div>
+            <div className="rounded-lg border bg-muted/30 p-3">
+              <div className="text-xs text-muted-foreground mb-1 font-medium">Notes</div>
               <div className="text-sm">{voucher.notes}</div>
             </div>
           )}
@@ -731,69 +823,95 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
 
   return (
     <>
-      <CardHeader className="py-3 flex-shrink-0 border-b">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Calculator className="h-4 w-4" />
-            {isEditing ? `Edit ${voucher.voucherNumber}` : "New Voucher"}
-          </CardTitle>
-          <Button size="icon" variant="ghost" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
+      {/* Sticky Header with Summary */}
+      <CardHeader className="py-3 flex-shrink-0 border-b sticky top-0 bg-card z-10">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Calculator className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <CardTitle className="text-lg font-bold">
+                {isEditing ? voucher.voucherNumber : "New Voucher"}
+              </CardTitle>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-xs text-muted-foreground">{selectedPOIds.length} PO{selectedPOIds.length !== 1 ? "s" : ""}</span>
+                <span className="text-xs text-muted-foreground">•</span>
+                <span className="text-xs text-muted-foreground">{totalQuantity} units</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* Live Total Preview */}
+            <div className="text-right hidden md:block">
+              <div className="text-xs text-muted-foreground">Grand Total</div>
+              <div className="font-mono font-bold text-lg text-primary tabular-nums">
+                {formatCurrency(grandTotalKwd)} KWD
+              </div>
+            </div>
+            <Button size="icon" variant="ghost" onClick={onClose}>
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-auto p-4">
-        <div className="space-y-4">
-          {/* Row 1: Basic Info - Voucher #, Date, PO Selection */}
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Voucher #</Label>
-              <Input
-                value={isEditing ? voucher.voucherNumber : (nextNumber?.voucherNumber || "LCV-0001")}
-                disabled
-                className="h-8 text-sm"
-                data-testid="input-voucher-number"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">Date</Label>
-              <Input
-                type="date"
-                value={voucherDate}
-                onChange={(e) => setVoucherDate(e.target.value)}
-                className="h-8 text-sm"
-                data-testid="input-voucher-date"
-              />
-            </div>
-            <div className="space-y-1 col-span-2">
-              <Label className="text-xs text-muted-foreground">Purchase Orders ({selectedPOIds.length})</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    className="w-full h-8 justify-start font-normal text-sm" 
-                    data-testid="button-select-purchase-orders"
-                  >
-                    {selectedPOIds.length === 0 
-                      ? "Select PO(s)..." 
-                      : selectedPOIds.length === 1 
-                        ? purchases.find(p => p.id === selectedPOIds[0])?.invoiceNumber || `PO #${selectedPOIds[0]}`
-                        : `${selectedPOIds.length} POs selected`}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 p-0" align="start">
-                  <ScrollArea className="h-64 p-2">
-                    <div className="space-y-1">
-                      {purchases.map(po => (
-                        <div 
-                          key={po.id} 
-                          className={`flex items-center gap-2 p-2 rounded-md cursor-pointer hover-elevate ${selectedPOIds.includes(po.id) ? 'bg-accent' : ''}`}
-                          onClick={() => {
-                            setSelectedPOIds(prev => 
-                              prev.includes(po.id) 
-                                ? prev.filter(id => id !== po.id)
-                                : [...prev, po.id]
-                            );
+        <div className="space-y-5">
+          {/* Section: Basic Info */}
+          <div className="space-y-3">
+            <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+              <FileText className="h-4 w-4" />
+              Voucher Details
+            </h4>
+            <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Voucher #</Label>
+                <Input
+                  value={isEditing ? voucher.voucherNumber : (nextNumber?.voucherNumber || "LCV-0001")}
+                  disabled
+                  className="h-9 text-sm font-mono bg-muted/50"
+                  data-testid="input-voucher-number"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">Date</Label>
+                <Input
+                  type="date"
+                  value={voucherDate}
+                  onChange={(e) => setVoucherDate(e.target.value)}
+                  className="h-9 text-sm"
+                  data-testid="input-voucher-date"
+                />
+              </div>
+              <div className="space-y-1 col-span-2">
+                <Label className="text-xs text-muted-foreground">Purchase Orders ({selectedPOIds.length})</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      className="w-full h-9 justify-start font-normal text-sm" 
+                      data-testid="button-select-purchase-orders"
+                    >
+                      {selectedPOIds.length === 0 
+                        ? "Select PO(s)..." 
+                        : selectedPOIds.length === 1 
+                          ? purchases.find(p => p.id === selectedPOIds[0])?.invoiceNumber || `PO #${selectedPOIds[0]}`
+                          : `${selectedPOIds.length} POs selected`}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 p-0" align="start">
+                    <ScrollArea className="h-64 p-2">
+                      <div className="space-y-1">
+                        {purchases.map(po => (
+                          <div 
+                            key={po.id} 
+                            className={`flex items-center gap-2 p-2 rounded-md cursor-pointer hover-elevate ${selectedPOIds.includes(po.id) ? 'bg-accent' : ''}`}
+                            onClick={() => {
+                              setSelectedPOIds(prev => 
+                                prev.includes(po.id) 
+                                  ? prev.filter(id => id !== po.id)
+                                  : [...prev, po.id]
+                              );
                           }}
                           data-testid={`checkbox-po-${po.id}`}
                         >
@@ -813,8 +931,13 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
             </div>
           </div>
 
-          {/* Row 2: Four Cost Cards Side by Side */}
-          <div className="grid gap-3 md:grid-cols-4">
+          {/* Section: Cost Breakdown */}
+          <div className="space-y-3">
+            <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground flex items-center gap-2">
+              <CreditCard className="h-4 w-4" />
+              Cost Breakdown
+            </h4>
+            <div className="grid gap-3 md:grid-cols-4">
             {/* HK→DXB Freight Card */}
             <div className="p-3 border rounded-md bg-blue-50/50 dark:bg-blue-950/20 space-y-2">
               <div className="flex items-center gap-1.5 text-xs font-medium text-blue-700 dark:text-blue-300">
@@ -954,9 +1077,10 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
                 <span className="font-mono text-green-700 dark:text-green-300">{formatCurrency(packingChargesKwd)}</span>
               </div>
             </div>
+            </div>
           </div>
 
-          {/* Row 3: Notes (optional, compact) */}
+          {/* Notes (optional, compact) */}
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Notes (optional)</Label>
             <Input
