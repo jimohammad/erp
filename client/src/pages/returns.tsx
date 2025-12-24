@@ -1211,74 +1211,137 @@ export default function ReturnsPage() {
       {/* View Return Dialog */}
       <Dialog open={!!viewReturn} onOpenChange={() => setViewReturn(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <RotateCcw className="h-5 w-5" />
-              Return Voucher Details
+          <DialogHeader className="pb-2">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <RotateCcw className="h-5 w-5 text-primary" />
+              Return Voucher
             </DialogTitle>
           </DialogHeader>
           {viewReturn && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-muted-foreground">Date:</span>{" "}
-                  {format(new Date(viewReturn.returnDate), "dd/MM/yyyy")}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Return #:</span>{" "}
-                  {viewReturn.returnNumber || "-"}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">
-                    {viewReturn.returnType === "sale_return" ? "Customer:" : "Supplier:"}
-                  </span>{" "}
-                  {viewReturn.returnType === "sale_return"
-                    ? viewReturn.customer?.name || "-"
-                    : viewReturn.supplier?.name || "-"}
-                </div>
-                <div>
-                  <span className="text-muted-foreground">Total KWD:</span>{" "}
-                  <span className="font-medium">
-                    {parseFloat(viewReturn.totalKwd || "0").toFixed(3)}
-                  </span>
+            <div className="space-y-6">
+              {/* Header Summary Card */}
+              <div className="rounded-lg border bg-muted/30 p-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Left Column - Return Details */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs uppercase tracking-wide">
+                        {viewReturn.returnType === "sale_return" ? "Sale Return" : "Purchase Return"}
+                      </Badge>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-sm w-24">Return #:</span>
+                        <span className="font-mono font-semibold text-primary">{viewReturn.returnNumber || "-"}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-sm w-24">Date:</span>
+                        <span className="font-medium">{format(new Date(viewReturn.returnDate), "dd MMM yyyy")}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground text-sm w-24">
+                          {viewReturn.returnType === "sale_return" ? "Customer:" : "Supplier:"}
+                        </span>
+                        <span className="font-medium">
+                          {viewReturn.returnType === "sale_return"
+                            ? viewReturn.customer?.name || "-"
+                            : viewReturn.supplier?.name || "-"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Right Column - Total Amount */}
+                  <div className="flex flex-col items-end justify-center">
+                    <div className="text-right">
+                      <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
+                      <p className="text-3xl font-bold tabular-nums text-primary">
+                        {parseFloat(viewReturn.totalKwd || "0").toFixed(3)}
+                      </p>
+                      <p className="text-sm text-muted-foreground">KWD</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div>
-                <h4 className="font-medium mb-2">Line Items</h4>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead className="text-center">Qty</TableHead>
-                      <TableHead className="text-right">Unit Price</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead>IMEI Numbers</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {viewReturn.lineItems?.map((item, idx) => (
-                      <TableRow key={idx}>
-                        <TableCell>{item.itemName}</TableCell>
-                        <TableCell className="text-center">{item.quantity}</TableCell>
-                        <TableCell className="text-right">
-                          {parseFloat(item.priceKwd || "0").toFixed(3)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {parseFloat(item.totalKwd || "0").toFixed(3)}
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground max-w-xs">
-                          {item.imeiNumbers?.length ? (
-                            <div className="space-y-0.5">
-                              {item.imeiNumbers.map((imei, imeiIdx) => (
-                                <div key={imeiIdx} className="font-mono">{imei}</div>
-                              ))}
-                            </div>
-                          ) : "-"}
-                        </TableCell>
+              
+              {/* Summary Badges */}
+              <div className="flex flex-wrap gap-3">
+                <Badge variant="secondary" className="text-xs px-3 py-1">
+                  {viewReturn.lineItems?.length || 0} Item{(viewReturn.lineItems?.length || 0) !== 1 ? "s" : ""}
+                </Badge>
+                <Badge variant="secondary" className="text-xs px-3 py-1">
+                  Total Qty: {viewReturn.lineItems?.reduce((sum, item) => sum + (item.quantity || 0), 0) || 0}
+                </Badge>
+                {viewReturn.lineItems?.some(item => (item.imeiNumbers?.length || 0) > 0) && (
+                  <Badge variant="outline" className="text-xs px-3 py-1">
+                    {viewReturn.lineItems.reduce((sum, item) => sum + (item.imeiNumbers?.length || 0), 0)} IMEI Tracked
+                  </Badge>
+                )}
+              </div>
+
+              {/* Line Items Table */}
+              <div className="space-y-3">
+                <h4 className="font-semibold text-sm uppercase tracking-wide text-muted-foreground">Line Items</h4>
+                <div className="rounded-lg border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="font-semibold">Item</TableHead>
+                        <TableHead className="text-center font-semibold w-20">Qty</TableHead>
+                        <TableHead className="text-right font-semibold w-28">Unit Price</TableHead>
+                        <TableHead className="text-right font-semibold w-28">Total</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {viewReturn.lineItems?.map((item, idx) => (
+                        <TableRow key={idx} className={idx % 2 === 0 ? "" : "bg-muted/20"}>
+                          <TableCell className="py-3">
+                            <div className="space-y-2">
+                              <span className="font-medium">{item.itemName}</span>
+                              {(item.imeiNumbers?.length || 0) > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs text-muted-foreground mb-1.5">
+                                    IMEI Numbers ({item.imeiNumbers?.length || 0}):
+                                  </p>
+                                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                                    {item.imeiNumbers?.map((imei, imeiIdx) => (
+                                      <Badge
+                                        key={imeiIdx}
+                                        variant="outline"
+                                        className="font-mono text-xs px-2 py-0.5 bg-background"
+                                      >
+                                        {imei}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center font-medium tabular-nums">
+                            {item.quantity}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {parseFloat(item.priceKwd || "0").toFixed(3)}
+                          </TableCell>
+                          <TableCell className="text-right font-medium tabular-nums">
+                            {parseFloat(item.totalKwd || "0").toFixed(3)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+
+              {/* Footer with Total */}
+              <div className="flex justify-end pt-2 border-t">
+                <div className="text-right">
+                  <span className="text-sm text-muted-foreground mr-4">Grand Total:</span>
+                  <span className="text-xl font-bold tabular-nums">
+                    KWD {parseFloat(viewReturn.totalKwd || "0").toFixed(3)}
+                  </span>
+                </div>
               </div>
             </div>
           )}
