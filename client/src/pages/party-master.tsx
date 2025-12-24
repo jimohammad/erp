@@ -660,26 +660,26 @@ export default function PartyMaster() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-16">ID</TableHead>
-                    <TableHead>Party Name</TableHead>
-                    <TableHead className="w-28">Type</TableHead>
-                    <TableHead>Address</TableHead>
-                    <TableHead className="w-28">Area</TableHead>
-                    <TableHead className="w-36">Phone</TableHead>
-                    <TableHead className="w-32 text-right">Credit/Commission</TableHead>
-                    {isAdmin && <TableHead className="w-24 text-right">Actions</TableHead>}
+                    <TableHead className="w-16 py-2">ID</TableHead>
+                    <TableHead className="py-2">Party Name</TableHead>
+                    <TableHead className="w-28 py-2">Type</TableHead>
+                    <TableHead className="py-2">Address</TableHead>
+                    <TableHead className="w-28 py-2">Area</TableHead>
+                    <TableHead className="w-36 py-2">Phone</TableHead>
+                    <TableHead className="w-32 text-right py-2">Credit/Commission</TableHead>
+                    {isAdmin && <TableHead className="w-24 text-right py-2">Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredParties.map((party) => (
                     <TableRow key={party.id} data-testid={`row-party-${party.id}`}>
-                      <TableCell className="font-mono text-sm text-muted-foreground">
+                      <TableCell className="py-2 font-mono text-sm text-muted-foreground">
                         {party.id}
                       </TableCell>
-                      <TableCell className="font-medium" data-testid={`text-party-name-${party.id}`}>
+                      <TableCell className="py-2 font-medium" data-testid={`text-party-name-${party.id}`}>
                         {party.name}
                       </TableCell>
-                      <TableCell data-testid={`text-party-type-${party.id}`}>
+                      <TableCell className="py-2" data-testid={`text-party-type-${party.id}`}>
                         <Badge 
                           variant={party.partyType === "customer" ? "default" : party.partyType === "salesman" ? "outline" : "secondary"}
                           className="capitalize"
@@ -687,16 +687,16 @@ export default function PartyMaster() {
                           {party.partyType || "supplier"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground" data-testid={`text-party-address-${party.id}`}>
+                      <TableCell className="py-2 text-sm text-muted-foreground" data-testid={`text-party-address-${party.id}`}>
                         {party.address || "-"}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground" data-testid={`text-party-area-${party.id}`}>
+                      <TableCell className="py-2 text-sm text-muted-foreground" data-testid={`text-party-area-${party.id}`}>
                         {party.area || "-"}
                       </TableCell>
-                      <TableCell className="text-sm" data-testid={`text-party-phone-${party.id}`}>
+                      <TableCell className="py-2 text-sm" data-testid={`text-party-phone-${party.id}`}>
                         {party.phone || "-"}
                       </TableCell>
-                      <TableCell className="text-right text-sm font-medium" data-testid={`text-credit-limit-${party.id}`}>
+                      <TableCell className="py-2 text-right text-sm font-medium" data-testid={`text-credit-limit-${party.id}`}>
                         {party.partyType === "customer" ? (
                           <div className="flex items-center justify-end gap-1">
                             {(() => {
@@ -730,7 +730,7 @@ export default function PartyMaster() {
                         ) : party.partyType === "salesman" ? formatCurrency(party.creditLimit) : "-"}
                       </TableCell>
                       {isAdmin && (
-                        <TableCell className="text-right">
+                        <TableCell className="py-2 text-right">
                           <div className="flex justify-end gap-1">
                             {party.partyType === "salesman" && (() => {
                               const SETTLEMENT_CYCLE_DAYS = 90;
