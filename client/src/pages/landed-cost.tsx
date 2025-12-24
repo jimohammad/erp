@@ -1491,7 +1491,7 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {selectedParty.vouchers.map(v => (
+                        {(selectedParty.vouchers ?? []).map(v => (
                           <TableRow key={v.id}>
                             <TableCell className="py-1.5 font-medium">{v.voucherNumber}</TableCell>
                             <TableCell className="py-1.5">{format(new Date(v.voucherDate), "dd/MM/yyyy")}</TableCell>
