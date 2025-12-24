@@ -952,7 +952,8 @@ export async function registerRoutes(
     try {
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
       const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
-      const result = await storage.getPayments({ limit, offset });
+      const direction = req.query.direction as string | undefined;
+      const result = await storage.getPayments({ limit, offset, direction });
       res.json(result);
     } catch (error) {
       console.error("Error fetching payments:", error);

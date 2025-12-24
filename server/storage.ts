@@ -204,7 +204,7 @@ export interface IStorage {
   getSalesMonthlyStats(year?: number): Promise<{ month: number; totalKwd: number; totalFx: number }[]>;
 
   // Payment Module
-  getPayments(options?: { limit?: number; offset?: number }): Promise<{ data: PaymentWithDetails[]; total: number }>;
+  getPayments(options?: { limit?: number; offset?: number; direction?: string }): Promise<{ data: PaymentWithDetails[]; total: number }>;
   getPayment(id: number): Promise<PaymentWithDetails | undefined>;
   createPayment(payment: InsertPayment, splits?: Omit<InsertPaymentSplit, 'paymentId'>[]): Promise<PaymentWithDetails>;
   deletePayment(id: number): Promise<boolean>;
@@ -1438,11 +1438,17 @@ export class DatabaseStorage implements IStorage {
 
   // ==================== PAYMENT MODULE ====================
 
-  async getPayments(options?: { limit?: number; offset?: number }): Promise<{ data: PaymentWithDetails[]; total: number }> {
-    const [countResult] = await db.select({ count: sql<number>`count(*)::int` }).from(payments);
+  async getPayments(options?: { limit?: number; offset?: number; direction?: string }): Promise<{ data: PaymentWithDetails[]; total: number }> {
+    // Build where condition for direction filter
+    const whereCondition = options?.direction ? eq(payments.direction, options.direction) : undefined;
+    
+    const [countResult] = await db.select({ count: sql<number>`count(*)::int` })
+      .from(payments)
+      .where(whereCondition);
     const total = countResult.count;
     
     const paymentList = await db.query.payments.findMany({
+      where: whereCondition,
       with: {
         customer: true,
         supplier: true,
