@@ -510,14 +510,14 @@ export class DatabaseStorage implements IStorage {
         SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
         FROM return_line_items rl
         JOIN returns r ON rl.return_id = r.id
-        WHERE r.return_type = 'sale'
+        WHERE r.return_type = 'sale_return'
         GROUP BY rl.item_name
       ),
       purchase_returns AS (
         SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
         FROM return_line_items rl
         JOIN returns r ON rl.return_id = r.id
-        WHERE r.return_type = 'purchase'
+        WHERE r.return_type = 'purchase_return'
         GROUP BY rl.item_name
       )
       SELECT 
@@ -569,14 +569,14 @@ export class DatabaseStorage implements IStorage {
         SELECT rl.item_name, SUM(rl.quantity) as qty
         FROM return_line_items rl
         JOIN returns r ON rl.return_id = r.id
-        WHERE r.return_type = 'sale'
+        WHERE r.return_type = 'sale_return'
         GROUP BY rl.item_name
       ),
       purchase_returns AS (
         SELECT rl.item_name, SUM(rl.quantity) as qty
         FROM return_line_items rl
         JOIN returns r ON rl.return_id = r.id
-        WHERE r.return_type = 'purchase'
+        WHERE r.return_type = 'purchase_return'
         GROUP BY rl.item_name
       )
       SELECT 
@@ -1517,14 +1517,14 @@ export class DatabaseStorage implements IStorage {
         SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
         FROM return_line_items rl
         JOIN returns r ON rl.return_id = r.id
-        WHERE r.return_type = 'sale'
+        WHERE r.return_type = 'sale_return'
         GROUP BY rl.item_name
       ),
       purchase_returns AS (
         SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
         FROM return_line_items rl
         JOIN returns r ON rl.return_id = r.id
-        WHERE r.return_type = 'purchase'
+        WHERE r.return_type = 'purchase_return'
         GROUP BY rl.item_name
       ),
       all_items AS (
@@ -1570,7 +1570,7 @@ export class DatabaseStorage implements IStorage {
           COALESCE((
             SELECT SUM(rli.quantity) FROM return_line_items rli 
             JOIN returns r ON rli.return_id = r.id 
-            WHERE rli.item_name = i.name AND r.return_type = 'sale'
+            WHERE rli.item_name = i.name AND r.return_type = 'sale_return'
           ), 0) -
           COALESCE((
             SELECT SUM(sli.quantity) FROM sales_order_line_items sli WHERE sli.item_name = i.name
@@ -1578,7 +1578,7 @@ export class DatabaseStorage implements IStorage {
           COALESCE((
             SELECT SUM(rli.quantity) FROM return_line_items rli 
             JOIN returns r ON rli.return_id = r.id 
-            WHERE rli.item_name = i.name AND r.return_type = 'purchase'
+            WHERE rli.item_name = i.name AND r.return_type = 'purchase_return'
           ), 0) as current_stock
         FROM items i
         WHERE i.min_stock_level > 0
@@ -1996,7 +1996,7 @@ export class DatabaseStorage implements IStorage {
             0::float as credit,
             created_at
           FROM returns
-          WHERE supplier_id = ${partyId} AND return_type = 'purchase'
+          WHERE supplier_id = ${partyId} AND return_type = 'purchase_return'
           ${dateFilter}
         )
         SELECT 
@@ -2059,7 +2059,7 @@ export class DatabaseStorage implements IStorage {
             COALESCE(CAST(total_amount AS DECIMAL), 0)::float as credit,
             created_at
           FROM returns
-          WHERE supplier_id = ${partyId} AND return_type = 'sale'
+          WHERE supplier_id = ${partyId} AND return_type = 'sale_return'
           ${dateFilter}
         )
         SELECT 
@@ -2989,14 +2989,14 @@ export class DatabaseStorage implements IStorage {
         SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
         FROM return_line_items rl
         JOIN returns r ON rl.return_id = r.id
-        WHERE r.return_type = 'sale'
+        WHERE r.return_type = 'sale_return'
         GROUP BY rl.item_name
       ),
       purchase_returns AS (
         SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
         FROM return_line_items rl
         JOIN returns r ON rl.return_id = r.id
-        WHERE r.return_type = 'purchase'
+        WHERE r.return_type = 'purchase_return'
         GROUP BY rl.item_name
       ),
       opening_stock AS (
@@ -3297,7 +3297,7 @@ export class DatabaseStorage implements IStorage {
     const saleReturnsResult = await db.execute(sql`
       SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
       FROM returns
-      WHERE return_type = 'sale' 
+      WHERE return_type = 'sale_return' 
       AND return_date >= ${startDate} AND return_date <= ${endDate}
       ${branchFilter}
     `);
@@ -3319,7 +3319,7 @@ export class DatabaseStorage implements IStorage {
     const purchaseReturnsResult = await db.execute(sql`
       SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
       FROM returns
-      WHERE return_type = 'purchase' 
+      WHERE return_type = 'purchase_return' 
       AND return_date >= ${startDate} AND return_date <= ${endDate}
       ${branchFilter}
     `);
@@ -4088,14 +4088,14 @@ export class DatabaseStorage implements IStorage {
         SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
         FROM return_line_items rl
         JOIN returns r ON rl.return_id = r.id
-        WHERE r.return_type = 'purchase'
+        WHERE r.return_type = 'purchase_return'
         GROUP BY rl.item_name
       ),
       sale_returns_qty AS (
         SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
         FROM return_line_items rl
         JOIN returns r ON rl.return_id = r.id
-        WHERE r.return_type = 'sale'
+        WHERE r.return_type = 'sale_return'
         GROUP BY rl.item_name
       ),
       net_consumed AS (
