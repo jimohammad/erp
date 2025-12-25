@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { ArrowRightLeft, Wallet, FileText, X, Plus, Pencil, Trash2, Banknote, Settings2, TrendingUp, TrendingDown, MoreHorizontal, ArrowUpDown } from "lucide-react";
+import { ArrowRightLeft, Wallet, FileText, X, Plus, Pencil, Trash2, Banknote, TrendingUp, TrendingDown, MoreHorizontal, ArrowUpDown, Building2, CreditCard, ShieldCheck, Smartphone } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -314,6 +314,57 @@ export default function AccountsPage() {
   // Calculate total balance
   const totalBalance = accounts.reduce((sum, acc) => sum + parseFloat(acc.balance || "0"), 0);
 
+  // Get account icon and styling based on name
+  const getAccountStyle = (name: string) => {
+    const lowerName = name.toLowerCase();
+    if (lowerName.includes("cash")) {
+      return { 
+        icon: Banknote, 
+        gradient: "from-emerald-500/20 to-emerald-600/10 dark:from-emerald-500/30 dark:to-emerald-600/20",
+        iconColor: "text-emerald-600 dark:text-emerald-400",
+        borderColor: "border-emerald-200 dark:border-emerald-800"
+      };
+    }
+    if (lowerName.includes("bank") || lowerName.includes("nbk") || lowerName.includes("cbk")) {
+      return { 
+        icon: Building2, 
+        gradient: "from-blue-500/20 to-blue-600/10 dark:from-blue-500/30 dark:to-blue-600/20",
+        iconColor: "text-blue-600 dark:text-blue-400",
+        borderColor: "border-blue-200 dark:border-blue-800"
+      };
+    }
+    if (lowerName.includes("knet")) {
+      return { 
+        icon: CreditCard, 
+        gradient: "from-purple-500/20 to-purple-600/10 dark:from-purple-500/30 dark:to-purple-600/20",
+        iconColor: "text-purple-600 dark:text-purple-400",
+        borderColor: "border-purple-200 dark:border-purple-800"
+      };
+    }
+    if (lowerName.includes("wamd") || lowerName.includes("wallet")) {
+      return { 
+        icon: Smartphone, 
+        gradient: "from-orange-500/20 to-orange-600/10 dark:from-orange-500/30 dark:to-orange-600/20",
+        iconColor: "text-orange-600 dark:text-orange-400",
+        borderColor: "border-orange-200 dark:border-orange-800"
+      };
+    }
+    if (lowerName.includes("safe")) {
+      return { 
+        icon: ShieldCheck, 
+        gradient: "from-slate-500/20 to-slate-600/10 dark:from-slate-500/30 dark:to-slate-600/20",
+        iconColor: "text-slate-600 dark:text-slate-400",
+        borderColor: "border-slate-200 dark:border-slate-700"
+      };
+    }
+    return { 
+      icon: Wallet, 
+      gradient: "from-gray-500/20 to-gray-600/10 dark:from-gray-500/30 dark:to-gray-600/20",
+      iconColor: "text-gray-600 dark:text-gray-400",
+      borderColor: "border-gray-200 dark:border-gray-700"
+    };
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -460,68 +511,79 @@ export default function AccountsPage() {
         {/* Account Cards Grid */}
         <div>
           <h2 className="text-lg font-semibold mb-3">Account Balances</h2>
-          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
             {accountsLoading ? (
               <div className="col-span-full text-center text-muted-foreground py-8">Loading accounts...</div>
             ) : (
-              accounts.map((account) => (
-                <Card 
-                  key={account.id} 
-                  className={`cursor-pointer transition-all hover-elevate ${
-                    selectedAccount?.id === account.id ? "ring-2 ring-primary shadow-md" : ""
-                  }`}
-                  onClick={() => setSelectedAccount(account)}
-                  data-testid={`card-account-${account.id}`}
-                >
-                  <CardHeader className="p-3 pb-1">
-                    <div className="flex items-center justify-between gap-1">
-                      <CardTitle className="text-sm font-medium truncate">{account.name}</CardTitle>
-                      {isAdmin && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                            <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" data-testid={`button-account-menu-${account.id}`}>
-                              <MoreHorizontal className="w-3.5 h-3.5" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenuItem onClick={() => handleAdjustment(account)} data-testid={`menu-adjustment-${account.id}`}>
-                              <ArrowUpDown className="w-4 h-4 mr-2" />
-                              Cash Adjustment
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleOpeningBalance(account)} data-testid={`menu-opening-balance-${account.id}`}>
-                              <Banknote className="w-4 h-4 mr-2" />
-                              Opening Balance
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => handleEditAccount(account)} data-testid={`menu-edit-${account.id}`}>
-                              <Pencil className="w-4 h-4 mr-2" />
-                              Rename
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => {
-                                if (confirm(`Are you sure you want to delete ${account.name}? This cannot be undone.`)) {
-                                  deleteAccountMutation.mutate(account.id);
-                                }
-                              }}
-                              data-testid={`menu-delete-${account.id}`}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-3 pt-0">
-                    <div className="text-lg font-bold tabular-nums" data-testid={`text-balance-${account.id}`}>
-                      {parseFloat(account.balance || "0").toFixed(3)}
-                    </div>
-                    <div className="text-xs text-muted-foreground">KWD</div>
-                  </CardContent>
-                </Card>
-              ))
+              accounts.map((account) => {
+                const style = getAccountStyle(account.name);
+                const AccountIcon = style.icon;
+                const balance = parseFloat(account.balance || "0");
+                
+                return (
+                  <Card 
+                    key={account.id} 
+                    className={`cursor-pointer transition-all overflow-visible hover-elevate bg-gradient-to-br ${style.gradient} ${style.borderColor} ${
+                      selectedAccount?.id === account.id ? "ring-2 ring-primary shadow-lg" : ""
+                    }`}
+                    onClick={() => setSelectedAccount(account)}
+                    data-testid={`card-account-${account.id}`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className={`p-2 rounded-lg bg-background/50 ${style.iconColor}`}>
+                          <AccountIcon className="w-5 h-5" />
+                        </div>
+                        {isAdmin && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 -mr-1 -mt-1" data-testid={`button-account-menu-${account.id}`}>
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenuItem onClick={() => handleAdjustment(account)} data-testid={`menu-adjustment-${account.id}`}>
+                                <ArrowUpDown className="w-4 h-4 mr-2" />
+                                Cash Adjustment
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleOpeningBalance(account)} data-testid={`menu-opening-balance-${account.id}`}>
+                                <Banknote className="w-4 h-4 mr-2" />
+                                Opening Balance
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleEditAccount(account)} data-testid={`menu-edit-${account.id}`}>
+                                <Pencil className="w-4 h-4 mr-2" />
+                                Rename
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => {
+                                  if (confirm(`Are you sure you want to delete ${account.name}? This cannot be undone.`)) {
+                                    deleteAccountMutation.mutate(account.id);
+                                  }
+                                }}
+                                data-testid={`menu-delete-${account.id}`}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-sm font-medium text-foreground/80">{account.name}</p>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xl font-bold tabular-nums" data-testid={`text-balance-${account.id}`}>
+                            {balance.toFixed(3)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">KWD</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
           </div>
         </div>
