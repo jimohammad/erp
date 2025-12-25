@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,7 +50,16 @@ interface TopSellingItem {
 export default function DashboardPage() {
   const [, setLocation] = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [showResults, setShowResults] = useState(false);
+  
+  // Debounce search query to prevent query flooding (300ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/dashboard/stats"],
@@ -65,14 +74,14 @@ export default function DashboardPage() {
   });
 
   const { data: searchResults, isLoading: searchLoading } = useQuery<SearchResult[]>({
-    queryKey: ["/api/search", searchQuery],
+    queryKey: ["/api/search", debouncedSearchQuery],
     queryFn: async () => {
-      if (searchQuery.length < 2) return [];
-      const res = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+      if (debouncedSearchQuery.length < 2) return [];
+      const res = await fetch(`/api/search?q=${encodeURIComponent(debouncedSearchQuery)}`);
       if (!res.ok) throw new Error("Search failed");
       return res.json();
     },
-    enabled: searchQuery.length >= 2,
+    enabled: debouncedSearchQuery.length >= 2,
   });
 
   const handleResultClick = (result: SearchResult) => {
