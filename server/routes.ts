@@ -1226,8 +1226,21 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Invalid status. Must be one of: pending, cleared, bounced, cancelled" });
       }
       
-      if (status === "bounced" && !bounceReason) {
+      if (status === "bounced" && (!bounceReason || !bounceReason.trim())) {
         return res.status(400).json({ error: "Bounce reason is required when marking cheque as bounced" });
+      }
+      
+      // Check current status and enforce transition rules
+      const existingCheque = await storage.getChequePayment(id);
+      if (!existingCheque) {
+        return res.status(404).json({ error: "Cheque payment not found" });
+      }
+      
+      // Only pending cheques can have their status changed
+      if (existingCheque.status !== "pending") {
+        return res.status(400).json({ 
+          error: `Cannot change status of ${existingCheque.status} cheque. Only pending cheques can be updated.` 
+        });
       }
       
       const updated = await storage.updateChequeStatus(id, status, clearingDate, bounceReason);

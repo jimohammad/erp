@@ -1537,12 +1537,15 @@ export class DatabaseStorage implements IStorage {
         await tx.insert(paymentSplits).values(splitValues as any);
       }
       
-      // Create cheque payment record if cheque details are provided
-      if (chequeDetails) {
+      // Create cheque payment record only if payment type is Cheque and cheque details are provided
+      if (chequeDetails && payment.paymentType === "Cheque") {
         await tx.insert(chequePayments).values({
           ...chequeDetails,
           paymentId: newPayment.id,
         } as any);
+      } else if (chequeDetails && payment.paymentType !== "Cheque") {
+        // Log warning but don't fail - cheque details ignored for non-cheque payments
+        console.warn(`[Payment] Cheque details provided but payment type is ${payment.paymentType}, ignoring cheque data`);
       }
       
       const result = await tx.query.payments.findFirst({

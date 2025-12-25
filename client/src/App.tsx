@@ -80,6 +80,7 @@ const CustomerAgingPage = lazy(() => import("@/pages/customer-aging"));
 const SendPriceListPage = lazy(() => import("@/pages/send-price-list"));
 const InvoicePrintingPage = lazy(() => import("@/pages/invoice-printing"));
 const SalesmanAnalysisPage = lazy(() => import("@/pages/salesman-analysis"));
+const ChequeRegisterPage = lazy(() => import("@/pages/cheque-register"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -468,6 +469,21 @@ function AppSidebar() {
                 </SidebarMenuItem>
               )}
 
+              {/* Cheque Register */}
+              {canAccess("payments") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/cheque-register"}
+                  >
+                    <Link href="/cheque-register" data-testid="link-cheque-register">
+                      <FileText className="h-4 w-4" />
+                      <span>Cheque Register</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
               {/* Stock - quick access */}
               {canAccess("reports") && (
                 <SidebarMenuItem>
@@ -646,6 +662,8 @@ function AuthenticatedLayout() {
         return "Payment IN (Receive)";
       case "/payments/out":
         return "Payment OUT (Pay)";
+      case "/cheque-register":
+        return "Cheque Register";
       case "/returns":
         return "Returns Register";
       case "/expenses":
@@ -728,6 +746,7 @@ function AuthenticatedLayout() {
                 <Route path="/payments" component={PaymentsPage} />
                 <Route path="/payments/in" component={PaymentInPage} />
                 <Route path="/payments/out" component={PaymentOutPage} />
+                <Route path="/cheque-register" component={ChequeRegisterPage} />
                 <Route path="/returns" component={ReturnsPage} />
                 <Route path="/expenses" component={ExpensesPage} />
                 <Route path="/accounts" component={AccountsPage} />
