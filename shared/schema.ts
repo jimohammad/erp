@@ -948,6 +948,43 @@ export type OpeningBalanceWithDetails = OpeningBalance & {
   partyName?: string;
 };
 
+// ==================== ACCOUNT OPENING BALANCES ====================
+
+export const accountOpeningBalances = pgTable("account_opening_balances", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  accountId: integer("account_id").notNull().references(() => accounts.id),
+  branchId: integer("branch_id").references(() => branches.id),
+  balanceAmount: numeric("balance_amount", { precision: 12, scale: 3 }).notNull(),
+  effectiveDate: date("effective_date").notNull(),
+  notes: text("notes"),
+  createdBy: varchar("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_aob_account").on(table.accountId),
+  index("idx_aob_branch").on(table.branchId),
+  index("idx_aob_date").on(table.effectiveDate),
+]);
+
+export const accountOpeningBalancesRelations = relations(accountOpeningBalances, ({ one }) => ({
+  account: one(accounts, {
+    fields: [accountOpeningBalances.accountId],
+    references: [accounts.id],
+  }),
+  branch: one(branches, {
+    fields: [accountOpeningBalances.branchId],
+    references: [branches.id],
+  }),
+}));
+
+export const insertAccountOpeningBalanceSchema = createInsertSchema(accountOpeningBalances).omit({ id: true, createdAt: true });
+export type InsertAccountOpeningBalance = z.infer<typeof insertAccountOpeningBalanceSchema>;
+export type AccountOpeningBalance = typeof accountOpeningBalances.$inferSelect;
+
+export type AccountOpeningBalanceWithDetails = AccountOpeningBalance & {
+  account: Account;
+  branch?: Branch;
+};
+
 // ==================== APP SETTINGS ====================
 
 export const appSettings = pgTable("app_settings", {
