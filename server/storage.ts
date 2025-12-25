@@ -2504,6 +2504,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getModulesForRole(role: string): Promise<string[]> {
+    // Superuser gets full access to all modules
+    if (role === "superuser" || role === "super_user") {
+      return [...MODULE_NAMES];
+    }
+    
     const permissions = await db.select().from(rolePermissions)
       .where(and(eq(rolePermissions.role, role), eq(rolePermissions.canAccess, 1)));
     return permissions.map(p => p.moduleName);
