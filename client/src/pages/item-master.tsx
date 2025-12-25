@@ -265,8 +265,8 @@ export default function ItemMaster() {
       "Purchase Price (KWD)": item.purchasePriceKwd ? parseFloat(item.purchasePriceKwd).toFixed(3) : "",
       "Purchase Price (FX)": item.purchasePriceFx ? parseFloat(item.purchasePriceFx).toFixed(3) : "",
       "FX Currency": item.fxCurrency || "",
-      "Selling Price (KWD)": item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "",
       "Landed Cost (KWD)": item.landedCostKwd ? parseFloat(item.landedCostKwd).toFixed(3) : "",
+      "Selling Price (KWD)": item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "",
       "Min Stock Level": item.minStockLevel ?? 0,
     }));
 
@@ -334,8 +334,8 @@ export default function ItemMaster() {
                       <TableHead className="w-28 text-right py-2">Purchase KWD</TableHead>
                       <TableHead className="w-28 text-right py-2">Purchase FX</TableHead>
                       <TableHead className="w-20 py-2">FX</TableHead>
-                      <TableHead className="w-28 text-right py-2">Selling KWD</TableHead>
                       <TableHead className="w-28 text-right py-2">Landed Cost</TableHead>
+                      <TableHead className="w-28 text-right py-2">Selling KWD</TableHead>
                       {isAdmin && <TableHead className="w-24 text-right py-2">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -363,11 +363,11 @@ export default function ItemMaster() {
                       <TableCell className="py-1" data-testid={`text-fx-currency-${item.id}`}>
                         {item.fxCurrency || "-"}
                       </TableCell>
-                      <TableCell className="py-1 text-right font-mono" data-testid={`text-selling-price-${item.id}`}>
-                        {item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "-"}
-                      </TableCell>
                       <TableCell className="py-1 text-right font-mono" data-testid={`text-landed-cost-${item.id}`}>
                         {item.landedCostKwd ? parseFloat(item.landedCostKwd).toFixed(3) : "-"}
+                      </TableCell>
+                      <TableCell className="py-1 text-right font-mono" data-testid={`text-selling-price-${item.id}`}>
+                        {item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "-"}
                       </TableCell>
                       {isAdmin && (
                         <TableCell className="py-1 text-right">
