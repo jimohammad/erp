@@ -207,8 +207,22 @@ export default function AccountsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
-      if (openingBalanceAccount) {
-        queryClient.invalidateQueries({ queryKey: [`/api/accounts/${openingBalanceAccount.id}/transactions`] });
+      // Invalidate all transaction queries for the affected account (including filtered ones)
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey;
+          if (Array.isArray(key) && key.length > 0) {
+            const firstKey = key[0];
+            return typeof firstKey === 'string' && 
+              firstKey.includes('/api/accounts/') && 
+              firstKey.includes('/transactions');
+          }
+          return false;
+        }
+      });
+      // Also invalidate current transactions query key if selected account matches
+      if (selectedAccount && openingBalanceAccount && selectedAccount.id === openingBalanceAccount.id) {
+        queryClient.invalidateQueries({ queryKey: [transactionsQueryKey] });
       }
       setOpeningBalanceDialogOpen(false);
       setOpeningBalanceAccount(null);
