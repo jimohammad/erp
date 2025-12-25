@@ -213,6 +213,7 @@ function AppSidebar() {
   ];
 
   const reportsSubItems = [
+    { title: "Financial Standing", url: "/financial-standing" },
     { title: "General Reports", url: "/reports" },
     { title: "Invoice Printing", url: "/reports/invoice-printing" },
     { title: "Salesman Analysis", url: "/reports/salesman-analysis" },
