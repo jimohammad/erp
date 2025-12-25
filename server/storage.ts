@@ -159,6 +159,10 @@ import {
   type PartySettlement,
   type InsertPartySettlement,
   type PartySettlementWithDetails,
+  chequePayments,
+  type ChequePayment,
+  type InsertChequePayment,
+  type ChequePaymentWithDetails,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, lte, sql, or, isNull, isNotNull, asc, inArray, ne } from "drizzle-orm";
@@ -210,9 +214,14 @@ export interface IStorage {
   // Payment Module
   getPayments(options?: { limit?: number; offset?: number; direction?: string }): Promise<{ data: PaymentWithDetails[]; total: number }>;
   getPayment(id: number): Promise<PaymentWithDetails | undefined>;
-  createPayment(payment: InsertPayment, splits?: Omit<InsertPaymentSplit, 'paymentId'>[]): Promise<PaymentWithDetails>;
+  createPayment(payment: InsertPayment, splits?: Omit<InsertPaymentSplit, 'paymentId'>[], chequeDetails?: Omit<InsertChequePayment, 'paymentId'>): Promise<PaymentWithDetails>;
   deletePayment(id: number): Promise<boolean>;
   getPaymentSplits(paymentId: number): Promise<PaymentSplit[]>;
+
+  // Cheque Payments
+  getChequePayments(options?: { status?: string; startDate?: string; endDate?: string }): Promise<ChequePaymentWithDetails[]>;
+  getChequePayment(id: number): Promise<ChequePaymentWithDetails | undefined>;
+  updateChequeStatus(id: number, status: string, clearingDate?: string, bounceReason?: string): Promise<ChequePayment | undefined>;
 
   // Reports
   getStockBalance(): Promise<{ itemName: string; purchased: number; sold: number; openingStock: number; balance: number }[]>;
@@ -1516,7 +1525,7 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(paymentSplits).where(eq(paymentSplits.paymentId, paymentId));
   }
 
-  async createPayment(payment: InsertPayment, splits?: Omit<InsertPaymentSplit, 'paymentId'>[]): Promise<PaymentWithDetails> {
+  async createPayment(payment: InsertPayment, splits?: Omit<InsertPaymentSplit, 'paymentId'>[], chequeDetails?: Omit<InsertChequePayment, 'paymentId'>): Promise<PaymentWithDetails> {
     return await db.transaction(async (tx) => {
       const [newPayment] = await tx.insert(payments).values(payment as any).returning();
       
@@ -1526,6 +1535,14 @@ export class DatabaseStorage implements IStorage {
           paymentId: newPayment.id,
         }));
         await tx.insert(paymentSplits).values(splitValues as any);
+      }
+      
+      // Create cheque payment record if cheque details are provided
+      if (chequeDetails) {
+        await tx.insert(chequePayments).values({
+          ...chequeDetails,
+          paymentId: newPayment.id,
+        } as any);
       }
       
       const result = await tx.query.payments.findFirst({
@@ -1540,6 +1557,81 @@ export class DatabaseStorage implements IStorage {
   async deletePayment(id: number): Promise<boolean> {
     const result = await db.delete(payments).where(eq(payments.id, id)).returning();
     return result.length > 0;
+  }
+
+  // ==================== CHEQUE PAYMENTS ====================
+
+  async getChequePayments(options?: { status?: string; startDate?: string; endDate?: string }): Promise<ChequePaymentWithDetails[]> {
+    const conditions: any[] = [];
+    
+    if (options?.status) {
+      conditions.push(eq(chequePayments.status, options.status));
+    }
+    if (options?.startDate) {
+      conditions.push(gte(chequePayments.chequeDate, options.startDate));
+    }
+    if (options?.endDate) {
+      conditions.push(lte(chequePayments.chequeDate, options.endDate));
+    }
+
+    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    
+    const result = await db.select().from(chequePayments).where(whereClause).orderBy(desc(chequePayments.chequeDate));
+    
+    // Fetch related payment details for each cheque
+    const chequeWithDetails: ChequePaymentWithDetails[] = [];
+    for (const cheque of result) {
+      const paymentData = await db.query.payments.findFirst({
+        where: eq(payments.id, cheque.paymentId),
+        with: { customer: true, supplier: true },
+      });
+      if (paymentData) {
+        chequeWithDetails.push({
+          ...cheque,
+          payment: paymentData,
+        });
+      }
+    }
+    
+    return chequeWithDetails;
+  }
+
+  async getChequePayment(id: number): Promise<ChequePaymentWithDetails | undefined> {
+    const cheque = await db.select().from(chequePayments).where(eq(chequePayments.id, id)).limit(1);
+    if (cheque.length === 0) return undefined;
+    
+    const paymentData = await db.query.payments.findFirst({
+      where: eq(payments.id, cheque[0].paymentId),
+      with: { customer: true, supplier: true },
+    });
+    
+    if (!paymentData) return undefined;
+    
+    return {
+      ...cheque[0],
+      payment: paymentData,
+    };
+  }
+
+  async updateChequeStatus(id: number, status: string, clearingDate?: string, bounceReason?: string): Promise<ChequePayment | undefined> {
+    const updateData: any = { 
+      status, 
+      updatedAt: new Date() 
+    };
+    
+    if (clearingDate) {
+      updateData.clearingDate = clearingDate;
+    }
+    if (bounceReason) {
+      updateData.bounceReason = bounceReason;
+    }
+    
+    const result = await db.update(chequePayments)
+      .set(updateData)
+      .where(eq(chequePayments.id, id))
+      .returning();
+    
+    return result.length > 0 ? result[0] : undefined;
   }
 
   // ==================== REPORTS ====================
