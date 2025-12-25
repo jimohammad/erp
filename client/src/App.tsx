@@ -612,6 +612,9 @@ function AppSidebar() {
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
+        <div className="mt-2 text-center">
+          <span className="text-xs text-muted-foreground" data-testid="text-app-version">v1.1.25</span>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
