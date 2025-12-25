@@ -69,7 +69,7 @@ const PAGE_SIZE = 25;
 export default function PaymentsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin" || user?.role === "super_user";
+  const isAdmin = user?.role === "admin" || user?.role === "superuser" || user?.role === "super_user";
   
   const [logoBase64, setLogoBase64] = useState<string>("");
   
