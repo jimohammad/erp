@@ -404,9 +404,8 @@ export default function DashboardPage() {
                     </ResponsiveContainer>
                   </div>
                 </CardContent>
-              </Card>
-            )}
-          </div>
+            </Card>
+          )}
 
           <Card data-testid="card-settlement-reminders" className="border-blue-200 dark:border-blue-800">
               <CardHeader className="flex flex-row items-center justify-between gap-2 p-4 pb-2">
