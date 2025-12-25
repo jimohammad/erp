@@ -240,7 +240,7 @@ function AppSidebar() {
     if (location.startsWith("/purchases")) return "purchases";
     if (location.startsWith("/sales")) return "sales";
     if (location.startsWith("/items")) return "items";
-    if (location.startsWith("/reports")) return "reports";
+    if (location.startsWith("/reports") || location === "/financial-standing") return "reports";
     if (location.startsWith("/settings")) return "settings";
     return null;
   };
@@ -308,21 +308,6 @@ function AppSidebar() {
                     <Link href="/" data-testid="link-dashboard">
                       <LayoutDashboard className="h-4 w-4" />
                       <span>Dashboard</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
-
-              {/* Financial Standing - company overview */}
-              {canAccess("reports") && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton 
-                    asChild 
-                    isActive={location === "/financial-standing"}
-                  >
-                    <Link href="/financial-standing" data-testid="link-financial-standing">
-                      <PieChart className="h-4 w-4" />
-                      <span>Financial Standing</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
