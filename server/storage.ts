@@ -31,6 +31,10 @@
  */
 
 import bcrypt from "bcryptjs";
+import Decimal from "decimal.js";
+
+// Configure Decimal.js for KWD precision (3 decimal places)
+Decimal.set({ precision: 20, rounding: Decimal.ROUND_HALF_UP });
 import { 
   suppliers, 
   items, 
@@ -750,18 +754,24 @@ export class DatabaseStorage implements IStorage {
     po: InsertPurchaseOrder, 
     lineItems: Omit<InsertLineItem, 'purchaseOrderId'>[]
   ): Promise<PurchaseOrderWithDetails> {
-    const [newPo] = await db.insert(purchaseOrders).values(po as any).returning();
-    
-    if (lineItems.length > 0) {
-      await db.insert(purchaseOrderLineItems).values(
-        lineItems.map(item => ({
-          ...item,
-          purchaseOrderId: newPo.id,
-        })) as any
-      );
-    }
+    return await db.transaction(async (tx) => {
+      const [newPo] = await tx.insert(purchaseOrders).values(po as any).returning();
+      
+      if (lineItems.length > 0) {
+        await tx.insert(purchaseOrderLineItems).values(
+          lineItems.map(item => ({
+            ...item,
+            purchaseOrderId: newPo.id,
+          })) as any
+        );
+      }
 
-    return this.getPurchaseOrder(newPo.id) as Promise<PurchaseOrderWithDetails>;
+      const result = await tx.query.purchaseOrders.findFirst({
+        where: eq(purchaseOrders.id, newPo.id),
+        with: { supplier: true, lineItems: true },
+      });
+      return result as PurchaseOrderWithDetails;
+    });
   }
 
   async updatePurchaseOrder(
@@ -769,24 +779,30 @@ export class DatabaseStorage implements IStorage {
     po: Partial<InsertPurchaseOrder>, 
     lineItems?: Omit<InsertLineItem, 'purchaseOrderId'>[]
   ): Promise<PurchaseOrderWithDetails | undefined> {
-    const [updated] = await db.update(purchaseOrders).set(po).where(eq(purchaseOrders.id, id)).returning();
-    
-    if (!updated) return undefined;
-
-    if (lineItems !== undefined) {
-      await db.delete(purchaseOrderLineItems).where(eq(purchaseOrderLineItems.purchaseOrderId, id));
+    return await db.transaction(async (tx) => {
+      const [updated] = await tx.update(purchaseOrders).set(po).where(eq(purchaseOrders.id, id)).returning();
       
-      if (lineItems.length > 0) {
-        await db.insert(purchaseOrderLineItems).values(
-          lineItems.map(item => ({
-            ...item,
-            purchaseOrderId: id,
-          })) as any
-        );
-      }
-    }
+      if (!updated) return undefined;
 
-    return this.getPurchaseOrder(id);
+      if (lineItems !== undefined) {
+        await tx.delete(purchaseOrderLineItems).where(eq(purchaseOrderLineItems.purchaseOrderId, id));
+        
+        if (lineItems.length > 0) {
+          await tx.insert(purchaseOrderLineItems).values(
+            lineItems.map(item => ({
+              ...item,
+              purchaseOrderId: id,
+            })) as any
+          );
+        }
+      }
+
+      const result = await tx.query.purchaseOrders.findFirst({
+        where: eq(purchaseOrders.id, id),
+        with: { supplier: true, lineItems: true },
+      });
+      return result as PurchaseOrderWithDetails | undefined;
+    });
   }
 
   async deletePurchaseOrder(id: number): Promise<boolean> {
@@ -1155,17 +1171,17 @@ export class DatabaseStorage implements IStorage {
       }).from(salesOrders)
         .where(eq(salesOrders.salesmanId, salesman.id));
       
-      // Total goods issued (all time)
+      // Total goods issued (all time) - using Decimal for precision
       const totalGoodsIssued = allSalesData.reduce((sum, s) => 
-        sum + parseFloat(s.totalKwd || '0'), 0);
+        sum.plus(new Decimal(s.totalKwd || '0')), new Decimal(0)).toNumber();
       
-      // Rolling 90-day goods
+      // Rolling 90-day goods - using Decimal for precision
       const rolling90DayGoods = allSalesData
         .filter(s => new Date(s.saleDate) >= ninety_days_ago)
-        .reduce((sum, s) => sum + parseFloat(s.totalKwd || '0'), 0);
+        .reduce((sum, s) => sum.plus(new Decimal(s.totalKwd || '0')), new Decimal(0)).toNumber();
       
-      // Credit limit and utilization
-      const creditLimit = parseFloat(salesman.creditLimit || '0');
+      // Credit limit and utilization - using Decimal for precision
+      const creditLimit = new Decimal(salesman.creditLimit || '0').toNumber();
       
       // Get outstanding credit (current balance of customers served by this salesman)
       const customerIdSet2 = new Set(allSalesData.map(o => o.customerId).filter(Boolean));
@@ -1386,18 +1402,24 @@ export class DatabaseStorage implements IStorage {
     so: InsertSalesOrder, 
     lineItems: Omit<InsertSalesLineItem, 'salesOrderId'>[]
   ): Promise<SalesOrderWithDetails> {
-    const [newSo] = await db.insert(salesOrders).values(so as any).returning();
-    
-    if (lineItems.length > 0) {
-      await db.insert(salesOrderLineItems).values(
-        lineItems.map(item => ({
-          ...item,
-          salesOrderId: newSo.id,
-        })) as any
-      );
-    }
+    return await db.transaction(async (tx) => {
+      const [newSo] = await tx.insert(salesOrders).values(so as any).returning();
+      
+      if (lineItems.length > 0) {
+        await tx.insert(salesOrderLineItems).values(
+          lineItems.map(item => ({
+            ...item,
+            salesOrderId: newSo.id,
+          })) as any
+        );
+      }
 
-    return this.getSalesOrder(newSo.id) as Promise<SalesOrderWithDetails>;
+      const result = await tx.query.salesOrders.findFirst({
+        where: eq(salesOrders.id, newSo.id),
+        with: { customer: true, lineItems: true },
+      });
+      return result as SalesOrderWithDetails;
+    });
   }
 
   async updateSalesOrder(
@@ -1405,24 +1427,30 @@ export class DatabaseStorage implements IStorage {
     so: Partial<InsertSalesOrder>,
     lineItems?: Omit<InsertSalesLineItem, 'salesOrderId'>[]
   ): Promise<SalesOrderWithDetails | undefined> {
-    const [updated] = await db.update(salesOrders).set(so).where(eq(salesOrders.id, id)).returning();
-    
-    if (!updated) return undefined;
-
-    if (lineItems !== undefined) {
-      await db.delete(salesOrderLineItems).where(eq(salesOrderLineItems.salesOrderId, id));
+    return await db.transaction(async (tx) => {
+      const [updated] = await tx.update(salesOrders).set(so).where(eq(salesOrders.id, id)).returning();
       
-      if (lineItems.length > 0) {
-        await db.insert(salesOrderLineItems).values(
-          lineItems.map(item => ({
-            ...item,
-            salesOrderId: id,
-          })) as any
-        );
-      }
-    }
+      if (!updated) return undefined;
 
-    return this.getSalesOrder(id);
+      if (lineItems !== undefined) {
+        await tx.delete(salesOrderLineItems).where(eq(salesOrderLineItems.salesOrderId, id));
+        
+        if (lineItems.length > 0) {
+          await tx.insert(salesOrderLineItems).values(
+            lineItems.map(item => ({
+              ...item,
+              salesOrderId: id,
+            })) as any
+          );
+        }
+      }
+
+      const result = await tx.query.salesOrders.findFirst({
+        where: eq(salesOrders.id, id),
+        with: { customer: true, lineItems: true },
+      });
+      return result as SalesOrderWithDetails | undefined;
+    });
   }
 
   async deleteSalesOrder(id: number): Promise<boolean> {
@@ -1489,17 +1517,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPayment(payment: InsertPayment, splits?: Omit<InsertPaymentSplit, 'paymentId'>[]): Promise<PaymentWithDetails> {
-    const [newPayment] = await db.insert(payments).values(payment as any).returning();
-    
-    if (splits && splits.length > 0) {
-      const splitValues = splits.map(split => ({
-        ...split,
-        paymentId: newPayment.id,
-      }));
-      await db.insert(paymentSplits).values(splitValues as any);
-    }
-    
-    return this.getPayment(newPayment.id) as Promise<PaymentWithDetails>;
+    return await db.transaction(async (tx) => {
+      const [newPayment] = await tx.insert(payments).values(payment as any).returning();
+      
+      if (splits && splits.length > 0) {
+        const splitValues = splits.map(split => ({
+          ...split,
+          paymentId: newPayment.id,
+        }));
+        await tx.insert(paymentSplits).values(splitValues as any);
+      }
+      
+      const result = await tx.query.payments.findFirst({
+        where: eq(payments.id, newPayment.id),
+        with: { customer: true, supplier: true, purchaseOrder: true },
+      });
+      const paymentSplitsList = await tx.select().from(paymentSplits).where(eq(paymentSplits.paymentId, newPayment.id));
+      return { ...(result as PaymentWithDetails), splits: paymentSplitsList };
+    });
   }
 
   async deletePayment(id: number): Promise<boolean> {
@@ -2196,9 +2231,10 @@ export class DatabaseStorage implements IStorage {
       notes: notes || `Opening balance for ${account.name}`,
     });
 
-    // Update account balance
-    const currentBalance = parseFloat(account.balance || "0");
-    const newBalance = (currentBalance + parseFloat(amount)).toFixed(3);
+    // Update account balance using Decimal.js for precision
+    const currentBalance = new Decimal(account.balance || "0");
+    const addAmount = new Decimal(amount);
+    const newBalance = currentBalance.plus(addAmount).toFixed(3);
     await db.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, accountId));
 
     return { success: true, balance: newBalance };
@@ -2210,8 +2246,8 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Account not found");
     }
 
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+    const parsedAmount = new Decimal(amount);
+    if (parsedAmount.isNaN() || parsedAmount.lte(0)) {
       throw new Error("Invalid amount");
     }
 
@@ -2225,10 +2261,10 @@ export class DatabaseStorage implements IStorage {
       notes: reason || `Cash adjustment for ${account.name}`,
     });
 
-    // Update account balance
-    const currentBalance = parseFloat(account.balance || "0");
-    const balanceChange = direction === "IN" ? parsedAmount : -parsedAmount;
-    const newBalance = (currentBalance + balanceChange).toFixed(3);
+    // Update account balance using Decimal.js for precision
+    const currentBalance = new Decimal(account.balance || "0");
+    const balanceChange = direction === "IN" ? parsedAmount : parsedAmount.negated();
+    const newBalance = currentBalance.plus(balanceChange).toFixed(3);
     await db.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, accountId));
 
     return { success: true, balance: newBalance };

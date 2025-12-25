@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import crypto from "crypto";
 import { storage } from "./storage";
@@ -7,6 +7,65 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupAuth, isAuthenticated, isAdmin } from "./localAuth";
 import { listBackups, getBackupDownloadUrl, createBackup } from "./backupScheduler";
 import { sendSaleNotification } from "./whatsapp";
+
+// CSRF Protection Middleware - validates Origin/Referer for mutating requests
+function csrfProtection(req: Request, res: Response, next: NextFunction) {
+  const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
+  
+  if (safeMethods.includes(req.method)) {
+    return next();
+  }
+  
+  // Allow requests without authentication (login/logout endpoints)
+  if (!req.isAuthenticated || !req.isAuthenticated()) {
+    return next();
+  }
+  
+  const origin = req.get('Origin');
+  const referer = req.get('Referer');
+  const host = req.get('Host');
+  
+  // For development, allow localhost
+  const allowedHosts = [
+    host,
+    `https://${host}`,
+    `http://${host}`,
+  ];
+  
+  // Add Replit dev URLs
+  if (host?.includes('.replit.dev') || host?.includes('.repl.co')) {
+    allowedHosts.push(`https://${host}`);
+  }
+  
+  let validOrigin = false;
+  
+  if (origin) {
+    validOrigin = allowedHosts.some(allowed => allowed && origin.startsWith(allowed.split('/').slice(0, 3).join('/')));
+  } else if (referer) {
+    // Fallback to Referer if Origin is not present
+    const refererUrl = new URL(referer);
+    validOrigin = allowedHosts.some(allowed => {
+      if (!allowed) return false;
+      try {
+        const allowedUrl = new URL(allowed.startsWith('http') ? allowed : `https://${allowed}`);
+        return refererUrl.host === allowedUrl.host;
+      } catch {
+        return refererUrl.host === allowed;
+      }
+    });
+  } else {
+    // No Origin or Referer - could be direct API call, reject for safety
+    console.warn(`[CSRF] Request blocked: Missing Origin/Referer for ${req.method} ${req.path}`);
+    return res.status(403).json({ message: "CSRF validation failed: Missing origin" });
+  }
+  
+  if (!validOrigin) {
+    console.warn(`[CSRF] Request blocked: Invalid origin ${origin || referer} for host ${host}`);
+    return res.status(403).json({ message: "CSRF validation failed: Invalid origin" });
+  }
+  
+  next();
+}
 
 // Simple in-memory cache for dashboard statistics
 const dashboardCache: {
@@ -86,6 +145,9 @@ export async function registerRoutes(
   });
 
   await setupAuth(app);
+  
+  // Apply CSRF protection to all API routes (after auth setup)
+  app.use("/api", csrfProtection);
   
   const objectStorageService = new ObjectStorageService();
 
@@ -1017,6 +1079,18 @@ export async function registerRoutes(
       
       if (paymentData.direction && !PAYMENT_DIRECTIONS.includes(paymentData.direction)) {
         return res.status(400).json({ error: `Invalid payment direction. Must be one of: ${PAYMENT_DIRECTIONS.join(", ")}` });
+      }
+      
+      // Validate amount is a valid positive number
+      if (paymentData.amount) {
+        const amount = parseFloat(paymentData.amount);
+        if (isNaN(amount) || amount <= 0) {
+          return res.status(400).json({ error: "Amount must be a positive number" });
+        }
+        // Ensure amount has at most 3 decimal places (KWD precision)
+        if (!/^\d+(\.\d{1,3})?$/.test(paymentData.amount.toString().trim())) {
+          return res.status(400).json({ error: "Amount can have at most 3 decimal places" });
+        }
       }
       
       const parsed = insertPaymentSchema.safeParse(paymentData);
