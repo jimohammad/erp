@@ -227,6 +227,7 @@ export interface IStorage {
   updateAccount(id: number, name: string): Promise<Account | undefined>;
   deleteAccount(id: number): Promise<{ deleted: boolean; error?: string }>;
   addAccountOpeningBalance(accountId: number, amount: string, date: string, notes?: string): Promise<{ success: boolean; balance: string }>;
+  addAccountAdjustment(accountId: number, amount: string, direction: "IN" | "OUT", date: string, reason: string): Promise<{ success: boolean; balance: string }>;
   ensureDefaultAccounts(): Promise<void>;
   getAccountTransactions(accountId: number, startDate?: string, endDate?: string): Promise<{ date: string; description: string; type: string; amount: number; balance: number }[]>;
   createAccountTransfer(transfer: InsertAccountTransfer): Promise<AccountTransferWithDetails>;
@@ -2195,6 +2196,36 @@ export class DatabaseStorage implements IStorage {
     // Update account balance
     const currentBalance = parseFloat(account.balance || "0");
     const newBalance = (currentBalance + parseFloat(amount)).toFixed(3);
+    await db.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, accountId));
+
+    return { success: true, balance: newBalance };
+  }
+
+  async addAccountAdjustment(accountId: number, amount: string, direction: "IN" | "OUT", date: string, reason: string): Promise<{ success: boolean; balance: string }> {
+    const account = await this.getAccount(accountId);
+    if (!account) {
+      throw new Error("Account not found");
+    }
+
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      throw new Error("Invalid amount");
+    }
+
+    // Create an adjustment payment record
+    await db.insert(payments).values({
+      paymentDate: date,
+      paymentType: account.name,
+      amount: parsedAmount.toFixed(3),
+      direction: direction,
+      reference: `Adjustment - ${date}`,
+      notes: reason || `Cash adjustment for ${account.name}`,
+    });
+
+    // Update account balance
+    const currentBalance = parseFloat(account.balance || "0");
+    const balanceChange = direction === "IN" ? parsedAmount : -parsedAmount;
+    const newBalance = (currentBalance + balanceChange).toFixed(3);
     await db.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, accountId));
 
     return { success: true, balance: newBalance };

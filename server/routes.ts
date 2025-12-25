@@ -1469,6 +1469,36 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/accounts/:id/adjustment", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid account ID" });
+      }
+      
+      const { amount, direction, date, reason } = req.body;
+      if (!amount || isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) {
+        return res.status(400).json({ error: "Valid positive amount is required" });
+      }
+      if (!direction || !["IN", "OUT"].includes(direction)) {
+        return res.status(400).json({ error: "Direction must be IN or OUT" });
+      }
+      if (!date) {
+        return res.status(400).json({ error: "Date is required" });
+      }
+      if (!reason || typeof reason !== "string" || reason.trim().length === 0) {
+        return res.status(400).json({ error: "Reason is required for adjustments" });
+      }
+      
+      const result = await storage.addAccountAdjustment(id, amount, direction, date, reason.trim());
+      invalidateDashboardCache();
+      res.json(result);
+    } catch (error) {
+      console.error("Error adding adjustment:", error);
+      res.status(500).json({ error: "Failed to add adjustment" });
+    }
+  });
+
   // ==================== EXPENSE MODULE ====================
 
   app.get("/api/expense-categories", isAuthenticated, async (req, res) => {

@@ -4,7 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { ArrowRightLeft, Wallet, FileText, X, Plus, Pencil, Trash2, Banknote } from "lucide-react";
+import { ArrowRightLeft, Wallet, FileText, X, Plus, Pencil, Trash2, Banknote, Settings2, TrendingUp, TrendingDown, MoreHorizontal, ArrowUpDown } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,6 +41,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { Account, AccountTransferWithDetails } from "@shared/schema";
@@ -82,6 +89,14 @@ export default function AccountsPage() {
   const [openingBalanceAmount, setOpeningBalanceAmount] = useState("");
   const [openingBalanceDate, setOpeningBalanceDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [openingBalanceNotes, setOpeningBalanceNotes] = useState("");
+  
+  // Adjustment state
+  const [adjustmentDialogOpen, setAdjustmentDialogOpen] = useState(false);
+  const [adjustmentAccount, setAdjustmentAccount] = useState<Account | null>(null);
+  const [adjustmentAmount, setAdjustmentAmount] = useState("");
+  const [adjustmentDirection, setAdjustmentDirection] = useState<"IN" | "OUT">("IN");
+  const [adjustmentDate, setAdjustmentDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [adjustmentReason, setAdjustmentReason] = useState("");
 
   const { data: accounts = [], isLoading: accountsLoading } = useQuery<Account[]>({
     queryKey: ["/api/accounts"],
@@ -207,7 +222,6 @@ export default function AccountsPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
-      // Invalidate all transaction queries for the affected account (including filtered ones)
       queryClient.invalidateQueries({ 
         predicate: (query) => {
           const key = query.queryKey;
@@ -220,7 +234,6 @@ export default function AccountsPage() {
           return false;
         }
       });
-      // Also invalidate current transactions query key if selected account matches
       if (selectedAccount && openingBalanceAccount && selectedAccount.id === openingBalanceAccount.id) {
         queryClient.invalidateQueries({ queryKey: [transactionsQueryKey] });
       }
@@ -232,6 +245,42 @@ export default function AccountsPage() {
     },
     onError: (error: any) => {
       toast({ title: "Failed to add opening balance", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const addAdjustmentMutation = useMutation({
+    mutationFn: async ({ accountId, amount, direction, date, reason }: { 
+      accountId: number; 
+      amount: string; 
+      direction: "IN" | "OUT"; 
+      date: string; 
+      reason: string 
+    }) => {
+      return apiRequest("POST", `/api/accounts/${accountId}/adjustment`, { amount, direction, date, reason });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey;
+          if (Array.isArray(key) && key.length > 0) {
+            const firstKey = key[0];
+            return typeof firstKey === 'string' && 
+              firstKey.includes('/api/accounts/') && 
+              firstKey.includes('/transactions');
+          }
+          return false;
+        }
+      });
+      setAdjustmentDialogOpen(false);
+      setAdjustmentAccount(null);
+      setAdjustmentAmount("");
+      setAdjustmentReason("");
+      setAdjustmentDirection("IN");
+      toast({ title: "Adjustment recorded successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to add adjustment", description: error.message, variant: "destructive" });
     },
   });
 
@@ -253,10 +302,26 @@ export default function AccountsPage() {
     setOpeningBalanceDialogOpen(true);
   };
 
+  const handleAdjustment = (account: Account) => {
+    setAdjustmentAccount(account);
+    setAdjustmentAmount("");
+    setAdjustmentDate(format(new Date(), "yyyy-MM-dd"));
+    setAdjustmentReason("");
+    setAdjustmentDirection("IN");
+    setAdjustmentDialogOpen(true);
+  };
+
+  // Calculate total balance
+  const totalBalance = accounts.reduce((sum, acc) => sum + parseFloat(acc.balance || "0"), 0);
+
   return (
     <div className="flex flex-col h-full">
+      {/* Header */}
       <header className="flex items-center justify-between gap-4 p-4 border-b flex-wrap">
-        <h1 className="text-2xl font-semibold" data-testid="heading-accounts">Accounts</h1>
+        <div>
+          <h1 className="text-2xl font-semibold" data-testid="heading-accounts">Accounts</h1>
+          <p className="text-sm text-muted-foreground">Manage cash, bank accounts and balances</p>
+        </div>
         <div className="flex items-center gap-2 flex-wrap">
           {isAdmin && (
             <Button variant="outline" onClick={() => { setAccountName(""); setAddAccountDialogOpen(true); }} data-testid="button-add-account">
@@ -271,186 +336,203 @@ export default function AccountsPage() {
                 Transfer
               </Button>
             </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Transfer Between Accounts</DialogTitle>
-            </DialogHeader>
-            <Form {...transferForm}>
-              <form onSubmit={transferForm.handleSubmit((data) => createTransferMutation.mutate(data))} className="space-y-4">
-                <FormField
-                  control={transferForm.control}
-                  name="transferDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Date</FormLabel>
-                      <FormControl>
-                        <Input type="date" data-testid="input-transfer-date" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={transferForm.control}
-                  name="fromAccountId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>From Account</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Transfer Between Accounts</DialogTitle>
+              </DialogHeader>
+              <Form {...transferForm}>
+                <form onSubmit={transferForm.handleSubmit((data) => createTransferMutation.mutate(data))} className="space-y-4">
+                  <FormField
+                    control={transferForm.control}
+                    name="transferDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Date</FormLabel>
                         <FormControl>
-                          <SelectTrigger data-testid="select-from-account">
-                            <SelectValue placeholder="Select source account" />
-                          </SelectTrigger>
+                          <Input type="date" data-testid="input-transfer-date" {...field} />
                         </FormControl>
-                        <SelectContent>
-                          {accounts.map((acc) => (
-                            <SelectItem key={acc.id} value={acc.id.toString()}>
-                              {acc.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={transferForm.control}
-                  name="toAccountId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>To Account</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-to-account">
-                            <SelectValue placeholder="Select destination account" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {accounts
-                            .filter((acc) => acc.id.toString() !== fromAccountId)
-                            .map((acc) => (
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={transferForm.control}
+                    name="fromAccountId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>From Account</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-from-account">
+                              <SelectValue placeholder="Select source account" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {accounts.map((acc) => (
                               <SelectItem key={acc.id} value={acc.id.toString()}>
                                 {acc.name}
                               </SelectItem>
                             ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={transferForm.control}
-                  name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Amount (KWD)</FormLabel>
-                      <FormControl>
-                        <Input type="number" step="0.001" min="0" data-testid="input-transfer-amount" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={transferForm.control}
-                  name="notes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Notes (Optional)</FormLabel>
-                      <FormControl>
-                        <Textarea data-testid="input-transfer-notes" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button type="submit" className="w-full" disabled={createTransferMutation.isPending} data-testid="button-submit-transfer">
-                  {createTransferMutation.isPending ? "Processing..." : "Complete Transfer"}
-                </Button>
-              </form>
-            </Form>
-          </DialogContent>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={transferForm.control}
+                    name="toAccountId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>To Account</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-to-account">
+                              <SelectValue placeholder="Select destination account" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {accounts
+                              .filter((acc) => acc.id.toString() !== fromAccountId)
+                              .map((acc) => (
+                                <SelectItem key={acc.id} value={acc.id.toString()}>
+                                  {acc.name}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={transferForm.control}
+                    name="amount"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Amount (KWD)</FormLabel>
+                        <FormControl>
+                          <Input type="number" step="0.001" min="0" data-testid="input-transfer-amount" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={transferForm.control}
+                    name="notes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Notes (Optional)</FormLabel>
+                        <FormControl>
+                          <Textarea data-testid="input-transfer-notes" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button type="submit" className="w-full" disabled={createTransferMutation.isPending} data-testid="button-submit-transfer">
+                    {createTransferMutation.isPending ? "Processing..." : "Complete Transfer"}
+                  </Button>
+                </form>
+              </Form>
+            </DialogContent>
           </Dialog>
         </div>
       </header>
 
-      <div className="flex-1 overflow-auto p-4">
-        <div className="grid gap-4 md:grid-cols-5 mb-6">
-          {accountsLoading ? (
-            <div className="col-span-5 text-center text-muted-foreground py-8">Loading accounts...</div>
-          ) : (
-            accounts.map((account) => (
-              <Card 
-                key={account.id} 
-                className={`cursor-pointer transition-colors ${
-                  selectedAccount?.id === account.id ? "ring-2 ring-primary" : ""
-                }`}
-                onClick={() => setSelectedAccount(account)}
-                data-testid={`card-account-${account.id}`}
-              >
-                <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
-                  <CardTitle className="text-sm font-medium">{account.name}</CardTitle>
-                  <div className="flex items-center gap-1">
-                    {isAdmin && (
-                      <>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-6 w-6"
-                          onClick={(e) => { e.stopPropagation(); handleOpeningBalance(account); }}
-                          title="Add Opening Balance"
-                          data-testid={`button-opening-balance-${account.id}`}
-                        >
-                          <Banknote className="w-3 h-3" />
-                        </Button>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-6 w-6"
-                          onClick={(e) => { e.stopPropagation(); handleEditAccount(account); }}
-                          title="Edit Account"
-                          data-testid={`button-edit-account-${account.id}`}
-                        >
-                          <Pencil className="w-3 h-3" />
-                        </Button>
-                        <Button 
-                          size="icon" 
-                          variant="ghost" 
-                          className="h-6 w-6 text-destructive"
-                          onClick={(e) => { 
-                            e.stopPropagation(); 
-                            if (confirm(`Are you sure you want to delete ${account.name}?`)) {
-                              deleteAccountMutation.mutate(account.id);
-                            }
-                          }}
-                          title="Delete Account"
-                          data-testid={`button-delete-account-${account.id}`}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
-                      </>
-                    )}
-                    <Wallet className="w-4 h-4 text-muted-foreground" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-xl font-bold" data-testid={`text-balance-${account.id}`}>
-                    {parseFloat(account.balance || "0").toFixed(3)} KWD
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
+      <div className="flex-1 overflow-auto p-4 space-y-6">
+        {/* Total Balance Summary */}
+        <Card className="bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-sm text-muted-foreground">Total Balance (All Accounts)</p>
+                <p className="text-3xl font-bold tabular-nums" data-testid="text-total-balance">
+                  {totalBalance.toFixed(3)} <span className="text-lg font-normal text-muted-foreground">KWD</span>
+                </p>
+              </div>
+              <Wallet className="w-10 h-10 text-primary/50" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Account Cards Grid */}
+        <div>
+          <h2 className="text-lg font-semibold mb-3">Account Balances</h2>
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+            {accountsLoading ? (
+              <div className="col-span-full text-center text-muted-foreground py-8">Loading accounts...</div>
+            ) : (
+              accounts.map((account) => (
+                <Card 
+                  key={account.id} 
+                  className={`cursor-pointer transition-all hover-elevate ${
+                    selectedAccount?.id === account.id ? "ring-2 ring-primary shadow-md" : ""
+                  }`}
+                  onClick={() => setSelectedAccount(account)}
+                  data-testid={`card-account-${account.id}`}
+                >
+                  <CardHeader className="p-3 pb-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <CardTitle className="text-sm font-medium truncate">{account.name}</CardTitle>
+                      {isAdmin && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" data-testid={`button-account-menu-${account.id}`}>
+                              <MoreHorizontal className="w-3.5 h-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                            <DropdownMenuItem onClick={() => handleAdjustment(account)} data-testid={`menu-adjustment-${account.id}`}>
+                              <ArrowUpDown className="w-4 h-4 mr-2" />
+                              Cash Adjustment
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpeningBalance(account)} data-testid={`menu-opening-balance-${account.id}`}>
+                              <Banknote className="w-4 h-4 mr-2" />
+                              Opening Balance
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem onClick={() => handleEditAccount(account)} data-testid={`menu-edit-${account.id}`}>
+                              <Pencil className="w-4 h-4 mr-2" />
+                              Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => {
+                                if (confirm(`Are you sure you want to delete ${account.name}? This cannot be undone.`)) {
+                                  deleteAccountMutation.mutate(account.id);
+                                }
+                              }}
+                              data-testid={`menu-delete-${account.id}`}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <div className="text-lg font-bold tabular-nums" data-testid={`text-balance-${account.id}`}>
+                      {parseFloat(account.balance || "0").toFixed(3)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">KWD</div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
         </div>
 
+        {/* Account Statement */}
         {selectedAccount && (
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap pb-3">
               <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                <CardTitle>{selectedAccount.name} - Statement</CardTitle>
+                <FileText className="w-5 h-5 text-primary" />
+                <CardTitle className="text-lg">{selectedAccount.name} - Statement</CardTitle>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 <Input
@@ -476,90 +558,96 @@ export default function AccountsPage() {
                 )}
               </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-0">
               {transactionsLoading ? (
                 <div className="text-center py-8 text-muted-foreground">Loading transactions...</div>
               ) : transactions.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">No transactions found</div>
               ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead className="text-right">Amount (KWD)</TableHead>
-                      <TableHead className="text-right">Balance (KWD)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transactions.map((tx, index) => (
-                      <TableRow key={index} data-testid={`row-transaction-${index}`}>
-                        <TableCell>{tx.date}</TableCell>
-                        <TableCell>{tx.description}</TableCell>
-                        <TableCell>
-                          <Badge variant={tx.amount >= 0 ? "default" : "secondary"}>
-                            {tx.type}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className={`text-right font-medium ${tx.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                          {tx.amount >= 0 ? "+" : ""}{tx.amount.toFixed(3)}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {tx.balance.toFixed(3)}
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-[100px]">Date</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead className="w-[100px]">Type</TableHead>
+                        <TableHead className="text-right w-[120px]">Amount</TableHead>
+                        <TableHead className="text-right w-[120px]">Balance</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    </TableHeader>
+                    <TableBody>
+                      {transactions.map((tx, index) => (
+                        <TableRow key={index} data-testid={`row-transaction-${index}`}>
+                          <TableCell className="text-sm">{tx.date}</TableCell>
+                          <TableCell className="text-sm">{tx.description}</TableCell>
+                          <TableCell>
+                            <Badge variant={tx.amount >= 0 ? "default" : "secondary"} className="text-xs">
+                              {tx.type}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className={`text-right font-medium tabular-nums ${tx.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                            {tx.amount >= 0 ? "+" : ""}{tx.amount.toFixed(3)}
+                          </TableCell>
+                          <TableCell className="text-right font-medium tabular-nums">
+                            {tx.balance.toFixed(3)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               )}
             </CardContent>
           </Card>
         )}
 
         {!selectedAccount && (
-          <Card>
-            <CardContent className="py-8">
+          <Card className="border-dashed">
+            <CardContent className="py-12">
               <div className="text-center text-muted-foreground">
-                Select an account above to view its statement
+                <Wallet className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p>Select an account above to view its statement</p>
               </div>
             </CardContent>
           </Card>
         )}
 
+        {/* Recent Transfers */}
         {transfers.length > 0 && (
-          <Card className="mt-4">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ArrowRightLeft className="w-5 h-5" />
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <ArrowRightLeft className="w-5 h-5 text-primary" />
                 Recent Transfers
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>From</TableHead>
-                    <TableHead>To</TableHead>
-                    <TableHead className="text-right">Amount (KWD)</TableHead>
-                    <TableHead>Notes</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transfers.map((transfer) => (
-                    <TableRow key={transfer.id} data-testid={`row-transfer-${transfer.id}`}>
-                      <TableCell>{transfer.transferDate}</TableCell>
-                      <TableCell>{transfer.fromAccount?.name || "-"}</TableCell>
-                      <TableCell>{transfer.toAccount?.name || "-"}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {parseFloat(transfer.amount).toFixed(3)}
-                      </TableCell>
-                      <TableCell>{transfer.notes || "-"}</TableCell>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-[100px]">Date</TableHead>
+                      <TableHead>From</TableHead>
+                      <TableHead>To</TableHead>
+                      <TableHead className="text-right w-[120px]">Amount</TableHead>
+                      <TableHead>Notes</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {transfers.slice(0, 10).map((transfer) => (
+                      <TableRow key={transfer.id} data-testid={`row-transfer-${transfer.id}`}>
+                        <TableCell className="text-sm">{transfer.transferDate}</TableCell>
+                        <TableCell>{transfer.fromAccount?.name || "-"}</TableCell>
+                        <TableCell>{transfer.toAccount?.name || "-"}</TableCell>
+                        <TableCell className="text-right font-medium tabular-nums">
+                          {parseFloat(transfer.amount).toFixed(3)} KWD
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{transfer.notes || "-"}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         )}
@@ -597,7 +685,7 @@ export default function AccountsPage() {
       <Dialog open={!!editingAccount} onOpenChange={(open) => { if (!open) setEditingAccount(null); }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Account</DialogTitle>
+            <DialogTitle>Rename Account</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -669,6 +757,88 @@ export default function AccountsPage() {
               data-testid="button-submit-opening-balance"
             >
               {addOpeningBalanceMutation.isPending ? "Adding..." : "Add Opening Balance"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cash Adjustment Dialog */}
+      <Dialog open={adjustmentDialogOpen} onOpenChange={setAdjustmentDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cash Adjustment - {adjustmentAccount?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={adjustmentDirection === "IN" ? "default" : "outline"}
+                className={`flex-1 ${adjustmentDirection === "IN" ? "" : ""}`}
+                onClick={() => setAdjustmentDirection("IN")}
+                data-testid="button-adjustment-in"
+              >
+                <TrendingUp className="w-4 h-4 mr-2" />
+                Increase
+              </Button>
+              <Button
+                type="button"
+                variant={adjustmentDirection === "OUT" ? "destructive" : "outline"}
+                className="flex-1"
+                onClick={() => setAdjustmentDirection("OUT")}
+                data-testid="button-adjustment-out"
+              >
+                <TrendingDown className="w-4 h-4 mr-2" />
+                Decrease
+              </Button>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Date</label>
+              <Input
+                type="date"
+                value={adjustmentDate}
+                onChange={(e) => setAdjustmentDate(e.target.value)}
+                data-testid="input-adjustment-date"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Amount (KWD)</label>
+              <Input
+                type="number"
+                step="0.001"
+                min="0"
+                value={adjustmentAmount}
+                onChange={(e) => setAdjustmentAmount(e.target.value)}
+                placeholder="Enter adjustment amount"
+                data-testid="input-adjustment-amount"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Reason <span className="text-destructive">*</span></label>
+              <Textarea
+                value={adjustmentReason}
+                onChange={(e) => setAdjustmentReason(e.target.value)}
+                placeholder="e.g., Cash counting correction, Petty cash reconciliation"
+                data-testid="input-adjustment-reason"
+              />
+            </div>
+            {adjustmentDirection === "OUT" && (
+              <div className="p-3 bg-destructive/10 rounded-md text-sm text-destructive">
+                This will decrease the account balance by {adjustmentAmount || "0"} KWD
+              </div>
+            )}
+            <Button 
+              className="w-full" 
+              onClick={() => adjustmentAccount && addAdjustmentMutation.mutate({ 
+                accountId: adjustmentAccount.id, 
+                amount: adjustmentAmount, 
+                direction: adjustmentDirection,
+                date: adjustmentDate,
+                reason: adjustmentReason
+              })}
+              disabled={addAdjustmentMutation.isPending || !adjustmentAmount || !adjustmentDate || !adjustmentReason.trim()}
+              data-testid="button-submit-adjustment"
+            >
+              {addAdjustmentMutation.isPending ? "Processing..." : "Apply Adjustment"}
             </Button>
           </div>
         </DialogContent>
