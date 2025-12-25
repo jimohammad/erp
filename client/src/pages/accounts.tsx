@@ -537,7 +537,7 @@ export default function AccountsPage() {
                         {isAdmin && (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 -mr-1 -mt-1" data-testid={`button-account-menu-${account.id}`}>
+                              <Button size="icon" variant="outline" className="shrink-0" data-testid={`button-account-menu-${account.id}`}>
                                 <MoreHorizontal className="w-4 h-4" />
                               </Button>
                             </DropdownMenuTrigger>
