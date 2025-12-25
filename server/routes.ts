@@ -1067,11 +1067,12 @@ export async function registerRoutes(
   app.post("/api/payments", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user?.claims?.sub;
-      const { splits, ...paymentBody } = req.body;
+      const { splits, chequeDetails, ...paymentBody } = req.body;
       const paymentData = { ...paymentBody, createdBy: userId };
       
       console.log("[Payment] Received payment data:", JSON.stringify(paymentData, null, 2));
       console.log("[Payment] Received splits:", JSON.stringify(splits, null, 2));
+      console.log("[Payment] Received cheque details:", JSON.stringify(chequeDetails, null, 2));
       
       if (!PAYMENT_TYPES.includes(paymentData.paymentType)) {
         return res.status(400).json({ error: `Invalid payment type. Must be one of: ${PAYMENT_TYPES.join(", ")}` });
@@ -1079,6 +1080,16 @@ export async function registerRoutes(
       
       if (paymentData.direction && !PAYMENT_DIRECTIONS.includes(paymentData.direction)) {
         return res.status(400).json({ error: `Invalid payment direction. Must be one of: ${PAYMENT_DIRECTIONS.join(", ")}` });
+      }
+      
+      // Validate cheque details if payment type is Cheque
+      if (paymentData.paymentType === "Cheque") {
+        if (!chequeDetails) {
+          return res.status(400).json({ error: "Cheque details are required for cheque payments" });
+        }
+        if (!chequeDetails.chequeNumber || !chequeDetails.bankName || !chequeDetails.chequeDate) {
+          return res.status(400).json({ error: "Cheque number, bank name, and cheque date are required" });
+        }
       }
       
       // Validate amount is a valid positive number
@@ -1113,7 +1124,7 @@ export async function registerRoutes(
         }
       }
       
-      const payment = await storage.createPayment(parsed.data, splits);
+      const payment = await storage.createPayment(parsed.data, splits, paymentData.paymentType === "Cheque" ? chequeDetails : undefined);
       
       // Audit log for payment creation
       await createAuditLog(
@@ -1167,6 +1178,79 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error deleting payment:", error);
       res.status(500).json({ error: "Failed to delete payment" });
+    }
+  });
+
+  // ==================== CHEQUE PAYMENTS ====================
+
+  app.get("/api/cheques", isAuthenticated, async (req, res) => {
+    try {
+      const status = req.query.status as string | undefined;
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const cheques = await storage.getChequePayments({ status, startDate, endDate });
+      res.json(cheques);
+    } catch (error) {
+      console.error("Error fetching cheque payments:", error);
+      res.status(500).json({ error: "Failed to fetch cheque payments" });
+    }
+  });
+
+  app.get("/api/cheques/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid cheque ID" });
+      }
+      const cheque = await storage.getChequePayment(id);
+      if (!cheque) {
+        return res.status(404).json({ error: "Cheque payment not found" });
+      }
+      res.json(cheque);
+    } catch (error) {
+      console.error("Error fetching cheque payment:", error);
+      res.status(500).json({ error: "Failed to fetch cheque payment" });
+    }
+  });
+
+  app.put("/api/cheques/:id/status", isAuthenticated, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid cheque ID" });
+      }
+      
+      const { status, clearingDate, bounceReason } = req.body;
+      
+      if (!status || !["pending", "cleared", "bounced", "cancelled"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status. Must be one of: pending, cleared, bounced, cancelled" });
+      }
+      
+      if (status === "bounced" && !bounceReason) {
+        return res.status(400).json({ error: "Bounce reason is required when marking cheque as bounced" });
+      }
+      
+      const updated = await storage.updateChequeStatus(id, status, clearingDate, bounceReason);
+      if (!updated) {
+        return res.status(404).json({ error: "Cheque payment not found" });
+      }
+      
+      // Audit log for cheque status update
+      await createAuditLog(
+        req,
+        "cheque_payment",
+        "update",
+        id,
+        `CHQ-${id}`,
+        null,
+        { status, clearingDate, bounceReason },
+        null
+      );
+      
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating cheque status:", error);
+      res.status(500).json({ error: "Failed to update cheque status" });
     }
   });
 
