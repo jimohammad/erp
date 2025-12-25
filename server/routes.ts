@@ -8,7 +8,8 @@ import { setupAuth, isAuthenticated, isAdmin } from "./localAuth";
 import { listBackups, getBackupDownloadUrl, createBackup } from "./backupScheduler";
 import { sendSaleNotification } from "./whatsapp";
 
-// CSRF Protection Middleware - validates Origin/Referer for mutating requests
+// CSRF Protection Middleware - validates Origin/Referer against configured allowed origins
+// Uses environment-driven allowlist, not request Host header (prevents spoofing)
 function csrfProtection(req: Request, res: Response, next: NextFunction) {
   const safeMethods = ['GET', 'HEAD', 'OPTIONS'];
   
@@ -23,44 +24,53 @@ function csrfProtection(req: Request, res: Response, next: NextFunction) {
   
   const origin = req.get('Origin');
   const referer = req.get('Referer');
-  const host = req.get('Host');
   
-  // For development, allow localhost
-  const allowedHosts = [
-    host,
-    `https://${host}`,
-    `http://${host}`,
-  ];
+  // Build allowed origins from environment or known safe patterns
+  // NEVER trust the incoming Host header for security decisions
+  const allowedOrigins: string[] = [];
   
-  // Add Replit dev URLs
-  if (host?.includes('.replit.dev') || host?.includes('.repl.co')) {
-    allowedHosts.push(`https://${host}`);
+  // Add configured allowed origins from environment
+  if (process.env.ALLOWED_ORIGINS) {
+    allowedOrigins.push(...process.env.ALLOWED_ORIGINS.split(',').map(o => o.trim()));
   }
   
-  let validOrigin = false;
+  // Add Replit domain patterns (safe - controlled by Replit infrastructure)
+  const replitSlug = process.env.REPL_SLUG;
+  const replitOwner = process.env.REPL_OWNER;
+  if (replitSlug && replitOwner) {
+    // Standard Replit URLs
+    allowedOrigins.push(`https://${replitSlug}.${replitOwner}.repl.co`);
+    allowedOrigins.push(`https://${replitSlug}-${replitOwner}.replit.dev`);
+  }
   
-  if (origin) {
-    validOrigin = allowedHosts.some(allowed => allowed && origin.startsWith(allowed.split('/').slice(0, 3).join('/')));
-  } else if (referer) {
-    // Fallback to Referer if Origin is not present
-    const refererUrl = new URL(referer);
-    validOrigin = allowedHosts.some(allowed => {
-      if (!allowed) return false;
-      try {
-        const allowedUrl = new URL(allowed.startsWith('http') ? allowed : `https://${allowed}`);
-        return refererUrl.host === allowedUrl.host;
-      } catch {
-        return refererUrl.host === allowed;
-      }
-    });
-  } else {
-    // No Origin or Referer - could be direct API call, reject for safety
+  // Add localhost for development
+  if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push('http://localhost:5000', 'http://127.0.0.1:5000', 'http://0.0.0.0:5000');
+  }
+  
+  // Validate origin or referer against allowlist
+  let validOrigin = false;
+  const checkOrigin = origin || (referer ? new URL(referer).origin : null);
+  
+  if (!checkOrigin) {
     console.warn(`[CSRF] Request blocked: Missing Origin/Referer for ${req.method} ${req.path}`);
     return res.status(403).json({ message: "CSRF validation failed: Missing origin" });
   }
   
+  // Check against allowed origins
+  validOrigin = allowedOrigins.some(allowed => {
+    if (!allowed) return false;
+    // Exact match or pattern match for Replit dev domains
+    if (checkOrigin === allowed) return true;
+    // Allow any replit.dev or repl.co subdomain (Replit-controlled infrastructure)
+    if (checkOrigin.endsWith('.replit.dev') || checkOrigin.endsWith('.repl.co')) {
+      return true;
+    }
+    return false;
+  });
+  
   if (!validOrigin) {
-    console.warn(`[CSRF] Request blocked: Invalid origin ${origin || referer} for host ${host}`);
+    console.warn(`[CSRF] Request blocked: Invalid origin ${checkOrigin}`);
     return res.status(403).json({ message: "CSRF validation failed: Invalid origin" });
   }
   

@@ -13,9 +13,14 @@ function validateEnvironment(): void {
     process.exit(1);
   }
   
-  // Warn about optional but recommended vars
+  // SESSION_SECRET is required in production - fail fast if not set
   if (!process.env.SESSION_SECRET) {
-    console.warn("[WARN] SESSION_SECRET not set - using default (not recommended for production)");
+    if (process.env.NODE_ENV === 'production') {
+      console.error("[FATAL] SESSION_SECRET is required in production - cannot start server");
+      process.exit(1);
+    } else {
+      console.warn("[WARN] SESSION_SECRET not set - using default (development only)");
+    }
   }
 }
 
