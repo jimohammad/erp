@@ -3412,7 +3412,73 @@ export class DatabaseStorage implements IStorage {
       results.push({ type: 'Payment', id: row.id, title: row.reference || 'Payment', subtitle: row.payment_type, url: '/payments' });
     }
 
-    return results.slice(0, 20);
+    // Search salesmen
+    const salesmenResults = await db.execute(sql`
+      SELECT id, name, phone FROM salesmen 
+      WHERE name ILIKE ${searchPattern} OR phone ILIKE ${searchPattern}
+      LIMIT 5
+    `);
+    for (const row of salesmenResults.rows as { id: number; name: string; phone: string | null }[]) {
+      results.push({ type: 'Salesman', id: row.id, title: row.name, subtitle: row.phone || '', url: '/parties' });
+    }
+
+    // Search IMEI numbers in sales line items
+    const imeiResults = await db.execute(sql`
+      SELECT sli.id, sli.imei, sli.item_name, so.invoice_number
+      FROM sales_order_line_items sli
+      JOIN sales_orders so ON sli.sales_order_id = so.id
+      WHERE sli.imei ILIKE ${searchPattern}
+      LIMIT 5
+    `);
+    for (const row of imeiResults.rows as { id: number; imei: string; item_name: string; invoice_number: string }[]) {
+      results.push({ type: 'IMEI', id: row.id, title: row.imei, subtitle: `${row.item_name} - ${row.invoice_number}`, url: '/imei-history' });
+    }
+
+    // Search IMEI in purchase line items
+    const purchaseImeiResults = await db.execute(sql`
+      SELECT pli.id, pli.imei, pli.item_name, po.invoice_number
+      FROM purchase_order_line_items pli
+      JOIN purchase_orders po ON pli.purchase_order_id = po.id
+      WHERE pli.imei ILIKE ${searchPattern}
+      LIMIT 5
+    `);
+    for (const row of purchaseImeiResults.rows as { id: number; imei: string; item_name: string; invoice_number: string }[]) {
+      results.push({ type: 'IMEI (Purchase)', id: row.id, title: row.imei, subtitle: `${row.item_name} - ${row.invoice_number}`, url: '/imei-history' });
+    }
+
+    // Search expenses by description or category
+    const expenseResults = await db.execute(sql`
+      SELECT id, description, category FROM expenses 
+      WHERE description ILIKE ${searchPattern} OR category ILIKE ${searchPattern}
+      LIMIT 5
+    `);
+    for (const row of expenseResults.rows as { id: number; description: string; category: string }[]) {
+      results.push({ type: 'Expense', id: row.id, title: row.description, subtitle: row.category, url: '/expenses' });
+    }
+
+    // Search returns by invoice number
+    const returnsResults = await db.execute(sql`
+      SELECT r.id, r.invoice_number, r.return_type
+      FROM returns r
+      WHERE r.invoice_number ILIKE ${searchPattern}
+      LIMIT 5
+    `);
+    for (const row of returnsResults.rows as { id: number; invoice_number: string; return_type: string }[]) {
+      const typeLabel = row.return_type === 'sale_return' ? 'Sale Return' : 'Purchase Return';
+      results.push({ type: typeLabel, id: row.id, title: `Return: ${row.invoice_number}`, subtitle: '', url: '/returns' });
+    }
+
+    // Search accounts by name
+    const accountResults = await db.execute(sql`
+      SELECT id, name, account_type FROM accounts 
+      WHERE name ILIKE ${searchPattern}
+      LIMIT 5
+    `);
+    for (const row of accountResults.rows as { id: number; name: string; account_type: string }[]) {
+      results.push({ type: 'Account', id: row.id, title: row.name, subtitle: row.account_type, url: '/accounts' });
+    }
+
+    return results.slice(0, 30);
   }
 
   // ==================== PROFIT AND LOSS ====================
