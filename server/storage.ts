@@ -223,6 +223,10 @@ export interface IStorage {
   // Accounts Module
   getAccounts(): Promise<Account[]>;
   getAccount(id: number): Promise<Account | undefined>;
+  createAccount(name: string): Promise<Account>;
+  updateAccount(id: number, name: string): Promise<Account | undefined>;
+  deleteAccount(id: number): Promise<{ deleted: boolean; error?: string }>;
+  addAccountOpeningBalance(accountId: number, amount: string, date: string, notes?: string): Promise<{ success: boolean; balance: string }>;
   ensureDefaultAccounts(): Promise<void>;
   getAccountTransactions(accountId: number, startDate?: string, endDate?: string): Promise<{ date: string; description: string; type: string; amount: number; balance: number }[]>;
   createAccountTransfer(transfer: InsertAccountTransfer): Promise<AccountTransferWithDetails>;
@@ -2134,6 +2138,66 @@ export class DatabaseStorage implements IStorage {
   async getAccount(id: number): Promise<Account | undefined> {
     const [account] = await db.select().from(accounts).where(eq(accounts.id, id));
     return account || undefined;
+  }
+
+  async createAccount(name: string): Promise<Account> {
+    const [account] = await db.insert(accounts).values({ name, balance: "0" }).returning();
+    return account;
+  }
+
+  async updateAccount(id: number, name: string): Promise<Account | undefined> {
+    const [updated] = await db.update(accounts).set({ name }).where(eq(accounts.id, id)).returning();
+    return updated || undefined;
+  }
+
+  async deleteAccount(id: number): Promise<{ deleted: boolean; error?: string }> {
+    // Check if account has any transactions
+    const account = await this.getAccount(id);
+    if (!account) {
+      return { deleted: false, error: "Account not found" };
+    }
+
+    // Check for transfers using this account
+    const transfersFrom = await db.select().from(accountTransfers).where(eq(accountTransfers.fromAccountId, id)).limit(1);
+    const transfersTo = await db.select().from(accountTransfers).where(eq(accountTransfers.toAccountId, id)).limit(1);
+    
+    if (transfersFrom.length > 0 || transfersTo.length > 0) {
+      return { deleted: false, error: "Cannot delete account with existing transfers" };
+    }
+
+    // Check for payments using this account name as payment type
+    const paymentsUsing = await db.select().from(payments).where(eq(payments.paymentType, account.name)).limit(1);
+    if (paymentsUsing.length > 0) {
+      return { deleted: false, error: "Cannot delete account with existing payments" };
+    }
+
+    await db.delete(accounts).where(eq(accounts.id, id));
+    return { deleted: true };
+  }
+
+  async addAccountOpeningBalance(accountId: number, amount: string, date: string, notes?: string): Promise<{ success: boolean; balance: string }> {
+    const account = await this.getAccount(accountId);
+    if (!account) {
+      throw new Error("Account not found");
+    }
+
+    // Create an opening balance payment record (IN direction, to this account)
+    // We'll use a special payment type "Opening Balance" that the account transactions query will pick up
+    await db.insert(payments).values({
+      paymentDate: date,
+      paymentType: account.name,
+      amount: amount,
+      direction: "IN",
+      reference: `Opening Balance - ${date}`,
+      notes: notes || `Opening balance for ${account.name}`,
+    });
+
+    // Update account balance
+    const currentBalance = parseFloat(account.balance || "0");
+    const newBalance = (currentBalance + parseFloat(amount)).toFixed(3);
+    await db.update(accounts).set({ balance: newBalance }).where(eq(accounts.id, accountId));
+
+    return { success: true, balance: newBalance };
   }
 
   async ensureDefaultAccounts(): Promise<void> {

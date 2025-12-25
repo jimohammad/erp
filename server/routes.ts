@@ -1376,6 +1376,99 @@ export async function registerRoutes(
     }
   });
 
+  // Account Management (Admin only)
+  app.post("/api/accounts", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const { name } = req.body;
+      if (!name || typeof name !== "string" || name.trim().length === 0) {
+        return res.status(400).json({ error: "Account name is required" });
+      }
+      
+      // Check for duplicate name
+      const existingAccounts = await storage.getAccounts();
+      if (existingAccounts.some(a => a.name.toLowerCase() === name.trim().toLowerCase())) {
+        return res.status(400).json({ error: "An account with this name already exists" });
+      }
+      
+      const account = await storage.createAccount(name.trim());
+      res.status(201).json(account);
+    } catch (error) {
+      console.error("Error creating account:", error);
+      res.status(500).json({ error: "Failed to create account" });
+    }
+  });
+
+  app.put("/api/accounts/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid account ID" });
+      }
+      
+      const { name } = req.body;
+      if (!name || typeof name !== "string" || name.trim().length === 0) {
+        return res.status(400).json({ error: "Account name is required" });
+      }
+      
+      // Check for duplicate name (excluding current account)
+      const existingAccounts = await storage.getAccounts();
+      if (existingAccounts.some(a => a.id !== id && a.name.toLowerCase() === name.trim().toLowerCase())) {
+        return res.status(400).json({ error: "An account with this name already exists" });
+      }
+      
+      const account = await storage.updateAccount(id, name.trim());
+      if (!account) {
+        return res.status(404).json({ error: "Account not found" });
+      }
+      res.json(account);
+    } catch (error) {
+      console.error("Error updating account:", error);
+      res.status(500).json({ error: "Failed to update account" });
+    }
+  });
+
+  app.delete("/api/accounts/:id", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid account ID" });
+      }
+      
+      const result = await storage.deleteAccount(id);
+      if (!result.deleted) {
+        return res.status(400).json({ error: result.error || "Failed to delete account" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      res.status(500).json({ error: "Failed to delete account" });
+    }
+  });
+
+  app.post("/api/accounts/:id/opening-balance", isAuthenticated, isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid account ID" });
+      }
+      
+      const { amount, date, notes } = req.body;
+      if (!amount || isNaN(parseFloat(amount))) {
+        return res.status(400).json({ error: "Valid amount is required" });
+      }
+      if (!date) {
+        return res.status(400).json({ error: "Date is required" });
+      }
+      
+      const result = await storage.addAccountOpeningBalance(id, amount, date, notes);
+      invalidateDashboardCache();
+      res.json(result);
+    } catch (error) {
+      console.error("Error adding opening balance:", error);
+      res.status(500).json({ error: "Failed to add opening balance" });
+    }
+  });
+
   // ==================== EXPENSE MODULE ====================
 
   app.get("/api/expense-categories", isAuthenticated, async (req, res) => {

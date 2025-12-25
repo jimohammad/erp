@@ -493,7 +493,7 @@ export type PaymentSplit = typeof paymentSplits.$inferSelect;
 
 // ==================== ACCOUNTS MODULE ====================
 
-export const ACCOUNT_NAMES = ["Cash", "NBK Bank", "CBK Bank", "Knet", "Wamd"] as const;
+export const ACCOUNT_NAMES = ["Cash", "NBK Bank", "CBK Bank", "Knet", "Wamd", "Safe"] as const;
 export type AccountName = typeof ACCOUNT_NAMES[number];
 
 export const accounts = pgTable("accounts", {
