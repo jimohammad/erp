@@ -3565,7 +3565,7 @@ export async function registerRoutes(
       addSheet(payments, "Payments");
       addSheet(expenses, "Expenses");
       addSheet(expenseCategories, "Expense_Categories");
-      addSheet(returns, "Returns");
+      addSheet((returns as any).data || returns, "Returns");
       addSheet(returnLineItems, "Return_Lines");
       addSheet(stockTransfers, "Stock_Transfers");
       addSheet(accountTransfers, "Account_Transfers");

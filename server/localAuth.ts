@@ -80,7 +80,8 @@ function recordLoginAttempt(ip: string, success: boolean) {
 // Clean up old entries periodically (every 30 minutes)
 setInterval(() => {
   const now = Date.now();
-  for (const [ip, data] of loginAttempts.entries()) {
+  const entries = Array.from(loginAttempts.entries());
+  for (const [ip, data] of entries) {
     // Remove entries that are unlocked and haven't had activity in 30 minutes
     if (data.lockedUntil < now && now - data.lastAttempt > 30 * 60 * 1000) {
       loginAttempts.delete(ip);

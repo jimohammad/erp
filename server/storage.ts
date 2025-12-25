@@ -1064,12 +1064,13 @@ export class DatabaseStorage implements IStorage {
       // Calculate outstanding credit by summing customer balances
       // This gets the actual current balance of customers served by this salesman
       let outstandingCredit = 0;
-      const uniqueCustomerIds = [...new Set(customerOrders.map(o => o.customerId).filter(Boolean))];
+      const customerIdSet = new Set(customerOrders.map(o => o.customerId).filter(Boolean));
+      const uniqueCustomerIds = Array.from(customerIdSet) as number[];
       
       if (uniqueCustomerIds.length > 0) {
+        const allBalances = await this.getAllCustomerBalances();
         for (const custId of uniqueCustomerIds) {
-          // Use the existing customer balance calculation  
-          const balance = await this.getCustomerBalance(custId as number);
+          const balance = allBalances.find(b => b.customerId === custId);
           if (balance && balance.balance > 0) {
             outstandingCredit += balance.balance;
           }
@@ -1167,10 +1168,12 @@ export class DatabaseStorage implements IStorage {
       const creditLimit = parseFloat(salesman.creditLimit || '0');
       
       // Get outstanding credit (current balance of customers served by this salesman)
-      const uniqueCustomerIds = [...new Set(allSalesData.map(o => o.customerId).filter(Boolean))];
+      const customerIdSet2 = new Set(allSalesData.map(o => o.customerId).filter(Boolean));
+      const uniqueCustomerIds = Array.from(customerIdSet2) as number[];
       let outstandingCredit = 0;
+      const allBalances = await this.getAllCustomerBalances();
       for (const custId of uniqueCustomerIds) {
-        const balance = await this.getCustomerBalance(custId as number);
+        const balance = allBalances.find(b => b.customerId === custId);
         if (balance && balance.balance > 0) {
           outstandingCredit += balance.balance;
         }
