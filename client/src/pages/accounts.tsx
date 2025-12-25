@@ -73,7 +73,7 @@ type TransferFormValues = z.infer<typeof transferFormSchema>;
 export default function AccountsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "superuser" || user?.role === "super_user";
   
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);

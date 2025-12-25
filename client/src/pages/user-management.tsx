@@ -318,6 +318,7 @@ export default function UserManagementPage() {
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="superuser">Superuser</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                     <SelectItem value="viewer">Viewer</SelectItem>
                   </SelectContent>

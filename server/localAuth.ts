@@ -429,14 +429,15 @@ export const isAdmin: RequestHandler = async (req, res, next) => {
     return res.status(403).json({ message: "Forbidden: Admin access required" });
   }
   
-  if (dbUser.role === "admin") {
+  // Check for superuser or admin role (superuser has highest authority)
+  if (dbUser.role === "superuser" || dbUser.role === "super_user" || dbUser.role === "admin") {
     return next();
   }
   
   const email = dbUser.email;
   if (email) {
     const assignedRole = await storage.getRoleForEmail(email);
-    if (assignedRole === "super_user" || assignedRole === "admin") {
+    if (assignedRole === "super_user" || assignedRole === "superuser" || assignedRole === "admin") {
       return next();
     }
   }

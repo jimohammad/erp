@@ -4042,9 +4042,9 @@ export async function registerRoutes(
         return res.status(400).json({ error: "Password must be at least 6 characters" });
       }
 
-      const validRoles = ["admin", "viewer"];
+      const validRoles = ["superuser", "admin", "viewer"];
       if (role && !validRoles.includes(role)) {
-        return res.status(400).json({ error: "Invalid role. Must be 'admin' or 'viewer'" });
+        return res.status(400).json({ error: "Invalid role. Must be 'superuser', 'admin' or 'viewer'" });
       }
 
       // Check if username already exists
@@ -4080,9 +4080,9 @@ export async function registerRoutes(
       const { id } = req.params;
       const { firstName, lastName, email, role } = req.body;
 
-      const validRoles = ["admin", "viewer"];
+      const validRoles = ["superuser", "admin", "viewer"];
       if (role && !validRoles.includes(role)) {
-        return res.status(400).json({ error: "Invalid role. Must be 'admin' or 'viewer'" });
+        return res.status(400).json({ error: "Invalid role. Must be 'superuser', 'admin' or 'viewer'" });
       }
 
       const updatedUser = await storage.updateUser(id, {
