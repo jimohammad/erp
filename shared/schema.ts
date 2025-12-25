@@ -402,8 +402,11 @@ export type SalesOrderWithDetails = SalesOrder & {
 
 // ==================== PAYMENT MODULE ====================
 
-export const PAYMENT_TYPES = ["Cash", "NBK Bank", "CBK Bank", "Knet", "Wamd"] as const;
+export const PAYMENT_TYPES = ["Cash", "NBK Bank", "CBK Bank", "Knet", "Wamd", "Cheque"] as const;
 export type PaymentType = typeof PAYMENT_TYPES[number];
+
+export const CHEQUE_STATUSES = ["pending", "cleared", "bounced", "cancelled"] as const;
+export type ChequeStatus = typeof CHEQUE_STATUSES[number];
 
 export const PAYMENT_DIRECTIONS = ["IN", "OUT"] as const;
 export type PaymentDirection = typeof PAYMENT_DIRECTIONS[number];
@@ -490,6 +493,51 @@ export const paymentSplitsRelations = relations(paymentSplits, ({ one }) => ({
 export const insertPaymentSplitSchema = createInsertSchema(paymentSplits).omit({ id: true });
 export type InsertPaymentSplit = z.infer<typeof insertPaymentSplitSchema>;
 export type PaymentSplit = typeof paymentSplits.$inferSelect;
+
+// ==================== CHEQUE PAYMENTS ====================
+
+export const chequePayments = pgTable("cheque_payments", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  paymentId: integer("payment_id").references(() => payments.id, { onDelete: "cascade" }).notNull(),
+  paymentSplitId: integer("payment_split_id").references(() => paymentSplits.id, { onDelete: "cascade" }),
+  chequeNumber: text("cheque_number").notNull(),
+  bankName: text("bank_name").notNull(),
+  chequeDate: date("cheque_date").notNull(),
+  depositDate: date("deposit_date"),
+  clearingDate: date("clearing_date"),
+  status: text("status").notNull().default("pending"),
+  bounceReason: text("bounce_reason"),
+  drawerName: text("drawer_name"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_cheque_payment").on(table.paymentId),
+  index("idx_cheque_status").on(table.status),
+  index("idx_cheque_clearing_date").on(table.clearingDate),
+]);
+
+export const chequePaymentsRelations = relations(chequePayments, ({ one }) => ({
+  payment: one(payments, {
+    fields: [chequePayments.paymentId],
+    references: [payments.id],
+  }),
+  paymentSplit: one(paymentSplits, {
+    fields: [chequePayments.paymentSplitId],
+    references: [paymentSplits.id],
+  }),
+}));
+
+export const insertChequePaymentSchema = createInsertSchema(chequePayments).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertChequePayment = z.infer<typeof insertChequePaymentSchema>;
+export type ChequePayment = typeof chequePayments.$inferSelect;
+
+export type ChequePaymentWithDetails = ChequePayment & {
+  payment: Payment & {
+    customer?: Customer | null;
+    supplier?: Supplier | null;
+  };
+};
 
 // ==================== ACCOUNTS MODULE ====================
 
