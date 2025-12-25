@@ -84,7 +84,7 @@ function MetricCard({
 }
 
 export default function FinancialStandingPage() {
-  const { data: standing, isLoading } = useQuery<FinancialStanding>({
+  const { data: standing, isLoading, error } = useQuery<FinancialStanding>({
     queryKey: ["/api/financial-standing"],
   });
 
@@ -96,10 +96,22 @@ export default function FinancialStandingPage() {
     );
   }
 
-  if (!standing) {
+  if (error || !standing) {
     return (
-      <div className="p-6">
-        <p className="text-muted-foreground">Unable to load financial standing data.</p>
+      <div className="p-6 space-y-4">
+        <h1 className="text-2xl font-bold">Financial Standing</h1>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-muted-foreground">
+              Unable to load financial standing data. Please try refreshing the page.
+            </p>
+            {error && (
+              <p className="text-sm text-red-500 mt-2">
+                Error: {error instanceof Error ? error.message : "Unknown error"}
+              </p>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   }
