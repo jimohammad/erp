@@ -31,14 +31,15 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Trash2, Package, Users, Building2, Shield } from "lucide-react";
+import { Plus, Trash2, Package, Users, Building2, Shield, Wallet } from "lucide-react";
 import type { 
   InventoryAdjustmentWithDetails, 
   OpeningBalanceWithDetails, 
   Item, 
   Branch, 
   Customer, 
-  Supplier 
+  Supplier,
+  Account 
 } from "@shared/schema";
 
 export default function OpeningBalances() {
@@ -64,6 +65,12 @@ export default function OpeningBalances() {
   const [balanceEffectiveDate, setBalanceEffectiveDate] = useState<string>("2025-12-31");
   const [balanceNotes, setBalanceNotes] = useState<string>("");
 
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [accountId, setAccountId] = useState<string>("");
+  const [accountAmount, setAccountAmount] = useState<string>("");
+  const [accountDate, setAccountDate] = useState<string>("2025-12-31");
+  const [accountNotes, setAccountNotes] = useState<string>("");
+
   const { data: stockAdjustments = [], isLoading: stockLoading } = useQuery<InventoryAdjustmentWithDetails[]>({
     queryKey: ["/api/inventory-adjustments"],
   });
@@ -86,6 +93,10 @@ export default function OpeningBalances() {
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
+  });
+
+  const { data: accounts = [] } = useQuery<Account[]>({
+    queryKey: ["/api/accounts"],
   });
 
   const createStockMutation = useMutation({
@@ -143,6 +154,45 @@ export default function OpeningBalances() {
       toast({ title: "Failed to delete", description: error.message, variant: "destructive" });
     },
   });
+
+  const createAccountBalanceMutation = useMutation({
+    mutationFn: async (data: { accountId: number; amount: string; date: string; notes?: string }) => {
+      return apiRequest("POST", `/api/accounts/${data.accountId}/opening-balance`, {
+        amount: data.amount,
+        date: data.date,
+        notes: data.notes,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      setIsAddAccountOpen(false);
+      resetAccountForm();
+      toast({ title: "Account opening balance added successfully" });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Failed to add account balance", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const resetAccountForm = () => {
+    setAccountId("");
+    setAccountAmount("");
+    setAccountDate("2025-12-31");
+    setAccountNotes("");
+  };
+
+  const handleAddAccountBalance = () => {
+    if (!accountId || !accountAmount || !accountDate) {
+      toast({ title: "Please fill all required fields", variant: "destructive" });
+      return;
+    }
+    createAccountBalanceMutation.mutate({
+      accountId: parseInt(accountId),
+      amount: accountAmount,
+      date: accountDate,
+      notes: accountNotes || undefined,
+    });
+  };
 
   const resetStockForm = () => {
     setStockItemId("");
@@ -228,17 +278,123 @@ export default function OpeningBalances() {
         </p>
       </div>
 
-      <Tabs defaultValue="stock" className="space-y-4">
+      <Tabs defaultValue="accounts" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="stock" data-testid="tab-stock">
-            <Package className="h-4 w-4 mr-2" />
-            Opening Stock
+          <TabsTrigger value="accounts" data-testid="tab-accounts">
+            <Wallet className="h-4 w-4 mr-2" />
+            Accounts
           </TabsTrigger>
           <TabsTrigger value="balances" data-testid="tab-balances">
             <Users className="h-4 w-4 mr-2" />
             Party Balances
           </TabsTrigger>
+          <TabsTrigger value="stock" data-testid="tab-stock">
+            <Package className="h-4 w-4 mr-2" />
+            Opening Stock
+          </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="accounts">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-4 flex-wrap">
+              <div>
+                <CardTitle>Account Balances</CardTitle>
+                <CardDescription>
+                  Set opening balances for Cash and Bank accounts
+                </CardDescription>
+              </div>
+              <Dialog open={isAddAccountOpen} onOpenChange={setIsAddAccountOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-add-account-balance">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Opening Balance
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add Account Opening Balance</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Account *</Label>
+                      <Select value={accountId} onValueChange={setAccountId}>
+                        <SelectTrigger data-testid="select-account">
+                          <SelectValue placeholder="Select account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((account) => (
+                            <SelectItem key={account.id} value={account.id.toString()}>
+                              {account.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Amount (KWD) *</Label>
+                      <Input
+                        type="number"
+                        step="0.001"
+                        value={accountAmount}
+                        onChange={(e) => setAccountAmount(e.target.value)}
+                        placeholder="0.000"
+                        data-testid="input-account-amount"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Effective Date *</Label>
+                      <Input
+                        type="date"
+                        value={accountDate}
+                        onChange={(e) => setAccountDate(e.target.value)}
+                        data-testid="input-account-date"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Notes</Label>
+                      <Input
+                        value={accountNotes}
+                        onChange={(e) => setAccountNotes(e.target.value)}
+                        placeholder="Opening balance for FY 2026"
+                        data-testid="input-account-notes"
+                      />
+                    </div>
+                    <Button 
+                      onClick={handleAddAccountBalance} 
+                      className="w-full"
+                      disabled={createAccountBalanceMutation.isPending}
+                      data-testid="button-save-account-balance"
+                    >
+                      {createAccountBalanceMutation.isPending ? "Adding..." : "Add Opening Balance"}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Account</TableHead>
+                      <TableHead className="text-right">Current Balance (KWD)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {accounts.map((account) => (
+                      <TableRow key={account.id} data-testid={`row-account-${account.id}`}>
+                        <TableCell className="font-medium">{account.name}</TableCell>
+                        <TableCell className="text-right font-mono">
+                          {parseFloat(account.balance || "0").toFixed(3)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="stock">
           <Card>
