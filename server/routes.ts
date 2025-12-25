@@ -2728,6 +2728,18 @@ export async function registerRoutes(
     }
   });
 
+  // ==================== FINANCIAL STANDING ROUTE ====================
+
+  app.get("/api/financial-standing", isAuthenticated, async (req, res) => {
+    try {
+      const standing = await storage.getFinancialStanding();
+      res.json(standing);
+    } catch (error) {
+      console.error("Error fetching financial standing:", error);
+      res.status(500).json({ error: "Failed to fetch financial standing" });
+    }
+  });
+
   // ==================== PROFIT AND LOSS ROUTE ====================
 
   app.get("/api/reports/profit-loss", isAuthenticated, async (req, res) => {

@@ -8,7 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { BranchProvider, useBranch } from "@/contexts/BranchContext";
 import { BranchSelector } from "@/components/BranchSelector";
-import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown, RotateCcw, FileText, Settings, Percent, LayoutDashboard, ArrowLeftRight, Building2, Smartphone, MessageCircle, ArrowDownLeft, ArrowUpRight, List } from "lucide-react";
+import { Loader2, LogOut, ShoppingCart, TrendingUp, Package, Users, CreditCard, FileBarChart, Receipt, Wallet, Edit3, ChevronDown, RotateCcw, FileText, Settings, Percent, LayoutDashboard, ArrowLeftRight, Building2, Smartphone, MessageCircle, ArrowDownLeft, ArrowUpRight, List, PieChart } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +81,7 @@ const SendPriceListPage = lazy(() => import("@/pages/send-price-list"));
 const InvoicePrintingPage = lazy(() => import("@/pages/invoice-printing"));
 const SalesmanAnalysisPage = lazy(() => import("@/pages/salesman-analysis"));
 const ChequeRegisterPage = lazy(() => import("@/pages/cheque-register"));
+const FinancialStandingPage = lazy(() => import("@/pages/financial-standing"));
 const NotFound = lazy(() => import("@/pages/not-found"));
 
 function PageLoader() {
@@ -306,6 +307,21 @@ function AppSidebar() {
                     <Link href="/" data-testid="link-dashboard">
                       <LayoutDashboard className="h-4 w-4" />
                       <span>Dashboard</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+
+              {/* Financial Standing - company overview */}
+              {canAccess("reports") && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    asChild 
+                    isActive={location === "/financial-standing"}
+                  >
+                    <Link href="/financial-standing" data-testid="link-financial-standing">
+                      <PieChart className="h-4 w-4" />
+                      <span>Financial Standing</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -664,6 +680,8 @@ function AuthenticatedLayout() {
         return "Payment OUT (Pay)";
       case "/cheque-register":
         return "Cheque Register";
+      case "/financial-standing":
+        return "Financial Standing";
       case "/returns":
         return "Returns Register";
       case "/expenses":
@@ -737,6 +755,7 @@ function AuthenticatedLayout() {
             <Suspense fallback={<PageLoader />}>
               <Switch>
                 <Route path="/" component={DashboardPage} />
+                <Route path="/financial-standing" component={FinancialStandingPage} />
                 <Route path="/purchases" component={Home} />
                 <Route path="/purchases/orders" component={PurchaseOrdersPage} />
                 <Route path="/purchases/all" component={AllPurchasesPage} />
