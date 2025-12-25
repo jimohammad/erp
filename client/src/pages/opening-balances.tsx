@@ -46,7 +46,7 @@ export default function OpeningBalances() {
   const { toast } = useToast();
   const { user } = useAuth();
   
-  const isAdminOrSuperUser = user?.role === "admin" || user?.role === "super_user";
+  const isAdminOrSuperUser = user?.role === "admin" || user?.role === "superuser" || user?.role === "super_user";
   
   const [isAddStockOpen, setIsAddStockOpen] = useState(false);
   const [isAddBalanceOpen, setIsAddBalanceOpen] = useState(false);
