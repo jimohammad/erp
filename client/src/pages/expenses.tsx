@@ -4,7 +4,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Plus, Trash2, Tag, Receipt, RotateCcw } from "lucide-react";
+import { Plus, Trash2, Tag, Receipt, RotateCcw, ChevronLeft, ChevronRight } from "lucide-react";
+
+const PAGE_SIZE = 25;
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -63,6 +65,7 @@ type CategoryFormValues = z.infer<typeof categoryFormSchema>;
 export default function ExpensesPage() {
   const { toast } = useToast();
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const categorySelectRef = useRef<HTMLButtonElement>(null);
 
   const { data: expenses = [], isLoading: expensesLoading } = useQuery<ExpenseWithDetails[]>({
@@ -182,6 +185,8 @@ export default function ExpensesPage() {
   });
 
   const totalExpenses = expenses.reduce((sum, e) => sum + parseFloat(e.amount), 0);
+  const totalPages = Math.ceil(expenses.length / PAGE_SIZE);
+  const paginatedExpenses = expenses.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   return (
     <div className="flex flex-col h-full">
@@ -329,44 +334,76 @@ export default function ExpensesPage() {
                 ) : expenses.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">No expenses recorded yet</div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Account</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Reference</TableHead>
-                        <TableHead className="text-right">Amount (KWD)</TableHead>
-                        <TableHead className="w-12"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {expenses.map((expense) => (
-                        <TableRow key={expense.id} data-testid={`row-expense-${expense.id}`}>
-                          <TableCell>{expense.expenseDate}</TableCell>
-                          <TableCell>{expense.category?.name || "-"}</TableCell>
-                          <TableCell>{expense.account?.name || "-"}</TableCell>
-                          <TableCell>{expense.description || "-"}</TableCell>
-                          <TableCell>{expense.reference || "-"}</TableCell>
-                          <TableCell className="text-right font-medium">
-                            {parseFloat(expense.amount).toFixed(3)}
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => deleteExpenseMutation.mutate(expense.id)}
-                              disabled={deleteExpenseMutation.isPending}
-                              data-testid={`button-delete-expense-${expense.id}`}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
+                  <>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Account</TableHead>
+                          <TableHead>Description</TableHead>
+                          <TableHead>Reference</TableHead>
+                          <TableHead className="text-right">Amount (KWD)</TableHead>
+                          <TableHead className="w-12"></TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedExpenses.map((expense) => (
+                          <TableRow key={expense.id} data-testid={`row-expense-${expense.id}`}>
+                            <TableCell>{expense.expenseDate}</TableCell>
+                            <TableCell>{expense.category?.name || "-"}</TableCell>
+                            <TableCell>{expense.account?.name || "-"}</TableCell>
+                            <TableCell>{expense.description || "-"}</TableCell>
+                            <TableCell>{expense.reference || "-"}</TableCell>
+                            <TableCell className="text-right font-medium">
+                              {parseFloat(expense.amount).toFixed(3)}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                onClick={() => deleteExpenseMutation.mutate(expense.id)}
+                                disabled={deleteExpenseMutation.isPending}
+                                data-testid={`button-delete-expense-${expense.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                        <span className="text-sm text-muted-foreground">
+                          Showing {((page - 1) * PAGE_SIZE) + 1} to {Math.min(page * PAGE_SIZE, expenses.length)} of {expenses.length} expenses
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPage(p => Math.max(1, p - 1))}
+                            disabled={page === 1}
+                            data-testid="button-expense-prev-page"
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                          <span className="text-sm">
+                            Page {page} of {totalPages}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                            disabled={page === totalPages}
+                            data-testid="button-expense-next-page"
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>

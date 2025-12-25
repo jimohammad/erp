@@ -13,7 +13,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Trash2, ArrowLeftRight, Loader2 } from "lucide-react";
+import { Plus, Trash2, ArrowLeftRight, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState } from "react";
+
+const PAGE_SIZE = 25;
 import { format } from "date-fns";
 
 interface Branch {
@@ -47,6 +50,7 @@ export default function StockTransfersPage() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
   const { currentBranchId } = useBranch();
+  const [page, setPage] = useState(1);
 
   const { data: allTransfers = [], isLoading } = useQuery<StockTransfer[]>({
     queryKey: ["/api/stock-transfers"],
@@ -57,6 +61,9 @@ export default function StockTransfersPage() {
         (t) => t.fromBranchId === currentBranchId || t.toBranchId === currentBranchId
       )
     : allTransfers;
+
+  const totalPages = Math.ceil(transfers.length / PAGE_SIZE);
+  const paginatedTransfers = transfers.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -101,51 +108,83 @@ export default function StockTransfersPage() {
               No stock transfers found. Click "New Transfer" to create one.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Transfer #</TableHead>
-                    <TableHead>From</TableHead>
-                    <TableHead>To</TableHead>
-                    <TableHead>Items</TableHead>
-                    <TableHead>Notes</TableHead>
-                    <TableHead className="w-12"></TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transfers.map((transfer) => (
-                    <TableRow key={transfer.id} data-testid={`row-transfer-${transfer.id}`}>
-                      <TableCell>{format(new Date(transfer.transferDate), "dd MMM yyyy")}</TableCell>
-                      <TableCell>{transfer.transferNumber || "-"}</TableCell>
-                      <TableCell>{transfer.fromBranch.name}</TableCell>
-                      <TableCell>{transfer.toBranch.name}</TableCell>
-                      <TableCell>
-                        <span className="text-sm">
-                          {transfer.lineItems.map((li) => `${li.itemName} (${li.quantity})`).join(", ")}
-                        </span>
-                      </TableCell>
-                      <TableCell className="max-w-[200px] truncate">{transfer.notes || "-"}</TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            if (confirm("Are you sure you want to delete this transfer?")) {
-                              deleteMutation.mutate(transfer.id);
-                            }
-                          }}
-                          data-testid={`button-delete-transfer-${transfer.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
+            <>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Transfer #</TableHead>
+                      <TableHead>From</TableHead>
+                      <TableHead>To</TableHead>
+                      <TableHead>Items</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="w-12"></TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedTransfers.map((transfer) => (
+                      <TableRow key={transfer.id} data-testid={`row-transfer-${transfer.id}`}>
+                        <TableCell>{format(new Date(transfer.transferDate), "dd MMM yyyy")}</TableCell>
+                        <TableCell>{transfer.transferNumber || "-"}</TableCell>
+                        <TableCell>{transfer.fromBranch.name}</TableCell>
+                        <TableCell>{transfer.toBranch.name}</TableCell>
+                        <TableCell>
+                          <span className="text-sm">
+                            {transfer.lineItems.map((li) => `${li.itemName} (${li.quantity})`).join(", ")}
+                          </span>
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate">{transfer.notes || "-"}</TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              if (confirm("Are you sure you want to delete this transfer?")) {
+                                deleteMutation.mutate(transfer.id);
+                              }
+                            }}
+                            data-testid={`button-delete-transfer-${transfer.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {((page - 1) * PAGE_SIZE) + 1} to {Math.min(page * PAGE_SIZE, transfers.length)} of {transfers.length} transfers
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      data-testid="button-transfers-prev-page"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm">
+                      Page {page} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      data-testid="button-transfers-next-page"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

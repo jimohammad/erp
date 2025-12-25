@@ -31,7 +31,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Pencil, Trash2, Loader2, Users, RotateCcw, Save, ClipboardCheck, AlertTriangle, Building2, Link, Copy, Check } from "lucide-react";
+import { Pencil, Trash2, Loader2, Users, RotateCcw, Save, ClipboardCheck, AlertTriangle, Building2, Link, Copy, Check, ChevronLeft, ChevronRight } from "lucide-react";
+
+const PAGE_SIZE = 25;
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Supplier, PartyType } from "@shared/schema";
 import { PARTY_TYPE_LABELS } from "@shared/schema";
@@ -67,6 +69,7 @@ export default function PartyMaster() {
   
   const [filterType, setFilterType] = useState<"all" | PartyType>("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
 
   const { data: allParties = [], isLoading } = useQuery<Supplier[]>({
     queryKey: ["/api/suppliers"],
@@ -100,6 +103,20 @@ export default function PartyMaster() {
       (p.area && p.area.toLowerCase().includes(searchQuery.toLowerCase()));
     return matchesType && matchesSearch;
   });
+
+  const totalPages = Math.ceil(filteredParties.length / PAGE_SIZE);
+  const paginatedParties = filteredParties.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Reset page when search or filter changes
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setPage(1);
+  };
+
+  const handleFilterChange = (value: "all" | PartyType) => {
+    setFilterType(value);
+    setPage(1);
+  };
 
   const resetForm = () => {
     setEditingParty(null);
@@ -610,7 +627,7 @@ export default function PartyMaster() {
             <Input
               placeholder="Search by name, phone, area..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-64"
               data-testid="input-search-party"
             />
@@ -618,7 +635,7 @@ export default function PartyMaster() {
             <Button
               variant={filterType === "all" ? "secondary" : "ghost"}
               size="sm"
-              onClick={() => setFilterType("all")}
+              onClick={() => handleFilterChange("all")}
               data-testid="filter-all"
             >
               All
@@ -626,7 +643,7 @@ export default function PartyMaster() {
             <Button
               variant={filterType === "supplier" ? "secondary" : "ghost"}
               size="sm"
-              onClick={() => setFilterType("supplier")}
+              onClick={() => handleFilterChange("supplier")}
               data-testid="filter-supplier"
             >
               Suppliers
@@ -634,7 +651,7 @@ export default function PartyMaster() {
             <Button
               variant={filterType === "customer" ? "secondary" : "ghost"}
               size="sm"
-              onClick={() => setFilterType("customer")}
+              onClick={() => handleFilterChange("customer")}
               data-testid="filter-customer"
             >
               Customers
@@ -642,7 +659,7 @@ export default function PartyMaster() {
             <Button
               variant={filterType === "salesman" ? "secondary" : "ghost"}
               size="sm"
-              onClick={() => setFilterType("salesman")}
+              onClick={() => handleFilterChange("salesman")}
               data-testid="filter-salesman"
             >
               Salesmen
@@ -656,21 +673,22 @@ export default function PartyMaster() {
               No parties found. {isAdmin && "Add your first party to get started."}
             </div>
           ) : (
-            <div className="border rounded-md">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-16 py-2">ID</TableHead>
-                    <TableHead className="py-2">Party Name</TableHead>
-                    <TableHead className="w-28 py-2">Type</TableHead>
-                    <TableHead className="w-28 py-2">Area</TableHead>
-                    <TableHead className="w-36 py-2">Phone</TableHead>
-                    <TableHead className="w-32 text-right py-2">Credit/Commission</TableHead>
-                    {isAdmin && <TableHead className="w-24 text-right py-2">Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredParties.map((party) => (
+            <>
+              <div className="border rounded-md">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16 py-2">ID</TableHead>
+                      <TableHead className="py-2">Party Name</TableHead>
+                      <TableHead className="w-28 py-2">Type</TableHead>
+                      <TableHead className="w-28 py-2">Area</TableHead>
+                      <TableHead className="w-36 py-2">Phone</TableHead>
+                      <TableHead className="w-32 text-right py-2">Credit/Commission</TableHead>
+                      {isAdmin && <TableHead className="w-24 text-right py-2">Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedParties.map((party) => (
                     <TableRow key={party.id} data-testid={`row-party-${party.id}`}>
                       <TableCell className="py-2 font-mono text-sm text-muted-foreground">
                         {party.id}
@@ -824,10 +842,41 @@ export default function PartyMaster() {
                         </TableCell>
                       )}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {((page - 1) * PAGE_SIZE) + 1} to {Math.min(page * PAGE_SIZE, filteredParties.length)} of {filteredParties.length} parties
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      data-testid="button-parties-prev-page"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm">
+                      Page {page} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      data-testid="button-parties-next-page"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

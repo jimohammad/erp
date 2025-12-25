@@ -4,7 +4,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Plus, Trash2, RotateCcw, X, Smartphone, Printer, FileDown, ChevronDown } from "lucide-react";
+import { Plus, Trash2, RotateCcw, X, Smartphone, Printer, FileDown, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+
+const PAGE_SIZE = 25;
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -99,6 +101,7 @@ interface ReturnLineItemForm {
 export default function ReturnsPage() {
   const { toast } = useToast();
   const [logoBase64, setLogoBase64] = useState<string>("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     fetch(companyLogoUrl)
@@ -854,6 +857,8 @@ export default function ReturnsPage() {
   };
 
   const filteredReturns = returns.filter(r => r.returnType === returnType);
+  const totalPages = Math.ceil(filteredReturns.length / PAGE_SIZE);
+  const paginatedReturns = filteredReturns.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const grandTotal = lineItems.reduce((sum, item) => sum + (parseFloat(item.totalKwd) || 0), 0);
 
@@ -1361,18 +1366,19 @@ export default function ReturnsPage() {
           ) : filteredReturns.length === 0 ? (
             <p className="text-sm text-muted-foreground">No {returnType === "sale_return" ? "sale" : "purchase"} returns recorded yet.</p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Return No.</TableHead>
-                  <TableHead>{returnType === "sale_return" ? "Customer" : "Supplier"}</TableHead>
-                  <TableHead>Items</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredReturns.map((ret) => (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Return No.</TableHead>
+                    <TableHead>{returnType === "sale_return" ? "Customer" : "Supplier"}</TableHead>
+                    <TableHead>Items</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedReturns.map((ret) => (
                   <TableRow key={ret.id} data-testid={`row-return-${ret.id}`}>
                     <TableCell className="py-2">{format(new Date(ret.returnDate), "dd/MM/yyyy")}</TableCell>
                     <TableCell className="py-2 font-medium">
@@ -1442,9 +1448,40 @@ export default function ReturnsPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {((page - 1) * PAGE_SIZE) + 1} to {Math.min(page * PAGE_SIZE, filteredReturns.length)} of {filteredReturns.length} returns
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      data-testid="button-returns-prev-page"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm">
+                      Page {page} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      data-testid="button-returns-next-page"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

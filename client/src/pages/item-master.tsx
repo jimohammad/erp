@@ -29,7 +29,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { Plus, Pencil, Trash2, Loader2, Package, RefreshCw, Download } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Package, RefreshCw, Download, ChevronLeft, ChevronRight } from "lucide-react";
+
+const PAGE_SIZE = 25;
 import * as XLSX from "xlsx";
 import type { Item } from "@shared/schema";
 import { ITEM_CATEGORIES } from "@shared/schema";
@@ -53,6 +55,7 @@ export default function ItemMaster() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<Item | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [page, setPage] = useState(1);
 
   const { data: items = [], isLoading } = useQuery<Item[]>({
     queryKey: ["/api/items"],
@@ -85,6 +88,15 @@ export default function ItemMaster() {
       (item.code && item.code.toLowerCase().includes(query)) ||
       (item.category && item.category.toLowerCase().includes(query));
   });
+
+  const totalPages = Math.ceil(filteredItems.length / PAGE_SIZE);
+  const paginatedItems = filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Reset page when search changes
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setPage(1);
+  };
 
   type ItemFormData = {
     code: string | null;
@@ -281,7 +293,7 @@ export default function ItemMaster() {
             <Input
               placeholder="Search by name, code, category..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-64"
               data-testid="input-search-item"
             />
@@ -303,23 +315,24 @@ export default function ItemMaster() {
               {searchQuery ? "No items match your search." : (isAdmin ? "No items found. Add your first item to get started." : "No items found.")}
             </div>
           ) : (
-            <div className="border rounded-md overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-16 py-2">ID</TableHead>
-                    <TableHead className="w-32 py-2">Item Code</TableHead>
-                    <TableHead className="py-2">Item Name</TableHead>
-                    <TableHead className="w-24 text-right py-2">Avail Qty</TableHead>
-                    <TableHead className="w-28 text-right py-2">Purchase KWD</TableHead>
-                    <TableHead className="w-28 text-right py-2">Purchase FX</TableHead>
-                    <TableHead className="w-20 py-2">FX</TableHead>
-                    <TableHead className="w-28 text-right py-2">Selling KWD</TableHead>
-                    {isAdmin && <TableHead className="w-24 text-right py-2">Actions</TableHead>}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredItems.map((item) => (
+            <>
+              <div className="border rounded-md overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16 py-2">ID</TableHead>
+                      <TableHead className="w-32 py-2">Item Code</TableHead>
+                      <TableHead className="py-2">Item Name</TableHead>
+                      <TableHead className="w-24 text-right py-2">Avail Qty</TableHead>
+                      <TableHead className="w-28 text-right py-2">Purchase KWD</TableHead>
+                      <TableHead className="w-28 text-right py-2">Purchase FX</TableHead>
+                      <TableHead className="w-20 py-2">FX</TableHead>
+                      <TableHead className="w-28 text-right py-2">Selling KWD</TableHead>
+                      {isAdmin && <TableHead className="w-24 text-right py-2">Actions</TableHead>}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedItems.map((item) => (
                     <TableRow key={item.id} data-testid={`row-item-${item.id}`}>
                       <TableCell className="py-1 font-mono text-sm text-muted-foreground">
                         {item.id}
@@ -368,10 +381,41 @@ export default function ItemMaster() {
                         </TableCell>
                       )}
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <span className="text-sm text-muted-foreground">
+                    Showing {((page - 1) * PAGE_SIZE) + 1} to {Math.min(page * PAGE_SIZE, filteredItems.length)} of {filteredItems.length} items
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                      data-testid="button-items-prev-page"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    <span className="text-sm">
+                      Page {page} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                      data-testid="button-items-next-page"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

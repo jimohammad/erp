@@ -46,7 +46,7 @@ import type { PaymentWithDetails, Supplier, PaymentType, PurchaseOrderWithDetail
 import { PAYMENT_TYPES } from "@shared/schema";
 
 const FX_CURRENCIES = ["AED", "USD"] as const;
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 export default function PaymentOutPage() {
   const { toast } = useToast();

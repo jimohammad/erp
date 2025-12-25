@@ -56,7 +56,7 @@ import { SiWhatsapp } from "react-icons/si";
 import type { PaymentWithDetails, Customer, PaymentType, User } from "@shared/schema";
 import { PAYMENT_TYPES } from "@shared/schema";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 export default function PaymentInPage() {
   const { toast } = useToast();

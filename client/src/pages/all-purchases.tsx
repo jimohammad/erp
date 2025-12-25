@@ -36,7 +36,7 @@ import { Loader2, Search, Eye, Trash2, FileText, Package, ChevronLeft, ChevronRi
 import { format } from "date-fns";
 import { usePasswordProtection } from "@/components/PasswordConfirmDialog";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 interface PurchaseOrderLineItem {
   id: number;

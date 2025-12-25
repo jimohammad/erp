@@ -47,7 +47,7 @@ import { SiWhatsapp } from "react-icons/si";
 import { format } from "date-fns";
 import { usePasswordProtection } from "@/components/PasswordConfirmDialog";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 interface SalesOrderLineItem {
   id: number;

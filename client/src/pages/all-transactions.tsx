@@ -26,7 +26,7 @@ import { format } from "date-fns";
 import { useLocation, Link } from "wouter";
 import type { AllTransaction, Branch, Supplier } from "@shared/schema";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 const MODULE_LABELS: Record<string, string> = {
   sales: "Sale",
