@@ -609,7 +609,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createSupplier(supplier: InsertSupplier): Promise<Supplier> {
-    const [newSupplier] = await db.insert(suppliers).values(supplier).returning();
+    const [newSupplier] = await db.insert(suppliers).values(supplier as any).returning();
     return newSupplier;
   }
 
@@ -659,25 +659,25 @@ export class DatabaseStorage implements IStorage {
         throw new Error(`Item code "${item.code}" already exists. Please use a unique item code.`);
       }
     }
-    const [newItem] = await db.insert(items).values(item).returning();
+    const [newItem] = await db.insert(items).values(item as any).returning();
     return newItem;
   }
 
-  async updateItem(id: number, item: InsertItem): Promise<Item | undefined> {
+  async updateItem(id: number, itemData: InsertItem): Promise<Item | undefined> {
     // Check for duplicate item code (case-insensitive), excluding current item
-    if (item.code && item.code.trim() !== '') {
+    if (itemData.code && itemData.code.trim() !== '') {
       const existingItem = await db.select()
         .from(items)
         .where(and(
-          sql`LOWER(${items.code}) = LOWER(${item.code.trim()})`,
+          sql`LOWER(${items.code}) = LOWER(${itemData.code.trim()})`,
           ne(items.id, id)
         ))
         .limit(1);
       if (existingItem.length > 0) {
-        throw new Error(`Item code "${item.code}" already exists. Please use a unique item code.`);
+        throw new Error(`Item code "${itemData.code}" already exists. Please use a unique item code.`);
       }
     }
-    const [updated] = await db.update(items).set(item).where(eq(items.id, id)).returning();
+    const [updated] = await db.update(items).set(itemData).where(eq(items.id, id)).returning();
     return updated || undefined;
   }
 
@@ -750,14 +750,14 @@ export class DatabaseStorage implements IStorage {
     po: InsertPurchaseOrder, 
     lineItems: Omit<InsertLineItem, 'purchaseOrderId'>[]
   ): Promise<PurchaseOrderWithDetails> {
-    const [newPo] = await db.insert(purchaseOrders).values(po).returning();
+    const [newPo] = await db.insert(purchaseOrders).values(po as any).returning();
     
     if (lineItems.length > 0) {
       await db.insert(purchaseOrderLineItems).values(
         lineItems.map(item => ({
           ...item,
           purchaseOrderId: newPo.id,
-        }))
+        })) as any
       );
     }
 
@@ -781,7 +781,7 @@ export class DatabaseStorage implements IStorage {
           lineItems.map(item => ({
             ...item,
             purchaseOrderId: id,
-          }))
+          })) as any
         );
       }
     }
@@ -863,7 +863,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createCustomer(customer: InsertCustomer): Promise<Customer> {
-    const [newCustomer] = await db.insert(customers).values(customer).returning();
+    const [newCustomer] = await db.insert(customers).values(customer as any).returning();
     return newCustomer;
   }
 
@@ -1386,14 +1386,14 @@ export class DatabaseStorage implements IStorage {
     so: InsertSalesOrder, 
     lineItems: Omit<InsertSalesLineItem, 'salesOrderId'>[]
   ): Promise<SalesOrderWithDetails> {
-    const [newSo] = await db.insert(salesOrders).values(so).returning();
+    const [newSo] = await db.insert(salesOrders).values(so as any).returning();
     
     if (lineItems.length > 0) {
       await db.insert(salesOrderLineItems).values(
         lineItems.map(item => ({
           ...item,
           salesOrderId: newSo.id,
-        }))
+        })) as any
       );
     }
 
@@ -1417,7 +1417,7 @@ export class DatabaseStorage implements IStorage {
           lineItems.map(item => ({
             ...item,
             salesOrderId: id,
-          }))
+          })) as any
         );
       }
     }
@@ -1489,14 +1489,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createPayment(payment: InsertPayment, splits?: Omit<InsertPaymentSplit, 'paymentId'>[]): Promise<PaymentWithDetails> {
-    const [newPayment] = await db.insert(payments).values(payment).returning();
+    const [newPayment] = await db.insert(payments).values(payment as any).returning();
     
     if (splits && splits.length > 0) {
       const splitValues = splits.map(split => ({
         ...split,
         paymentId: newPayment.id,
       }));
-      await db.insert(paymentSplits).values(splitValues);
+      await db.insert(paymentSplits).values(splitValues as any);
     }
     
     return this.getPayment(newPayment.id) as Promise<PaymentWithDetails>;
@@ -2324,7 +2324,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createAccountTransfer(transfer: InsertAccountTransfer): Promise<AccountTransferWithDetails> {
-    const [newTransfer] = await db.insert(accountTransfers).values(transfer).returning();
+    const [newTransfer] = await db.insert(accountTransfers).values(transfer as any).returning();
     
     const result = await db.query.accountTransfers.findFirst({
       where: eq(accountTransfers.id, newTransfer.id),
@@ -2354,7 +2354,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createExpenseCategory(category: InsertExpenseCategory): Promise<ExpenseCategory> {
-    const [newCategory] = await db.insert(expenseCategories).values(category).returning();
+    const [newCategory] = await db.insert(expenseCategories).values(category as any).returning();
     return newCategory;
   }
 
