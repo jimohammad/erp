@@ -122,6 +122,13 @@ export default function PaymentInPage() {
   const [amount, setAmount] = useState("");
   const [notes, setNotes] = useState("");
   
+  // Cheque payment details
+  const [chequeNumber, setChequeNumber] = useState("");
+  const [chequeBankName, setChequeBankName] = useState("");
+  const [chequeDate, setChequeDate] = useState(new Date().toISOString().split("T")[0]);
+  const [chequeDrawerName, setChequeDrawerName] = useState("");
+  const [chequeNotes, setChequeNotes] = useState("");
+  
   // Split payment state
   const [splitEnabled, setSplitEnabled] = useState(false);
   const [splits, setSplits] = useState<Array<{ paymentType: PaymentType; amount: string }>>([
@@ -198,6 +205,7 @@ export default function PaymentInPage() {
       reference: string | null;
       notes: string | null;
       splits?: Array<{ paymentType: string; amount: string; fxCurrency?: string; fxRate?: string; fxAmount?: string }>;
+      chequeDetails?: { chequeNumber: string; bankName: string; chequeDate: string; drawerName?: string; notes?: string };
     }) => {
       const response = await apiRequest("POST", "/api/payments", data);
       return response.json();
@@ -289,6 +297,12 @@ export default function PaymentInPage() {
     setPaymentType("Cash");
     setAmount("");
     setNotes("");
+    // Reset cheque fields
+    setChequeNumber("");
+    setChequeBankName("");
+    setChequeDate(new Date().toISOString().split("T")[0]);
+    setChequeDrawerName("");
+    setChequeNotes("");
   };
 
   const handleAmountChange = (value: string) => {
@@ -339,6 +353,22 @@ export default function PaymentInPage() {
         toast({ title: "Please enter a valid amount", variant: "destructive" });
         return;
       }
+      
+      // Validate cheque details if payment type is Cheque
+      if (paymentType === "Cheque") {
+        if (!chequeNumber.trim()) {
+          toast({ title: "Cheque number is required", variant: "destructive" });
+          return;
+        }
+        if (!chequeBankName.trim()) {
+          toast({ title: "Bank name is required", variant: "destructive" });
+          return;
+        }
+        if (!chequeDate) {
+          toast({ title: "Cheque date is required", variant: "destructive" });
+          return;
+        }
+      }
 
       createPaymentMutation.mutate({
         paymentDate,
@@ -353,6 +383,15 @@ export default function PaymentInPage() {
         fxAmount: null,
         reference: null,
         notes: notes || null,
+        ...(paymentType === "Cheque" && {
+          chequeDetails: {
+            chequeNumber: chequeNumber.trim(),
+            bankName: chequeBankName.trim(),
+            chequeDate,
+            drawerName: chequeDrawerName.trim() || undefined,
+            notes: chequeNotes.trim() || undefined,
+          },
+        }),
       });
     }
   };
@@ -391,6 +430,8 @@ export default function PaymentInPage() {
         return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
       case "Wamd":
         return "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200";
+      case "Cheque":
+        return "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200";
       default:
         return "";
     }
@@ -835,6 +876,65 @@ export default function PaymentInPage() {
                 </div>
               )}
             </div>
+            
+            {/* Cheque Details Section - Only shown when payment type is Cheque */}
+            {!splitEnabled && paymentType === "Cheque" && (
+              <div className="p-4 border rounded-md bg-amber-50 dark:bg-amber-950/30 space-y-4">
+                <Label className="text-base font-semibold text-amber-800 dark:text-amber-200">Cheque Details</Label>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="chequeNumber">Cheque Number *</Label>
+                    <Input
+                      id="chequeNumber"
+                      value={chequeNumber}
+                      onChange={(e) => setChequeNumber(e.target.value)}
+                      placeholder="Enter cheque number"
+                      data-testid="input-cheque-number"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="chequeBankName">Bank Name *</Label>
+                    <Input
+                      id="chequeBankName"
+                      value={chequeBankName}
+                      onChange={(e) => setChequeBankName(e.target.value)}
+                      placeholder="Enter bank name"
+                      data-testid="input-cheque-bank"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="chequeDate">Cheque Date *</Label>
+                    <Input
+                      id="chequeDate"
+                      type="date"
+                      value={chequeDate}
+                      onChange={(e) => setChequeDate(e.target.value)}
+                      data-testid="input-cheque-date"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="chequeDrawerName">Drawer Name</Label>
+                    <Input
+                      id="chequeDrawerName"
+                      value={chequeDrawerName}
+                      onChange={(e) => setChequeDrawerName(e.target.value)}
+                      placeholder="Name on cheque (optional)"
+                      data-testid="input-cheque-drawer"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="chequeNotes">Cheque Notes</Label>
+                  <Input
+                    id="chequeNotes"
+                    value={chequeNotes}
+                    onChange={(e) => setChequeNotes(e.target.value)}
+                    placeholder="Additional notes about this cheque (optional)"
+                    data-testid="input-cheque-notes"
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="flex items-center gap-3 py-2 border-t">
               <Switch
