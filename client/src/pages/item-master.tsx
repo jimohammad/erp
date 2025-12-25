@@ -50,6 +50,7 @@ export default function ItemMaster() {
   const [purchasePriceFx, setPurchasePriceFx] = useState("");
   const [fxCurrency, setFxCurrency] = useState("");
   const [sellingPriceKwd, setSellingPriceKwd] = useState("");
+  const [landedCostKwd, setLandedCostKwd] = useState("");
   const [minStockLevel, setMinStockLevel] = useState("");
   const [fetchingPricing, setFetchingPricing] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -106,6 +107,7 @@ export default function ItemMaster() {
     purchasePriceFx: string | null;
     fxCurrency: string | null;
     sellingPriceKwd: string | null;
+    landedCostKwd: string | null;
     minStockLevel: number | null;
   };
 
@@ -186,6 +188,7 @@ export default function ItemMaster() {
     setPurchasePriceFx("");
     setFxCurrency("");
     setSellingPriceKwd("");
+    setLandedCostKwd("");
     setMinStockLevel("");
     setDialogOpen(true);
   };
@@ -199,6 +202,7 @@ export default function ItemMaster() {
     setPurchasePriceFx(item.purchasePriceFx || "");
     setFxCurrency(item.fxCurrency || "");
     setSellingPriceKwd(item.sellingPriceKwd || "");
+    setLandedCostKwd(item.landedCostKwd || "");
     setMinStockLevel(item.minStockLevel?.toString() || "");
     setDialogOpen(true);
   };
@@ -213,6 +217,7 @@ export default function ItemMaster() {
     setPurchasePriceFx("");
     setFxCurrency("");
     setSellingPriceKwd("");
+    setLandedCostKwd("");
     setMinStockLevel("");
   };
 
@@ -228,6 +233,7 @@ export default function ItemMaster() {
       purchasePriceFx: purchasePriceFx.trim() || null,
       fxCurrency: fxCurrency.trim() || null,
       sellingPriceKwd: sellingPriceKwd.trim() || null,
+      landedCostKwd: landedCostKwd.trim() || null,
       minStockLevel: minStockLevel.trim() ? parseInt(minStockLevel.trim()) : 0,
     };
 
@@ -260,6 +266,7 @@ export default function ItemMaster() {
       "Purchase Price (FX)": item.purchasePriceFx ? parseFloat(item.purchasePriceFx).toFixed(3) : "",
       "FX Currency": item.fxCurrency || "",
       "Selling Price (KWD)": item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "",
+      "Landed Cost (KWD)": item.landedCostKwd ? parseFloat(item.landedCostKwd).toFixed(3) : "",
       "Min Stock Level": item.minStockLevel ?? 0,
     }));
 
@@ -328,6 +335,7 @@ export default function ItemMaster() {
                       <TableHead className="w-28 text-right py-2">Purchase FX</TableHead>
                       <TableHead className="w-20 py-2">FX</TableHead>
                       <TableHead className="w-28 text-right py-2">Selling KWD</TableHead>
+                      <TableHead className="w-28 text-right py-2">Landed Cost</TableHead>
                       {isAdmin && <TableHead className="w-24 text-right py-2">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
@@ -357,6 +365,9 @@ export default function ItemMaster() {
                       </TableCell>
                       <TableCell className="py-1 text-right font-mono" data-testid={`text-selling-price-${item.id}`}>
                         {item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "-"}
+                      </TableCell>
+                      <TableCell className="py-1 text-right font-mono" data-testid={`text-landed-cost-${item.id}`}>
+                        {item.landedCostKwd ? parseFloat(item.landedCostKwd).toFixed(3) : "-"}
                       </TableCell>
                       {isAdmin && (
                         <TableCell className="py-1 text-right">
@@ -542,6 +553,20 @@ export default function ItemMaster() {
                   step="0.001"
                   data-testid="input-selling-price"
                 />
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="landedCostKwd">Landed Cost (KWD)</Label>
+                <Input
+                  id="landedCostKwd"
+                  value={landedCostKwd}
+                  onChange={(e) => setLandedCostKwd(e.target.value)}
+                  placeholder="0.000"
+                  type="number"
+                  step="0.001"
+                  data-testid="input-landed-cost"
+                />
+                <p className="text-xs text-muted-foreground">Total cost including shipping, customs, etc.</p>
               </div>
               
               <div className="space-y-2">
