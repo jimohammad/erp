@@ -3819,10 +3819,10 @@ export class DatabaseStorage implements IStorage {
       results.push({ type: 'Payment', id: row.id, title: row.reference || 'Payment', subtitle: row.payment_type, url: '/payments' });
     }
 
-    // Search salesmen
+    // Search salesmen (stored in suppliers table with type = 'salesman')
     const salesmenResults = await db.execute(sql`
-      SELECT id, name, phone FROM salesmen 
-      WHERE name ILIKE ${searchPattern} OR phone ILIKE ${searchPattern}
+      SELECT id, name, phone FROM suppliers 
+      WHERE type = 'salesman' AND (name ILIKE ${searchPattern} OR phone ILIKE ${searchPattern})
       LIMIT 5
     `);
     for (const row of salesmenResults.rows as { id: number; name: string; phone: string | null }[]) {
