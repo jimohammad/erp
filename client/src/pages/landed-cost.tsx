@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { todayLocalISO } from "@/lib/dateUtils";
+import { toDecimal, formatKWD, multiplyDecimals, divideDecimals, addDecimals } from "@/lib/currency";
 import { useBranch } from "@/contexts/BranchContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,18 +57,6 @@ interface PartnerProfitSetting {
 }
 
 const CURRENCIES = ["KWD", "USD", "AED", "CNY", "HKD"];
-
-function formatCurrency(value: string | number | null | undefined): string {
-  if (value === null || value === undefined) return "0.000";
-  const num = typeof value === "string" ? parseFloat(value) : value;
-  return isNaN(num) ? "0.000" : num.toFixed(3);
-}
-
-function parseDecimal(value: string | null | undefined): number {
-  if (!value) return 0;
-  const num = parseFloat(value);
-  return isNaN(num) ? 0 : num;
-}
 
 type PanelMode = "closed" | "create" | "edit" | "view";
 
@@ -247,7 +236,7 @@ export default function LandedCostPage() {
                           </div>
                           <div className="text-right flex-shrink-0">
                             <div className="font-mono text-base font-bold tabular-nums">
-                              {formatCurrency(v.grandTotalKwd)}
+                              {formatKWD(v.grandTotalKwd)}
                             </div>
                             <div className="text-[10px] text-muted-foreground">KWD</div>
                           </div>
@@ -330,7 +319,7 @@ interface VoucherViewPanelProps {
 
 function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: VoucherViewPanelProps) {
   const totalUnits = voucher.lineItems?.reduce((sum, li) => sum + (li.quantity || 0), 0) || 0;
-  const freightTotal = parseDecimal(voucher.hkToDxbKwd) + parseDecimal(voucher.dxbToKwiKwd);
+  const freightTotalDec = toDecimal(voucher.hkToDxbKwd).plus(toDecimal(voucher.dxbToKwiKwd));
   
   return (
     <>
@@ -387,12 +376,12 @@ function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: Voucher
                   <Badge variant={voucher.payableStatus === "paid" ? "default" : "secondary"} className="text-xs">
                     Freight: {voucher.payableStatus === "paid" ? "Paid" : "Pending"}
                   </Badge>
-                  {voucher.partnerParty && parseDecimal(voucher.totalPartnerProfitKwd) > 0 && (
+                  {voucher.partnerParty && toDecimal(voucher.totalPartnerProfitKwd).greaterThan(0) && (
                     <Badge variant={voucher.partnerPayableStatus === "paid" ? "default" : "secondary"} className="text-xs">
                       Partner: {voucher.partnerPayableStatus === "paid" ? "Paid" : "Pending"}
                     </Badge>
                   )}
-                  {voucher.packingParty && parseDecimal(voucher.packingChargesKwd) > 0 && (
+                  {voucher.packingParty && toDecimal(voucher.packingChargesKwd).greaterThan(0) && (
                     <Badge variant={voucher.packingPayableStatus === "paid" ? "default" : "secondary"} className="text-xs">
                       Packing: {voucher.packingPayableStatus === "paid" ? "Paid" : "Pending"}
                     </Badge>
@@ -404,7 +393,7 @@ function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: Voucher
                 <div className="text-right">
                   <p className="text-sm text-muted-foreground mb-1">Grand Total</p>
                   <p className="text-3xl font-bold tabular-nums text-primary">
-                    {formatCurrency(voucher.grandTotalKwd)}
+                    {formatKWD(voucher.grandTotalKwd)}
                   </p>
                   <p className="text-sm text-muted-foreground">KWD</p>
                 </div>
@@ -421,7 +410,7 @@ function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: Voucher
               {totalUnits} Units
             </Badge>
             <Badge variant="outline" className="text-xs px-3 py-1">
-              Freight: {formatCurrency(freightTotal)} KWD
+              Freight: {formatKWD(freightTotalDec)} KWD
             </Badge>
           </div>
 
@@ -436,7 +425,7 @@ function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: Voucher
                   <span className="text-xs font-medium text-blue-700 dark:text-blue-300">HK → DXB</span>
                 </div>
                 <div className="font-mono font-bold text-lg text-blue-700 dark:text-blue-300">
-                  {formatCurrency(voucher.hkToDxbKwd)}
+                  {formatKWD(voucher.hkToDxbKwd)}
                 </div>
                 {voucher.party && (
                   <div className="text-xs text-muted-foreground mt-1 truncate">{voucher.party.name}</div>
@@ -450,7 +439,7 @@ function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: Voucher
                   <span className="text-xs font-medium text-cyan-700 dark:text-cyan-300">DXB → KWI</span>
                 </div>
                 <div className="font-mono font-bold text-lg text-cyan-700 dark:text-cyan-300">
-                  {formatCurrency(voucher.dxbToKwiKwd)}
+                  {formatKWD(voucher.dxbToKwiKwd)}
                 </div>
                 {voucher.dxbKwiParty && (
                   <div className="text-xs text-muted-foreground mt-1 truncate">{voucher.dxbKwiParty.name}</div>
@@ -464,7 +453,7 @@ function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: Voucher
                   <span className="text-xs font-medium text-purple-700 dark:text-purple-300">Partner</span>
                 </div>
                 <div className="font-mono font-bold text-lg text-purple-700 dark:text-purple-300">
-                  {formatCurrency(voucher.totalPartnerProfitKwd)}
+                  {formatKWD(voucher.totalPartnerProfitKwd)}
                 </div>
                 {voucher.partnerParty && (
                   <div className="text-xs text-muted-foreground mt-1 truncate">{voucher.partnerParty.name}</div>
@@ -478,7 +467,7 @@ function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: Voucher
                   <span className="text-xs font-medium text-green-700 dark:text-green-300">Packing</span>
                 </div>
                 <div className="font-mono font-bold text-lg text-green-700 dark:text-green-300">
-                  {formatCurrency(voucher.packingChargesKwd)}
+                  {formatKWD(voucher.packingChargesKwd)}
                 </div>
                 {voucher.packingParty && (
                   <div className="text-xs text-muted-foreground mt-1 truncate">{voucher.packingParty.name}</div>
@@ -509,10 +498,10 @@ function VoucherViewPanel({ voucher, onClose, onEdit, onPay, onDelete }: Voucher
                         <TableCell className="py-2 text-sm font-medium">{li.itemName}</TableCell>
                         <TableCell className="py-2 text-sm text-center font-mono tabular-nums">{li.quantity}</TableCell>
                         <TableCell className="py-2 text-sm text-right font-mono tabular-nums text-muted-foreground">
-                          {formatCurrency(li.unitPriceKwd)}
+                          {formatKWD(li.unitPriceKwd)}
                         </TableCell>
                         <TableCell className="py-2 text-sm text-right font-mono tabular-nums font-semibold text-primary">
-                          {formatCurrency(li.landedCostPerUnitKwd)}
+                          {formatKWD(li.landedCostPerUnitKwd)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -671,13 +660,13 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
     return allLineItems;
   }, [selectedPOs]);
 
-  const hkToDxbKwd = parseDecimal(hkToDxbAmount);
-  const dxbToKwiKwd = parseDecimal(dxbToKwiAmount);
-  const partnerProfitKwd = parseDecimal(partnerProfitAmount);
-  const packingChargesKwd = parseDecimal(packingAmount);
+  const hkToDxbKwdDec = toDecimal(hkToDxbAmount);
+  const dxbToKwiKwdDec = toDecimal(dxbToKwiAmount);
+  const partnerProfitKwdDec = toDecimal(partnerProfitAmount);
+  const packingChargesKwdDec = toDecimal(packingAmount);
 
-  const totalFreightKwd = hkToDxbKwd + dxbToKwiKwd;
-  const grandTotalKwd = totalFreightKwd + partnerProfitKwd + packingChargesKwd;
+  const totalFreightKwdDec = hkToDxbKwdDec.plus(dxbToKwiKwdDec);
+  const grandTotalKwdDec = totalFreightKwdDec.plus(partnerProfitKwdDec).plus(packingChargesKwdDec);
 
   const totalQuantity = useMemo(() => {
     // When editing and aggregatedLineItems haven't loaded, use voucher's line items
@@ -707,14 +696,14 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
     }
     
     if (aggregatedLineItems.length === 0) return [];
-    const freightPerUnit = totalQuantity > 0 ? (totalFreightKwd / totalQuantity) : 0;
-    const partnerProfitPerUnit = totalQuantity > 0 ? (partnerProfitKwd / totalQuantity) : 0;
-    const packingPerUnit = totalQuantity > 0 ? (packingChargesKwd / totalQuantity) : 0;
+    const freightPerUnit = totalQuantity > 0 ? divideDecimals(totalFreightKwdDec, totalQuantity) : toDecimal(0);
+    const partnerProfitPerUnit = totalQuantity > 0 ? divideDecimals(partnerProfitKwdDec, totalQuantity) : toDecimal(0);
+    const packingPerUnit = totalQuantity > 0 ? divideDecimals(packingChargesKwdDec, totalQuantity) : toDecimal(0);
 
     return aggregatedLineItems.map(li => {
       const category = itemCategoryMap[li.itemName] || "";
-      const unitPriceKwd = parseDecimal(li.priceKwd);
-      const landedCostPerUnit = unitPriceKwd + freightPerUnit + partnerProfitPerUnit + packingPerUnit;
+      const unitPriceKwd = toDecimal(li.priceKwd);
+      const landedCostPerUnit = unitPriceKwd.plus(freightPerUnit).plus(partnerProfitPerUnit).plus(packingPerUnit);
       const qty = li.quantity || 0;
 
       return {
@@ -722,16 +711,16 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
         itemName: li.itemName,
         itemCategory: category,
         quantity: qty,
-        unitPriceKwd: unitPriceKwd.toFixed(3),
-        lineTotalKwd: (unitPriceKwd * qty).toFixed(3),
-        freightPerUnitKwd: freightPerUnit.toFixed(3),
-        partnerProfitPerUnitKwd: partnerProfitPerUnit.toFixed(3),
-        packingPerUnitKwd: packingPerUnit.toFixed(3),
-        landedCostPerUnitKwd: landedCostPerUnit.toFixed(3),
-        totalLandedCostKwd: (landedCostPerUnit * qty).toFixed(3),
+        unitPriceKwd: formatKWD(unitPriceKwd),
+        lineTotalKwd: formatKWD(multiplyDecimals(unitPriceKwd, qty)),
+        freightPerUnitKwd: formatKWD(freightPerUnit),
+        partnerProfitPerUnitKwd: formatKWD(partnerProfitPerUnit),
+        packingPerUnitKwd: formatKWD(packingPerUnit),
+        landedCostPerUnitKwd: formatKWD(landedCostPerUnit),
+        totalLandedCostKwd: formatKWD(multiplyDecimals(landedCostPerUnit, qty)),
       };
     });
-  }, [aggregatedLineItems, totalFreightKwd, partnerProfitKwd, packingChargesKwd, totalQuantity, itemCategoryMap, isEditing, voucher]);
+  }, [aggregatedLineItems, totalFreightKwdDec, partnerProfitKwdDec, packingChargesKwdDec, totalQuantity, itemCategoryMap, isEditing, voucher]);
 
   const createMutation = useMutation({
     mutationFn: async (data: { voucher: any; lineItems: any[]; purchaseOrderIds: number[] }) => {
@@ -782,24 +771,24 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
       hkToDxbAmount: hkToDxbAmount ?? null,
       hkToDxbCurrency: "KWD",
       hkToDxbFxRate: "1",
-      hkToDxbKwd: hkToDxbKwd.toFixed(3),
+      hkToDxbKwd: formatKWD(hkToDxbKwdDec),
       dxbToKwiAmount: dxbToKwiAmount ?? null,
       dxbToKwiCurrency: "KWD",
       dxbToKwiFxRate: "1",
-      dxbToKwiKwd: dxbToKwiKwd.toFixed(3),
-      totalPartnerProfitKwd: partnerProfitKwd.toFixed(3),
-      packingChargesKwd: packingChargesKwd.toFixed(3),
-      totalFreightKwd: totalFreightKwd.toFixed(3),
-      totalChargesKwd: packingChargesKwd.toFixed(3),
-      grandTotalKwd: grandTotalKwd.toFixed(3),
+      dxbToKwiKwd: formatKWD(dxbToKwiKwdDec),
+      totalPartnerProfitKwd: formatKWD(partnerProfitKwdDec),
+      packingChargesKwd: formatKWD(packingChargesKwdDec),
+      totalFreightKwd: formatKWD(totalFreightKwdDec),
+      totalChargesKwd: formatKWD(packingChargesKwdDec),
+      grandTotalKwd: formatKWD(grandTotalKwdDec),
       allocationMethod: "quantity",
       partyId: hkDxbPartyId ?? null,
       dxbKwiPartyId: dxbKwiPartyId ?? null,
       partnerPartyId: partnerPartyId ?? null,
       packingPartyId: packingPartyId ?? null,
       payableStatus: "pending",
-      partnerPayableStatus: partnerPartyId && partnerProfitKwd > 0 ? "pending" : "paid",
-      packingPayableStatus: packingPartyId && packingChargesKwd > 0 ? "pending" : "paid",
+      partnerPayableStatus: partnerPartyId && partnerProfitKwdDec.greaterThan(0) ? "pending" : "paid",
+      packingPayableStatus: packingPartyId && packingChargesKwdDec.greaterThan(0) ? "pending" : "paid",
       notes: notes || null,
       branchId: branchId ?? null,
     };
@@ -847,7 +836,7 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
             <div className="text-right hidden md:block">
               <div className="text-xs text-muted-foreground">Grand Total</div>
               <div className="font-mono font-bold text-lg text-primary tabular-nums">
-                {formatCurrency(grandTotalKwd)} KWD
+                {formatKWD(grandTotalKwdDec)} KWD
               </div>
             </div>
             <Button size="icon" variant="ghost" onClick={onClose}>
@@ -971,7 +960,7 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
               </div>
               <div className="pt-2 border-t border-blue-200 dark:border-blue-800 flex justify-between text-xs font-medium">
                 <span>Total:</span>
-                <span className="font-mono text-blue-700 dark:text-blue-300">{formatCurrency(hkToDxbKwd)}</span>
+                <span className="font-mono text-blue-700 dark:text-blue-300">{formatKWD(hkToDxbKwdDec)}</span>
               </div>
             </div>
 
@@ -1006,7 +995,7 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
               </div>
               <div className="pt-2 border-t border-cyan-200 dark:border-cyan-800 flex justify-between text-xs font-medium">
                 <span>Total:</span>
-                <span className="font-mono text-cyan-700 dark:text-cyan-300">{formatCurrency(dxbToKwiKwd)}</span>
+                <span className="font-mono text-cyan-700 dark:text-cyan-300">{formatKWD(dxbToKwiKwdDec)}</span>
               </div>
             </div>
 
@@ -1041,7 +1030,7 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
               </div>
               <div className="pt-2 border-t border-purple-200 dark:border-purple-800 flex justify-between text-xs font-medium">
                 <span>Total:</span>
-                <span className="font-mono text-purple-700 dark:text-purple-300">{formatCurrency(partnerProfitKwd)}</span>
+                <span className="font-mono text-purple-700 dark:text-purple-300">{formatKWD(partnerProfitKwdDec)}</span>
               </div>
             </div>
 
@@ -1076,7 +1065,7 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
               </div>
               <div className="pt-2 border-t border-green-200 dark:border-green-800 flex justify-between text-xs font-medium">
                 <span>Total:</span>
-                <span className="font-mono text-green-700 dark:text-green-300">{formatCurrency(packingChargesKwd)}</span>
+                <span className="font-mono text-green-700 dark:text-green-300">{formatKWD(packingChargesKwdDec)}</span>
               </div>
             </div>
             </div>
@@ -1098,19 +1087,19 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
           <div className="p-3 bg-muted rounded-md flex items-center justify-between">
             <div className="flex items-center gap-4 text-sm">
               <span className="text-muted-foreground">
-                <Truck className="h-3 w-3 inline mr-1" />{formatCurrency(totalFreightKwd)}
+                <Truck className="h-3 w-3 inline mr-1" />{formatKWD(totalFreightKwdDec)}
               </span>
               <span className="text-muted-foreground">+</span>
               <span className="text-muted-foreground">
-                <Users className="h-3 w-3 inline mr-1" />{formatCurrency(partnerProfitKwd)}
+                <Users className="h-3 w-3 inline mr-1" />{formatKWD(partnerProfitKwdDec)}
               </span>
               <span className="text-muted-foreground">+</span>
               <span className="text-muted-foreground">
-                <Package className="h-3 w-3 inline mr-1" />{formatCurrency(packingChargesKwd)}
+                <Package className="h-3 w-3 inline mr-1" />{formatKWD(packingChargesKwdDec)}
               </span>
             </div>
             <div className="text-lg font-bold">
-              = {formatCurrency(grandTotalKwd)} KWD
+              = {formatKWD(grandTotalKwdDec)} KWD
             </div>
           </div>
 
@@ -1198,7 +1187,7 @@ function PayLandedCostDialog({ voucher, onClose }: PayLandedCostDialogProps) {
     const targets: { type: "freight" | "partner" | "packing"; label: string; partyName: string; amount: string; color: string }[] = [];
     
     // Freight (logistics company)
-    if (voucher.partyId && voucher.payableStatus === "pending" && parseFloat(voucher.totalFreightKwd || "0") > 0) {
+    if (voucher.partyId && voucher.payableStatus === "pending" && toDecimal(voucher.totalFreightKwd).greaterThan(0)) {
       targets.push({
         type: "freight",
         label: "Freight",
@@ -1209,7 +1198,7 @@ function PayLandedCostDialog({ voucher, onClose }: PayLandedCostDialogProps) {
     }
     
     // Partner profit
-    if (voucher.partnerPartyId && voucher.partnerPayableStatus === "pending" && parseFloat(voucher.totalPartnerProfitKwd || "0") > 0) {
+    if (voucher.partnerPartyId && voucher.partnerPayableStatus === "pending" && toDecimal(voucher.totalPartnerProfitKwd).greaterThan(0)) {
       targets.push({
         type: "partner",
         label: "Partner",
@@ -1220,7 +1209,7 @@ function PayLandedCostDialog({ voucher, onClose }: PayLandedCostDialogProps) {
     }
     
     // Packing charges
-    if (voucher.packingPartyId && voucher.packingPayableStatus === "pending" && parseFloat(voucher.packingChargesKwd || "0") > 0) {
+    if (voucher.packingPartyId && voucher.packingPayableStatus === "pending" && toDecimal(voucher.packingChargesKwd).greaterThan(0)) {
       targets.push({
         type: "packing",
         label: "Packing",
@@ -1318,7 +1307,7 @@ function PayLandedCostDialog({ voucher, onClose }: PayLandedCostDialogProps) {
             </div>
             <div className="flex justify-between text-sm mt-1">
               <span className="text-muted-foreground">Amount:</span>
-              <span className="font-mono font-semibold">{formatCurrency(currentTarget?.amount || "0")} KWD</span>
+              <span className="font-mono font-semibold">{formatKWD(currentTarget?.amount || "0")} KWD</span>
             </div>
             <div className="flex justify-between text-sm mt-1">
               <span className="text-muted-foreground">Type:</span>
@@ -1461,7 +1450,7 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
         partyId: data.partyId,
         settlementPeriod: data.period,
         settlementDate: todayLocalISO(),
-        totalAmountKwd: data.totalAmount.toFixed(3),
+        totalAmountKwd: formatKWD(data.totalAmount),
         voucherIds: JSON.stringify(data.voucherIds),
         accountId,
         status: "pending",
@@ -1568,7 +1557,7 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
                         <div className="font-medium text-sm truncate">{party.partyName}</div>
                         <div className="text-xs text-muted-foreground">{party.voucherCount} pending</div>
                       </div>
-                      <div className="font-mono font-semibold text-sm">{party.totalAmountKwd.toFixed(3)} KWD</div>
+                      <div className="font-mono font-semibold text-sm">{formatKWD(party.totalAmountKwd)} KWD</div>
                     </div>
                   </div>
                 ))}
@@ -1593,17 +1582,17 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
                           <TableCell className="py-1.5 text-sm text-muted-foreground">{format(new Date(v.voucherDate), "dd/MM/yy")}</TableCell>
                           <TableCell className="py-1.5 text-sm text-right font-mono">
                             {partyType === "partner" 
-                              ? formatCurrency(v.totalPartnerProfitKwd || "0")
+                              ? formatKWD(v.totalPartnerProfitKwd || "0")
                               : partyType === "packing"
-                                ? formatCurrency(v.packingChargesKwd || "0")
-                                : formatCurrency(((v as any)._hkDxbAmount || 0) + ((v as any)._dxbKwiAmount || 0))
+                                ? formatKWD(v.packingChargesKwd || "0")
+                                : formatKWD(((v as any)._hkDxbAmount || 0) + ((v as any)._dxbKwiAmount || 0))
                             }
                           </TableCell>
                         </TableRow>
                       ))}
                       <TableRow className="bg-muted/30">
                         <TableCell colSpan={2} className="py-1.5 text-sm font-semibold">Total</TableCell>
-                        <TableCell className="py-1.5 text-sm text-right font-mono font-semibold">{selectedParty.totalAmountKwd.toFixed(3)} KWD</TableCell>
+                        <TableCell className="py-1.5 text-sm text-right font-mono font-semibold">{formatKWD(selectedParty.totalAmountKwd)} KWD</TableCell>
                       </TableRow>
                     </TableBody>
                   </Table>
@@ -1638,7 +1627,7 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
               data-testid="button-finalize-settlement"
             >
               {settleMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Pay {selectedParty.totalAmountKwd.toFixed(3)} KWD
+              Pay {formatKWD(selectedParty.totalAmountKwd)} KWD
             </Button>
           )}
         </DialogFooter>

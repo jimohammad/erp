@@ -21,16 +21,19 @@ export function subtractDecimals(a: string | number | null | undefined, b: strin
   return toDecimal(a).minus(toDecimal(b));
 }
 
-export function multiplyDecimals(a: string | number | null | undefined, b: string | number | null | undefined): Decimal {
-  return toDecimal(a).times(toDecimal(b));
+export function multiplyDecimals(a: string | number | Decimal | null | undefined, b: string | number | Decimal | null | undefined): Decimal {
+  const aDec = a instanceof Decimal ? a : toDecimal(a);
+  const bDec = b instanceof Decimal ? b : toDecimal(b);
+  return aDec.times(bDec);
 }
 
-export function divideDecimals(a: string | number | null | undefined, b: string | number | null | undefined): Decimal {
-  const divisor = toDecimal(b);
-  if (divisor.isZero()) {
+export function divideDecimals(a: string | number | Decimal | null | undefined, b: string | number | Decimal | null | undefined): Decimal {
+  const aDec = a instanceof Decimal ? a : toDecimal(a);
+  const bDec = b instanceof Decimal ? b : toDecimal(b);
+  if (bDec.isZero()) {
     return new Decimal(0);
   }
-  return toDecimal(a).dividedBy(divisor);
+  return aDec.dividedBy(bDec);
 }
 
 export function formatKWD(value: string | number | Decimal | null | undefined): string {

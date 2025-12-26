@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { todayLocalISO } from "@/lib/dateUtils";
+import { toDecimal, addDecimals, divideDecimals, formatKWD, formatCurrency } from "@/lib/currency";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, useSearch } from "wouter";
 import companyLogoUrl from "@/assets/company-logo.jpg";
@@ -150,7 +151,7 @@ export default function PaymentsPage() {
     setSplits(newSplits);
   };
   
-  const splitTotal = splits.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+  const splitTotal = splits.reduce((sum, s) => sum.plus(toDecimal(s.amount)), toDecimal(0));
 
   const { data: paymentsData, isLoading: paymentsLoading } = useQuery<{ data: PaymentWithDetails[]; total: number }>({
     queryKey: ["/api/payments", page],
@@ -329,17 +330,17 @@ export default function PaymentsPage() {
     setFxAmount(value);
     // If both FX amount and KWD amount exist, calculate the exchange rate
     if (value && amount) {
-      const fxAmt = parseFloat(value);
-      const kwdAmt = parseFloat(amount);
-      if (!isNaN(fxAmt) && !isNaN(kwdAmt) && kwdAmt > 0) {
-        setFxRate((fxAmt / kwdAmt).toFixed(4));
+      const fxAmt = toDecimal(value);
+      const kwdAmt = toDecimal(amount);
+      if (!fxAmt.isNaN() && !kwdAmt.isNaN() && kwdAmt.greaterThan(0)) {
+        setFxRate(divideDecimals(fxAmt, kwdAmt).toFixed(4));
       }
     } else if (value && fxRate) {
       // Fallback: if rate exists, calculate KWD
-      const rate = parseFloat(fxRate);
-      const fxAmt = parseFloat(value);
-      if (!isNaN(rate) && !isNaN(fxAmt) && rate > 0) {
-        setAmount((fxAmt / rate).toFixed(3));
+      const rate = toDecimal(fxRate);
+      const fxAmt = toDecimal(value);
+      if (!rate.isNaN() && !fxAmt.isNaN() && rate.greaterThan(0)) {
+        setAmount(divideDecimals(fxAmt, rate).toFixed(3));
       }
     }
   };
@@ -347,10 +348,10 @@ export default function PaymentsPage() {
   const handleFxRateChange = (value: string) => {
     setFxRate(value);
     if (fxAmount && value) {
-      const rate = parseFloat(value);
-      const fxAmt = parseFloat(fxAmount);
-      if (!isNaN(rate) && !isNaN(fxAmt) && rate > 0) {
-        setAmount((fxAmt / rate).toFixed(3));
+      const rate = toDecimal(value);
+      const fxAmt = toDecimal(fxAmount);
+      if (!rate.isNaN() && !fxAmt.isNaN() && rate.greaterThan(0)) {
+        setAmount(divideDecimals(fxAmt, rate).toFixed(3));
       }
     }
   };
@@ -359,10 +360,10 @@ export default function PaymentsPage() {
     setAmount(value);
     // For Payment OUT: if both KWD amount and FX amount exist, calculate exchange rate
     if (direction === "OUT" && value && fxAmount) {
-      const kwdAmt = parseFloat(value);
-      const fxAmt = parseFloat(fxAmount);
-      if (!isNaN(kwdAmt) && !isNaN(fxAmt) && kwdAmt > 0) {
-        setFxRate((fxAmt / kwdAmt).toFixed(4));
+      const kwdAmt = toDecimal(value);
+      const fxAmt = toDecimal(fxAmount);
+      if (!kwdAmt.isNaN() && !fxAmt.isNaN() && kwdAmt.greaterThan(0)) {
+        setFxRate(divideDecimals(fxAmt, kwdAmt).toFixed(4));
       }
     }
   };
@@ -376,9 +377,9 @@ export default function PaymentsPage() {
       : "";
     const partyLabel = payment.direction === "IN" ? "Received From" : "Paid To";
 
-    let currentBalance = 0;
-    let previousBalance = 0;
-    const paymentAmount = parseFloat(payment.amount);
+    let currentBalance = toDecimal(0);
+    let previousBalance = toDecimal(0);
+    const paymentAmount = toDecimal(payment.amount);
 
     if (payment.direction === "IN" && payment.customerId) {
       try {
@@ -387,8 +388,8 @@ export default function PaymentsPage() {
         });
         if (res.ok) {
           const data = await res.json();
-          currentBalance = data.balance || 0;
-          previousBalance = currentBalance + paymentAmount;
+          currentBalance = toDecimal(data.balance || 0);
+          previousBalance = currentBalance.plus(paymentAmount);
         }
       } catch (e) {
         console.error("Failed to fetch customer balance:", e);
@@ -407,7 +408,7 @@ export default function PaymentsPage() {
     const fxSection = payment.fxCurrency && payment.fxAmount ? `
       <div class="row">
         <span class="label">FX Amount:</span>
-        <span class="value">${parseFloat(payment.fxAmount).toFixed(2)} ${payment.fxCurrency}</span>
+        <span class="value">${formatCurrency(payment.fxAmount, 2)} ${payment.fxCurrency}</span>
       </div>
       <div class="row">
         <span class="label">Rate:</span>
@@ -419,11 +420,11 @@ export default function PaymentsPage() {
       <div class="balance-section">
         <div class="row">
           <span class="label">Previous Bal:</span>
-          <span class="value">${previousBalance.toFixed(3)} KWD</span>
+          <span class="value">${formatKWD(previousBalance)} KWD</span>
         </div>
         <div class="row">
           <span class="label">Current Bal:</span>
-          <span class="value">${currentBalance.toFixed(3)} KWD</span>
+          <span class="value">${formatKWD(currentBalance)} KWD</span>
         </div>
       </div>
     ` : "";
@@ -498,7 +499,7 @@ export default function PaymentsPage() {
             ${payment.splits.map((split: { paymentType: string; amount: string }) => `
               <div class="row">
                 <span class="label">${split.paymentType}:</span>
-                <span class="value">${parseFloat(split.amount).toFixed(3)} KWD</span>
+                <span class="value">${formatKWD(split.amount)} KWD</span>
               </div>
             `).join('')}
           </div>
@@ -515,7 +516,7 @@ export default function PaymentsPage() {
           
           <div class="total-row row">
             <span>AMOUNT (KWD):</span>
-            <span>${parseFloat(payment.amount).toFixed(3)}</span>
+            <span>${formatKWD(payment.amount)}</span>
           </div>
           
           ${balanceSection}
@@ -544,9 +545,9 @@ export default function PaymentsPage() {
       : "";
     const partyLabel = payment.direction === "IN" ? "Received From" : "Paid To";
 
-    let currentBalance = 0;
-    let previousBalance = 0;
-    const paymentAmount = parseFloat(payment.amount);
+    let currentBalance = toDecimal(0);
+    let previousBalance = toDecimal(0);
+    const paymentAmount = toDecimal(payment.amount);
 
     if (payment.direction === "IN" && payment.customerId) {
       try {
@@ -555,8 +556,8 @@ export default function PaymentsPage() {
         });
         if (res.ok) {
           const data = await res.json();
-          currentBalance = data.balance || 0;
-          previousBalance = currentBalance + paymentAmount;
+          currentBalance = toDecimal(data.balance || 0);
+          previousBalance = currentBalance.plus(paymentAmount);
         }
       } catch (e) {
         console.error("Failed to fetch customer balance:", e);
@@ -772,12 +773,12 @@ export default function PaymentsPage() {
                 <th class="amount-col">Amounts</th>
               </tr>
               <tr class="data-row">
-                <td>${numberToWords(paymentAmount)} Dinars only</td>
+                <td>${numberToWords(paymentAmount.toNumber())} Dinars only</td>
                 <td class="amount-col">${payment.direction === "IN" ? "Received" : "Paid"}</td>
               </tr>
               <tr class="data-row">
                 <td></td>
-                <td class="amount-col" style="font-weight: bold;">KWD ${paymentAmount.toFixed(3)}</td>
+                <td class="amount-col" style="font-weight: bold;">KWD ${formatKWD(paymentAmount)}</td>
               </tr>
               ${payment.direction === "IN" ? `
               <tr class="header-row">
@@ -787,7 +788,7 @@ export default function PaymentsPage() {
               ${payment.splits && payment.splits.length > 0 ? 
                 payment.splits.map((split: { paymentType: string; amount: string }) => `
                   <tr class="data-row">
-                    <td>${split.paymentType.toUpperCase()}: KWD ${parseFloat(split.amount).toFixed(3)}</td>
+                    <td>${split.paymentType.toUpperCase()}: KWD ${formatKWD(split.amount)}</td>
                     <td class="amount-col"></td>
                   </tr>
                 `).join('') : `
@@ -802,7 +803,7 @@ export default function PaymentsPage() {
               </tr>
               <tr class="data-row">
                 <td></td>
-                <td class="amount-col" style="font-weight: bold;">KWD ${previousBalance.toFixed(3)}</td>
+                <td class="amount-col" style="font-weight: bold;">KWD ${formatKWD(previousBalance)}</td>
               </tr>
               <tr class="data-row">
                 <td></td>
@@ -810,7 +811,7 @@ export default function PaymentsPage() {
               </tr>
               <tr class="data-row">
                 <td></td>
-                <td class="amount-col" style="font-weight: bold;">KWD ${currentBalance.toFixed(3)}</td>
+                <td class="amount-col" style="font-weight: bold;">KWD ${formatKWD(currentBalance)}</td>
               </tr>
               ` : `
               <tr class="header-row">
@@ -820,7 +821,7 @@ export default function PaymentsPage() {
               ${payment.splits && payment.splits.length > 0 ? 
                 payment.splits.map((split: { paymentType: string; amount: string }) => `
                   <tr class="data-row">
-                    <td>${split.paymentType.toUpperCase()}: KWD ${parseFloat(split.amount).toFixed(3)}</td>
+                    <td>${split.paymentType.toUpperCase()}: KWD ${formatKWD(split.amount)}</td>
                     <td class="amount-col"></td>
                   </tr>
                 `).join('') : `
@@ -901,13 +902,13 @@ export default function PaymentsPage() {
     
     if (splitEnabled) {
       // Validate splits
-      const validSplits = splits.filter(s => s.amount && parseFloat(s.amount) > 0);
+      const validSplits = splits.filter(s => s.amount && toDecimal(s.amount).greaterThan(0));
       if (validSplits.length < 2) {
         toast({ title: "Split payment requires at least 2 payment methods with amounts", variant: "destructive" });
         return;
       }
-      const total = validSplits.reduce((sum, s) => sum + parseFloat(s.amount), 0);
-      if (total <= 0) {
+      const total = validSplits.reduce((sum, s) => sum.plus(toDecimal(s.amount)), toDecimal(0));
+      if (total.lessThanOrEqualTo(0)) {
         toast({ title: "Please enter valid amounts", variant: "destructive" });
         return;
       }
@@ -924,7 +925,7 @@ export default function PaymentsPage() {
         supplierId: direction === "OUT" && supplierId ? parseInt(supplierId) : null,
         purchaseOrderId: direction === "OUT" && purchaseOrderId ? parseInt(purchaseOrderId) : null,
         paymentType: validSplits[0].paymentType,
-        amount: total.toFixed(3),
+        amount: formatKWD(total),
         fxCurrency: null,
         fxRate: null,
         fxAmount: null,
@@ -939,7 +940,7 @@ export default function PaymentsPage() {
         })),
       });
     } else {
-      if (!amount || parseFloat(amount) <= 0) {
+      if (!amount || toDecimal(amount).lessThanOrEqualTo(0)) {
         toast({ title: "Please enter a valid amount", variant: "destructive" });
         return;
       }
@@ -1027,11 +1028,11 @@ export default function PaymentsPage() {
 
   const totalIn = filteredPayments
     .filter(p => p.direction === "IN")
-    .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    .reduce((sum, p) => sum.plus(toDecimal(p.amount)), toDecimal(0));
   
   const totalOut = filteredPayments
     .filter(p => p.direction === "OUT")
-    .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    .reduce((sum, p) => sum.plus(toDecimal(p.amount)), toDecimal(0));
 
   const { data: todaySummary } = useQuery<{ total: number; byType: Record<string, number>; date: string }>({
     queryKey: ["/api/payments/today-summary"],
@@ -1060,7 +1061,7 @@ export default function PaymentsPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Today's Payment In</p>
                 <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400" data-testid="text-total-payment-in">
-                  {todayTotalIn.toFixed(3)} KWD
+                  {formatKWD(todayTotalIn)} KWD
                 </p>
               </div>
             </div>
@@ -1068,27 +1069,27 @@ export default function PaymentsPage() {
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-100 dark:bg-green-900">
                 <Banknote className="h-3.5 w-3.5 text-green-700 dark:text-green-300" />
                 <span className="text-xs text-green-700 dark:text-green-300">Cash</span>
-                <span className="text-sm font-semibold text-green-800 dark:text-green-200" data-testid="text-today-cash">{todayByType.Cash.toFixed(3)}</span>
+                <span className="text-sm font-semibold text-green-800 dark:text-green-200" data-testid="text-today-cash">{formatKWD(todayByType.Cash)}</span>
               </div>
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-blue-100 dark:bg-blue-900">
                 <Building2 className="h-3.5 w-3.5 text-blue-700 dark:text-blue-300" />
                 <span className="text-xs text-blue-700 dark:text-blue-300">NBK</span>
-                <span className="text-sm font-semibold text-blue-800 dark:text-blue-200" data-testid="text-today-nbk">{todayByType["NBK Bank"].toFixed(3)}</span>
+                <span className="text-sm font-semibold text-blue-800 dark:text-blue-200" data-testid="text-today-nbk">{formatKWD(todayByType["NBK Bank"])}</span>
               </div>
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-purple-100 dark:bg-purple-900">
                 <Building2 className="h-3.5 w-3.5 text-purple-700 dark:text-purple-300" />
                 <span className="text-xs text-purple-700 dark:text-purple-300">CBK</span>
-                <span className="text-sm font-semibold text-purple-800 dark:text-purple-200" data-testid="text-today-cbk">{todayByType["CBK Bank"].toFixed(3)}</span>
+                <span className="text-sm font-semibold text-purple-800 dark:text-purple-200" data-testid="text-today-cbk">{formatKWD(todayByType["CBK Bank"])}</span>
               </div>
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-orange-100 dark:bg-orange-900">
                 <CreditCard className="h-3.5 w-3.5 text-orange-700 dark:text-orange-300" />
                 <span className="text-xs text-orange-700 dark:text-orange-300">Knet</span>
-                <span className="text-sm font-semibold text-orange-800 dark:text-orange-200" data-testid="text-today-knet">{todayByType.Knet.toFixed(3)}</span>
+                <span className="text-sm font-semibold text-orange-800 dark:text-orange-200" data-testid="text-today-knet">{formatKWD(todayByType.Knet)}</span>
               </div>
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-pink-100 dark:bg-pink-900">
                 <CreditCard className="h-3.5 w-3.5 text-pink-700 dark:text-pink-300" />
                 <span className="text-xs text-pink-700 dark:text-pink-300">Wamd</span>
-                <span className="text-sm font-semibold text-pink-800 dark:text-pink-200" data-testid="text-today-wamd">{todayByType.Wamd.toFixed(3)}</span>
+                <span className="text-sm font-semibold text-pink-800 dark:text-pink-200" data-testid="text-today-wamd">{formatKWD(todayByType.Wamd)}</span>
               </div>
             </div>
           </div>
@@ -1330,7 +1331,7 @@ export default function PaymentsPage() {
                 ))}
                 <div className="flex justify-between items-center pt-2 border-t">
                   <span className="text-sm font-medium">Total:</span>
-                  <span className="text-xl font-bold font-mono">{splitTotal.toFixed(3)} KWD</span>
+                  <span className="text-xl font-bold font-mono">{formatKWD(splitTotal)} KWD</span>
                 </div>
               </div>
             ) : (
@@ -1539,7 +1540,7 @@ export default function PaymentsPage() {
                           </Badge>
                         </td>
                         <td className="py-3 px-2 text-right font-mono">
-                          {parseFloat(payment.amount).toFixed(3)}
+                          {formatKWD(payment.amount)}
                         </td>
                         <td className="py-3 px-2 text-muted-foreground text-xs">
                           {payment.reference || "-"}
@@ -1579,17 +1580,17 @@ export default function PaymentsPage() {
                           <div className="flex items-center gap-2">
                             <ArrowDownLeft className="h-4 w-4 text-emerald-600" />
                             <span className="text-muted-foreground">IN:</span>
-                            <span className="font-mono font-bold text-emerald-600">{totalIn.toFixed(3)}</span>
+                            <span className="font-mono font-bold text-emerald-600">{formatKWD(totalIn)}</span>
                           </div>
                           <div className="flex items-center gap-2">
                             <ArrowUpRight className="h-4 w-4 text-red-600" />
                             <span className="text-muted-foreground">OUT:</span>
-                            <span className="font-mono font-bold text-red-600">{totalOut.toFixed(3)}</span>
+                            <span className="font-mono font-bold text-red-600">{formatKWD(totalOut)}</span>
                           </div>
                           <div className="border-l pl-4 flex items-center gap-2">
                             <span className="text-muted-foreground">Net:</span>
-                            <span className={`font-mono font-bold ${totalIn - totalOut >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                              {(totalIn - totalOut).toFixed(3)} KWD
+                            <span className={`font-mono font-bold ${totalIn.minus(totalOut).greaterThanOrEqualTo(0) ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {formatKWD(totalIn.minus(totalOut))} KWD
                             </span>
                           </div>
                         </div>
@@ -1691,7 +1692,7 @@ export default function PaymentsPage() {
                 <p className="text-xs text-muted-foreground">Amount</p>
                 <p className={`text-2xl font-bold font-mono flex items-center gap-2 ${selectedPayment.direction === "IN" ? "text-emerald-600" : "text-red-600"}`}>
                   <Banknote className="h-6 w-6" />
-                  {selectedPayment.direction === "OUT" ? "-" : "+"}{parseFloat(selectedPayment.amount).toFixed(3)} KWD
+                  {selectedPayment.direction === "OUT" ? "-" : "+"}{formatKWD(selectedPayment.amount)} KWD
                 </p>
               </div>
               
@@ -1755,7 +1756,7 @@ export default function PaymentsPage() {
             <AlertDialogTitle>Delete Payment?</AlertDialogTitle>
             <AlertDialogDescription>
               Are you sure you want to delete this {paymentToDelete?.direction === "IN" ? "incoming" : "outgoing"} payment of{" "}
-              <strong>{paymentToDelete ? parseFloat(paymentToDelete.amount).toFixed(3) : 0} KWD</strong>
+              <strong>{paymentToDelete ? formatKWD(paymentToDelete.amount) : "0.000"} KWD</strong>
               {paymentToDelete?.direction === "IN" && paymentToDelete?.customer 
                 ? ` from ${paymentToDelete.customer.name}` 
                 : paymentToDelete?.direction === "OUT" && paymentToDelete?.supplier

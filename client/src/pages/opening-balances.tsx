@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Plus, Trash2, Package, Users, Building2, Shield, Wallet } from "lucide-react";
+import { formatKWD, toDecimal } from "@/lib/currency";
 import type { 
   InventoryAdjustmentWithDetails, 
   OpeningBalanceWithDetails, 
@@ -243,9 +244,9 @@ export default function OpeningBalances() {
     });
   };
 
-  const formatCurrency = (amount: string | null) => {
+  const formatCurrencyDisplay = (amount: string | null) => {
     if (!amount) return "-";
-    return `KWD ${parseFloat(amount).toFixed(3)}`;
+    return `KWD ${formatKWD(amount)}`;
   };
 
   const parties = balancePartyType === "customer" ? customers : suppliers;
@@ -385,7 +386,7 @@ export default function OpeningBalances() {
                       <TableRow key={account.id} data-testid={`row-account-${account.id}`}>
                         <TableCell className="font-medium">{account.name}</TableCell>
                         <TableCell className="text-right font-mono">
-                          {parseFloat(account.balance || "0").toFixed(3)}
+                          {formatKWD(account.balance)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -530,7 +531,7 @@ export default function OpeningBalances() {
                             <Badge variant="outline">{adj.branch?.name || "Unknown"}</Badge>
                           </TableCell>
                           <TableCell className="text-right">{adj.quantity}</TableCell>
-                          <TableCell className="text-right">{formatCurrency(adj.unitCostKwd)}</TableCell>
+                          <TableCell className="text-right">{formatCurrencyDisplay(adj.unitCostKwd)}</TableCell>
                           <TableCell>{adj.effectiveDate}</TableCell>
                           <TableCell className="text-muted-foreground">{adj.notes || "-"}</TableCell>
                           <TableCell>
@@ -702,8 +703,8 @@ export default function OpeningBalances() {
                               <span className="text-muted-foreground">All</span>
                             )}
                           </TableCell>
-                          <TableCell className={`text-right font-medium ${parseFloat(bal.balanceAmount) >= 0 ? "text-green-600" : "text-red-600"}`}>
-                            {formatCurrency(bal.balanceAmount)}
+                          <TableCell className={`text-right font-medium ${toDecimal(bal.balanceAmount).greaterThanOrEqualTo(0) ? "text-green-600" : "text-red-600"}`}>
+                            {formatCurrencyDisplay(bal.balanceAmount)}
                           </TableCell>
                           <TableCell>{bal.effectiveDate}</TableCell>
                           <TableCell className="text-muted-foreground">{bal.notes || "-"}</TableCell>

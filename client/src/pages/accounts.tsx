@@ -50,6 +50,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatKWD, toDecimal } from "@/lib/currency";
 import type { Account, AccountTransferWithDetails } from "@shared/schema";
 
 interface AccountTransaction {
@@ -312,7 +313,7 @@ export default function AccountsPage() {
   };
 
   // Calculate total balance
-  const totalBalance = accounts.reduce((sum, acc) => sum + parseFloat(acc.balance || "0"), 0);
+  const totalBalanceDec = accounts.reduce((sum, acc) => sum.plus(toDecimal(acc.balance)), toDecimal(0));
 
   // Get account icon and styling based on name
   const getAccountStyle = (name: string) => {
@@ -500,7 +501,7 @@ export default function AccountsPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Total Balance (All Accounts)</p>
                 <p className="text-3xl font-bold tabular-nums" data-testid="text-total-balance">
-                  {totalBalance.toFixed(3)} <span className="text-lg font-normal text-muted-foreground">KWD</span>
+                  {formatKWD(totalBalanceDec)} <span className="text-lg font-normal text-muted-foreground">KWD</span>
                 </p>
               </div>
               <Wallet className="w-10 h-10 text-primary/50" />
@@ -518,7 +519,7 @@ export default function AccountsPage() {
               accounts.map((account) => {
                 const style = getAccountStyle(account.name);
                 const AccountIcon = style.icon;
-                const balance = parseFloat(account.balance || "0");
+                const balanceDec = toDecimal(account.balance);
                 
                 return (
                   <Card 
@@ -575,7 +576,7 @@ export default function AccountsPage() {
                         <p className="text-sm font-medium text-foreground/80">{account.name}</p>
                         <div className="flex items-baseline gap-1">
                           <span className="text-xl font-bold tabular-nums" data-testid={`text-balance-${account.id}`}>
-                            {balance.toFixed(3)}
+                            {formatKWD(balanceDec)}
                           </span>
                           <span className="text-xs text-muted-foreground">KWD</span>
                         </div>
@@ -648,10 +649,10 @@ export default function AccountsPage() {
                             </Badge>
                           </TableCell>
                           <TableCell className={`text-right font-medium tabular-nums ${tx.amount >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                            {tx.amount >= 0 ? "+" : ""}{tx.amount.toFixed(3)}
+                            {tx.amount >= 0 ? "+" : ""}{formatKWD(tx.amount)}
                           </TableCell>
                           <TableCell className="text-right font-medium tabular-nums">
-                            {tx.balance.toFixed(3)}
+                            {formatKWD(tx.balance)}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -702,7 +703,7 @@ export default function AccountsPage() {
                         <TableCell>{transfer.fromAccount?.name || "-"}</TableCell>
                         <TableCell>{transfer.toAccount?.name || "-"}</TableCell>
                         <TableCell className="text-right font-medium tabular-nums">
-                          {parseFloat(transfer.amount).toFixed(3)} KWD
+                          {formatKWD(transfer.amount)} KWD
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">{transfer.notes || "-"}</TableCell>
                       </TableRow>
