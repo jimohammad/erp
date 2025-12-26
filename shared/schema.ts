@@ -1169,38 +1169,6 @@ export const insertDocumentVerificationSchema = createInsertSchema(documentVerif
 export type InsertDocumentVerification = z.infer<typeof insertDocumentVerificationSchema>;
 export type DocumentVerification = typeof documentVerifications.$inferSelect;
 
-// ==================== ALL TRANSACTIONS ====================
-// Unified view of all financial transactions across modules
-
-export type TransactionModule = 
-  | "sales" 
-  | "purchase" 
-  | "payment_in" 
-  | "payment_out" 
-  | "sale_return" 
-  | "purchase_return" 
-  | "expense" 
-  | "discount";
-
-export type AllTransaction = {
-  id: string;
-  transactionDate: string;
-  module: TransactionModule;
-  reference: string;
-  partyId: number | null;
-  partyName: string | null;
-  partyType: string | null;
-  branchId: number | null;
-  branchName: string | null;
-  amountKwd: string;
-  amountFx: string | null;
-  fxCurrency: string | null;
-  fxRate: string | null;
-  notes: string | null;
-  createdBy: string | null;
-  createdAt: string;
-};
-
 // ==================== AUDIT TRAIL ====================
 // Immutable audit log for all financial transactions
 

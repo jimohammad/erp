@@ -75,7 +75,6 @@ const SalesmanStatementPage = lazy(() => import("@/pages/salesman-statement"));
 const StockListPage = lazy(() => import("@/pages/stock-list"));
 const PriceListPage = lazy(() => import("@/pages/price-list"));
 const VerifyPage = lazy(() => import("@/pages/verify"));
-const AllTransactionsPage = lazy(() => import("@/pages/all-transactions"));
 const CustomerAgingPage = lazy(() => import("@/pages/customer-aging"));
 const SendPriceListPage = lazy(() => import("@/pages/send-price-list"));
 const SalesmanAnalysisPage = lazy(() => import("@/pages/salesman-analysis"));
@@ -188,12 +187,6 @@ function AppSidebar() {
       url: "/stock-transfers",
       icon: ArrowLeftRight,
       module: "purchases",
-    },
-    {
-      title: "All Transactions",
-      url: "/all-transactions",
-      icon: List,
-      module: "all_transactions",
     },
   ].filter(item => canAccess(item.module));
 
@@ -690,8 +683,6 @@ function AuthenticatedLayout() {
         return "Customer Statement";
       case "/reports/export-imei":
         return "Export IMEI";
-      case "/all-transactions":
-        return "All Transactions";
       case "/settings/users":
         return "User Management";
       case "/settings/user-roles":
@@ -763,7 +754,6 @@ function AuthenticatedLayout() {
                 <Route path="/reports/item-report" component={ItemReportPage} />
                 <Route path="/reports/export-imei" component={ExportImeiPage} />
                 <Route path="/reports/customer-statement" component={CustomerStatementPage} />
-                <Route path="/all-transactions" component={AllTransactionsPage} />
                 <Route path="/reports/customer-aging" component={CustomerAgingPage} />
                 <Route path="/reports/salesman-analysis" component={SalesmanAnalysisPage} />
                 <Route path="/send-price-list" component={SendPriceListPage} />
