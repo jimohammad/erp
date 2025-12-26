@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,7 +77,7 @@ export default function ExportImeiPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `imei-export-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `imei-export-${todayLocalISO()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -135,7 +136,7 @@ export default function ExportImeiPage() {
         <!DOCTYPE html>
         <html>
         <head>
-          <title>IMEI Export - ${new Date().toISOString().split("T")[0]}</title>
+          <title>IMEI Export - ${todayLocalISO()}</title>
           <style>
             @media print {
               @page { margin: 1cm; }

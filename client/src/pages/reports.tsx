@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -122,11 +123,11 @@ export default function ReportsPage() {
   });
   const [plEndDate, setPlEndDate] = useState(() => {
     const now = new Date();
-    return now.toISOString().split('T')[0];
+    return todayLocalISO();
   });
   const [logoBase64, setLogoBase64] = useState<string>("");
   const printRef = useRef<HTMLDivElement>(null);
-  const { selectedBranchId } = useBranch();
+  const { currentBranchId } = useBranch();
 
   const { data: stockBalance = [], isLoading: stockLoading } = useQuery<StockBalanceItem[]>({
     queryKey: ["/api/reports/stock-balance"],
@@ -151,7 +152,7 @@ export default function ReportsPage() {
     ? `/api/reports/profit-loss?${new URLSearchParams({
         startDate: plStartDate,
         endDate: plEndDate,
-        ...(selectedBranchId && { branchId: selectedBranchId.toString() }),
+        ...(currentBranchId && { branchId: currentBranchId.toString() }),
       }).toString()}`
     : null;
 

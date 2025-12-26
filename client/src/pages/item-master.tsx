@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -274,7 +275,7 @@ export default function ItemMaster() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Items");
     
-    const today = new Date().toISOString().split("T")[0];
+    const today = todayLocalISO();
     XLSX.writeFile(wb, `Item_Master_${today}.xlsx`);
     
     toast({ title: "Export successful", description: `Exported ${exportData.length} items to Excel.` });

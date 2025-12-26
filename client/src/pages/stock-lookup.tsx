@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -96,7 +97,7 @@ export default function StockLookupPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `stock-report-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `stock-report-${todayLocalISO()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };

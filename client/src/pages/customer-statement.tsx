@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { todayLocalISO } from "@/lib/dateUtils";
 import companyLogoUrl from "@/assets/company-logo.jpg";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -195,7 +196,7 @@ export default function CustomerStatementPage() {
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Statement - ${statementData.customer.name} - ${new Date().toISOString().split("T")[0]}</title>
+          <title>Statement - ${statementData.customer.name} - ${todayLocalISO()}</title>
           <style>
             @media print { @page { margin: 1cm; } }
             body { font-family: Arial, sans-serif; padding: 20px; }

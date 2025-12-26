@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { useAuth } from "@/hooks/useAuth";
 import companyLogoUrl from "@/assets/company-logo.jpg";
 import { generateQRCodeDataURL } from "@/lib/qrcode";
@@ -93,7 +94,7 @@ export default function PaymentInPage() {
     setPage(1);
   };
   
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paymentDate, setPaymentDate] = useState(todayLocalISO());
   const [shouldPrintAfterSave, setShouldPrintAfterSave] = useState(false);
   const [printTypeAfterSave, setPrintTypeAfterSave] = useState<"thermal" | "a5">("a5");
   const [customerId, setCustomerId] = useState("");
@@ -121,7 +122,7 @@ export default function PaymentInPage() {
   // Cheque payment details
   const [chequeNumber, setChequeNumber] = useState("");
   const [chequeBankName, setChequeBankName] = useState("");
-  const [chequeDate, setChequeDate] = useState(new Date().toISOString().split("T")[0]);
+  const [chequeDate, setChequeDate] = useState(todayLocalISO());
   const [chequeDrawerName, setChequeDrawerName] = useState("");
   const [chequeNotes, setChequeNotes] = useState("");
   
@@ -203,8 +204,7 @@ export default function PaymentInPage() {
       splits?: Array<{ paymentType: string; amount: string; fxCurrency?: string; fxRate?: string; fxAmount?: string }>;
       chequeDetails?: { chequeNumber: string; bankName: string; chequeDate: string; drawerName?: string; notes?: string };
     }) => {
-      const response = await apiRequest("POST", "/api/payments", data);
-      return response.json();
+      return await apiRequest<PaymentWithDetails>("POST", "/api/payments", data);
     },
     onSuccess: async (savedPayment: PaymentWithDetails) => {
       await queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
@@ -244,7 +244,7 @@ export default function PaymentInPage() {
   });
 
   const resetForm = () => {
-    setPaymentDate(new Date().toISOString().split("T")[0]);
+    setPaymentDate(todayLocalISO());
     setCustomerId("");
     setPaymentType("Cash");
     setAmount("");
@@ -252,7 +252,7 @@ export default function PaymentInPage() {
     // Reset cheque fields
     setChequeNumber("");
     setChequeBankName("");
-    setChequeDate(new Date().toISOString().split("T")[0]);
+    setChequeDate(todayLocalISO());
     setChequeDrawerName("");
     setChequeNotes("");
   };

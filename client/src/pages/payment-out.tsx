@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { useAuth } from "@/hooks/useAuth";
 import companyLogoUrl from "@/assets/company-logo.jpg";
 import { generateQRCodeDataURL } from "@/lib/qrcode";
@@ -84,7 +85,7 @@ export default function PaymentOutPage() {
     setPage(1);
   };
   
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paymentDate, setPaymentDate] = useState(todayLocalISO());
   const [shouldPrintAfterSave, setShouldPrintAfterSave] = useState(false);
   const [supplierId, setSupplierId] = useState("");
   const [purchaseOrderId, setPurchaseOrderId] = useState("");
@@ -150,8 +151,7 @@ export default function PaymentOutPage() {
       reference: string | null;
       notes: string | null;
     }) => {
-      const response = await apiRequest("POST", "/api/payments", data);
-      return response.json();
+      return await apiRequest<PaymentWithDetails>("POST", "/api/payments", data);
     },
     onSuccess: async (savedPayment: PaymentWithDetails) => {
       await queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/payments") });
@@ -186,7 +186,7 @@ export default function PaymentOutPage() {
   });
 
   const resetForm = () => {
-    setPaymentDate(new Date().toISOString().split("T")[0]);
+    setPaymentDate(todayLocalISO());
     setSupplierId("");
     setPurchaseOrderId("");
     setPaymentType("Cash");

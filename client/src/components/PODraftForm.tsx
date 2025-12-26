@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { useBranch } from "@/contexts/BranchContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -70,7 +71,7 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
   const { currentBranch } = useBranch();
   
   const [poNumber, setPoNumber] = useState("");
-  const [poDate, setPoDate] = useState(new Date().toISOString().split("T")[0]);
+  const [poDate, setPoDate] = useState(todayLocalISO());
   const [supplierId, setSupplierId] = useState<string>("");
   const [fxCurrency, setFxCurrency] = useState<"AED" | "USD">("AED");
   const [fxRate, setFxRate] = useState("");
@@ -105,7 +106,7 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
   });
 
   const resetForm = () => {
-    setPoDate(new Date().toISOString().split("T")[0]);
+    setPoDate(todayLocalISO());
     setSupplierId("");
     setFxCurrency("AED");
     setFxRate("");

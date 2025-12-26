@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams } from "wouter";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,8 +51,7 @@ export default function PriceListPage() {
 
   const verifyMutation = useMutation({
     mutationFn: async (pinCode: string) => {
-      const response = await apiRequest("POST", `/api/public/price-list/${token}/verify`, { pin: pinCode });
-      return response.json();
+      return await apiRequest<PriceListData>("POST", `/api/public/price-list/${token}/verify`, { pin: pinCode });
     },
     onSuccess: (data: PriceListData) => {
       setPriceData(data);
@@ -72,7 +72,7 @@ export default function PriceListPage() {
   };
 
   const categories = priceData?.priceList 
-    ? [...new Set(priceData.priceList.map(item => item.category).filter(Boolean))]
+    ? Array.from(new Set(priceData.priceList.map(item => item.category).filter(Boolean)))
     : [];
 
   const filteredPrices = priceData?.priceList.filter(item => {
@@ -161,7 +161,7 @@ export default function PriceListPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `price-list-${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = `price-list-${todayLocalISO()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };

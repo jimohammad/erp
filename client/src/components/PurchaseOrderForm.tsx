@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +44,7 @@ export function PurchaseOrderForm({
   isSubmitting,
 }: PurchaseOrderFormProps) {
   const supplierSelectRef = useRef<HTMLButtonElement>(null);
-  const [purchaseDate, setPurchaseDate] = useState(new Date().toISOString().split("T")[0]);
+  const [purchaseDate, setPurchaseDate] = useState(todayLocalISO());
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [supplierId, setSupplierId] = useState<string>("");
 
@@ -107,7 +108,7 @@ export function PurchaseOrderForm({
   };
 
   const handleReset = () => {
-    setPurchaseDate(new Date().toISOString().split("T")[0]);
+    setPurchaseDate(todayLocalISO());
     setInvoiceNumber("");
     setSupplierId("");
     setFxCurrency("AED");

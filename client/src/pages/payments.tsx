@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation, useSearch } from "wouter";
 import companyLogoUrl from "@/assets/company-logo.jpg";
@@ -110,7 +111,7 @@ export default function PaymentsPage() {
     setPage(1);
   };
   
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paymentDate, setPaymentDate] = useState(todayLocalISO());
   const [direction, setDirection] = useState<PaymentDirection>("IN");
   const [shouldPrintAfterSave, setShouldPrintAfterSave] = useState(false);
   const [printTypeAfterSave, setPrintTypeAfterSave] = useState<"thermal" | "a5">("a5");
@@ -231,8 +232,7 @@ export default function PaymentsPage() {
       notes: string | null;
       splits?: { paymentType: string; amount: string; fxCurrency?: string; fxRate?: string; fxAmount?: string }[];
     }) => {
-      const response = await apiRequest("POST", "/api/payments", data);
-      return response.json();
+      return await apiRequest<PaymentWithDetails>("POST", "/api/payments", data);
     },
     onSuccess: async (savedPayment: PaymentWithDetails) => {
       // Invalidate all related queries for real-time updates
@@ -296,7 +296,7 @@ export default function PaymentsPage() {
   });
 
   const resetForm = () => {
-    setPaymentDate(new Date().toISOString().split("T")[0]);
+    setPaymentDate(todayLocalISO());
     setDirection("IN");
     setCustomerId("");
     setSupplierId("");

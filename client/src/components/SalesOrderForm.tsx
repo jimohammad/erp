@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +54,7 @@ export function SalesOrderForm({
   isSubmitting,
   isAdmin = false,
 }: SalesOrderFormProps) {
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().split("T")[0]);
+  const [saleDate, setSaleDate] = useState(todayLocalISO());
   const [invoiceNumber, setInvoiceNumber] = useState("");
   const [customerId, setCustomerId] = useState<string>("");
   const [salesmanId, setSalesmanId] = useState<string>("");
@@ -488,7 +489,7 @@ export function SalesOrderForm({
   };
 
   const handleReset = (refetchInvoiceNumber = false) => {
-    setSaleDate(new Date().toISOString().split("T")[0]);
+    setSaleDate(todayLocalISO());
     setInvoiceNumber("");
     setCustomerId("");
     setLineItems([

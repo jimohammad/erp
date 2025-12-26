@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { useBranch } from "@/contexts/BranchContext";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -55,7 +56,7 @@ export default function StockTransferNewPage() {
   const [, setLocation] = useLocation();
   const { branches, currentBranchId } = useBranch();
   const [formData, setFormData] = useState({
-    transferDate: new Date().toISOString().split("T")[0],
+    transferDate: todayLocalISO(),
     transferNumber: "",
     fromBranchId: currentBranchId?.toString() || "",
     toBranchId: "",

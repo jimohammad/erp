@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { todayLocalISO } from "@/lib/dateUtils";
 import { useBranch } from "@/contexts/BranchContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -553,7 +554,7 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
   }, [voucher]);
 
   const [selectedPOIds, setSelectedPOIds] = useState<number[]>(getInitialPOIds);
-  const [voucherDate, setVoucherDate] = useState(voucher?.voucherDate || new Date().toISOString().split("T")[0]);
+  const [voucherDate, setVoucherDate] = useState(voucher?.voucherDate || todayLocalISO());
   const [hkDxbPartyId, setHkDxbPartyId] = useState<number | null>(voucher?.partyId || null);
   const [dxbKwiPartyId, setDxbKwiPartyId] = useState<number | null>(voucher?.dxbKwiPartyId || null);
   const [partnerPartyId, setPartnerPartyId] = useState<number | null>(voucher?.partnerPartyId || null);
@@ -567,7 +568,7 @@ function VoucherFormPanel({ voucher, branchId, onClose, onSuccess }: VoucherForm
   // Sync all form fields when voucher changes (e.g., when editing a different voucher)
   useEffect(() => {
     setSelectedPOIds(getInitialPOIds());
-    setVoucherDate(voucher?.voucherDate || new Date().toISOString().split("T")[0]);
+    setVoucherDate(voucher?.voucherDate || todayLocalISO());
     setHkDxbPartyId(voucher?.partyId || null);
     setDxbKwiPartyId(voucher?.dxbKwiPartyId || null);
     setPartnerPartyId(voucher?.partnerPartyId || null);
@@ -1177,7 +1178,7 @@ interface PayLandedCostDialogProps {
 
 function PayLandedCostDialog({ voucher, onClose }: PayLandedCostDialogProps) {
   const { toast } = useToast();
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paymentDate, setPaymentDate] = useState(todayLocalISO());
   const [paymentType, setPaymentType] = useState("cash");
   const [paymentReference, setPaymentReference] = useState("");
 
@@ -1459,7 +1460,7 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
         partyType,
         partyId: data.partyId,
         settlementPeriod: data.period,
-        settlementDate: new Date().toISOString().split("T")[0],
+        settlementDate: todayLocalISO(),
         totalAmountKwd: data.totalAmount.toFixed(3),
         voucherIds: JSON.stringify(data.voucherIds),
         accountId,
