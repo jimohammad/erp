@@ -1081,9 +1081,14 @@ export class DatabaseStorage implements IStorage {
     lastSettlementDate: string | null;
     settlementStatus: 'overdue' | 'due_soon' | 'ok';
   }[]> {
-    // Get all salesmen
-    const salesmen = await db.select().from(suppliers)
-      .where(eq(suppliers.partyType, 'salesman'));
+    // Get all salesmen and customer balances ONCE (avoid N+1 queries)
+    const [salesmen, allBalances] = await Promise.all([
+      db.select().from(suppliers).where(eq(suppliers.partyType, 'salesman')),
+      this.getAllCustomerBalances()
+    ]);
+    
+    // Create a Map for O(1) balance lookups
+    const balanceMap = new Map(allBalances.map(b => [b.customerId, b.balance]));
     
     const today = new Date();
     const SETTLEMENT_PERIOD_DAYS = 90;
@@ -1112,19 +1117,13 @@ export class DatabaseStorage implements IStorage {
           sql`customer_id IS NOT NULL`
         ));
       
-      // Calculate outstanding credit by summing customer balances
-      // This gets the actual current balance of customers served by this salesman
+      // Calculate outstanding credit using the pre-fetched balance map
       let outstandingCredit = 0;
       const customerIdSet = new Set(customerOrders.map(o => o.customerId).filter(Boolean));
-      const uniqueCustomerIds = Array.from(customerIdSet) as number[];
-      
-      if (uniqueCustomerIds.length > 0) {
-        const allBalances = await this.getAllCustomerBalances();
-        for (const custId of uniqueCustomerIds) {
-          const balance = allBalances.find(b => b.customerId === custId);
-          if (balance && balance.balance > 0) {
-            outstandingCredit += balance.balance;
-          }
+      for (const custId of customerIdSet) {
+        const balance = balanceMap.get(custId as number);
+        if (balance && balance > 0) {
+          outstandingCredit += balance;
         }
       }
       
@@ -1185,8 +1184,14 @@ export class DatabaseStorage implements IStorage {
     rank: number;
     percentile: number;
   }[]> {
-    const salesmen = await db.select().from(suppliers)
-      .where(eq(suppliers.partyType, 'salesman'));
+    // Fetch salesmen and customer balances ONCE (avoid N+1 queries)
+    const [salesmen, allBalances] = await Promise.all([
+      db.select().from(suppliers).where(eq(suppliers.partyType, 'salesman')),
+      this.getAllCustomerBalances()
+    ]);
+    
+    // Create a Map for O(1) balance lookups
+    const balanceMap = new Map(allBalances.map(b => [b.customerId, b.balance]));
     
     const today = new Date();
     const ninety_days_ago = new Date(today);
@@ -1218,15 +1223,13 @@ export class DatabaseStorage implements IStorage {
       // Credit limit and utilization - using Decimal for precision
       const creditLimit = new Decimal(salesman.creditLimit || '0').toNumber();
       
-      // Get outstanding credit (current balance of customers served by this salesman)
+      // Get outstanding credit using pre-fetched balance map
       const customerIdSet2 = new Set(allSalesData.map(o => o.customerId).filter(Boolean));
-      const uniqueCustomerIds = Array.from(customerIdSet2) as number[];
       let outstandingCredit = 0;
-      const allBalances = await this.getAllCustomerBalances();
-      for (const custId of uniqueCustomerIds) {
-        const balance = allBalances.find(b => b.customerId === custId);
-        if (balance && balance.balance > 0) {
-          outstandingCredit += balance.balance;
+      for (const custId of customerIdSet2) {
+        const balance = balanceMap.get(custId as number);
+        if (balance && balance > 0) {
+          outstandingCredit += balance;
         }
       }
       
@@ -1234,6 +1237,7 @@ export class DatabaseStorage implements IStorage {
       
       // Calculate avg days goods are held (from sale to payment)
       // Get payments received from customers of this salesman
+      const uniqueCustomerIds = Array.from(customerIdSet2) as number[];
       const customerPayments = await db.select({
         paymentDate: payments.paymentDate,
         amount: payments.amount,
@@ -1241,7 +1245,7 @@ export class DatabaseStorage implements IStorage {
       }).from(payments)
         .where(and(
           eq(payments.direction, 'IN'),
-          inArray(payments.customerId, uniqueCustomerIds.length > 0 ? uniqueCustomerIds as number[] : [0])
+          inArray(payments.customerId, uniqueCustomerIds.length > 0 ? uniqueCustomerIds : [0])
         ));
       
       // Calculate average payment lag (days between sale and payment)
