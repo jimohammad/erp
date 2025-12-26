@@ -3248,35 +3248,6 @@ export async function registerRoutes(
     }
   });
 
-  // Partner Profit Settings (admin only to protect margin data)
-  app.get("/api/settings/partner-profit", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const settingsJson = await storage.getSetting('partner_profit_settings');
-      if (!settingsJson) {
-        return res.json({ settings: [] });
-      }
-      const settings = JSON.parse(settingsJson);
-      res.json({ settings });
-    } catch (error) {
-      console.error("Error fetching partner profit settings:", error);
-      res.status(500).json({ error: "Failed to fetch settings" });
-    }
-  });
-
-  app.post("/api/settings/partner-profit", isAuthenticated, isAdmin, async (req, res) => {
-    try {
-      const { settings } = req.body;
-      if (!Array.isArray(settings)) {
-        return res.status(400).json({ error: "Settings must be an array" });
-      }
-      await storage.setSetting('partner_profit_settings', JSON.stringify(settings));
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error saving partner profit settings:", error);
-      res.status(500).json({ error: "Failed to save settings" });
-    }
-  });
-
   // ==================== LANDED COST VOUCHERS ====================
 
   app.get("/api/landed-cost-vouchers", isAuthenticated, isAdmin, async (req, res) => {
