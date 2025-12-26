@@ -4059,7 +4059,7 @@ export class DatabaseStorage implements IStorage {
 
     // Pre-fetch all branches and line items in bulk to avoid N+1 queries
     const transferIds = transfers.map(t => t.id);
-    const branchIds = [...new Set([...transfers.map(t => t.fromBranchId), ...transfers.map(t => t.toBranchId)])];
+    const branchIds = Array.from(new Set([...transfers.map(t => t.fromBranchId), ...transfers.map(t => t.toBranchId)]));
     
     const [allBranches, allLineItems] = await Promise.all([
       db.select().from(branches).where(inArray(branches.id, branchIds)),
@@ -4127,8 +4127,8 @@ export class DatabaseStorage implements IStorage {
     if (adjustments.length === 0) return [];
 
     // Pre-fetch all items and branches in bulk to avoid N+1 queries
-    const itemIds = [...new Set(adjustments.map(a => a.itemId))];
-    const branchIds = [...new Set(adjustments.map(a => a.branchId))];
+    const itemIds = Array.from(new Set(adjustments.map(a => a.itemId)));
+    const branchIds = Array.from(new Set(adjustments.map(a => a.branchId)));
     
     const [allItems, allBranches] = await Promise.all([
       db.select().from(items).where(inArray(items.id, itemIds)),
@@ -4183,9 +4183,9 @@ export class DatabaseStorage implements IStorage {
     if (balances.length === 0) return [];
 
     // Pre-fetch all branches, customers, and suppliers in bulk to avoid N+1 queries
-    const branchIds = [...new Set(balances.filter(b => b.branchId).map(b => b.branchId!))];
-    const customerIds = [...new Set(balances.filter(b => b.partyType === "customer").map(b => b.partyId))];
-    const supplierIds = [...new Set(balances.filter(b => b.partyType === "supplier").map(b => b.partyId))];
+    const branchIds = Array.from(new Set(balances.filter(b => b.branchId).map(b => b.branchId!)));
+    const customerIds = Array.from(new Set(balances.filter(b => b.partyType === "customer").map(b => b.partyId)));
+    const supplierIds = Array.from(new Set(balances.filter(b => b.partyType === "supplier").map(b => b.partyId)));
     
     const [allBranches, allCustomers, allSuppliers] = await Promise.all([
       branchIds.length > 0 ? db.select().from(branches).where(inArray(branches.id, branchIds)) : Promise.resolve([]),
@@ -5556,7 +5556,7 @@ export class DatabaseStorage implements IStorage {
 
     // Pre-fetch all data in bulk to avoid N+1 queries
     const voucherIds = voucherRows.map(v => v.landed_cost_vouchers.id);
-    const partnerPartyIds = [...new Set(voucherRows.filter(v => v.landed_cost_vouchers.partnerPartyId).map(v => v.landed_cost_vouchers.partnerPartyId!))];
+    const partnerPartyIds = Array.from(new Set(voucherRows.filter(v => v.landed_cost_vouchers.partnerPartyId).map(v => v.landed_cost_vouchers.partnerPartyId!)));
     
     const [allLineItems, allPartnerParties] = await Promise.all([
       db.select().from(landedCostLineItems).where(inArray(landedCostLineItems.voucherId, voucherIds)).orderBy(landedCostLineItems.id),
@@ -5607,7 +5607,7 @@ export class DatabaseStorage implements IStorage {
 
     // Pre-fetch all data in bulk to avoid N+1 queries
     const voucherIds = voucherRows.map(v => v.landed_cost_vouchers.id);
-    const freightPartyIds = [...new Set(voucherRows.filter(v => v.landed_cost_vouchers.partyId).map(v => v.landed_cost_vouchers.partyId!))];
+    const freightPartyIds = Array.from(new Set(voucherRows.filter(v => v.landed_cost_vouchers.partyId).map(v => v.landed_cost_vouchers.partyId!)));
     
     const [allLineItems, allFreightParties] = await Promise.all([
       db.select().from(landedCostLineItems).where(inArray(landedCostLineItems.voucherId, voucherIds)).orderBy(landedCostLineItems.id),
