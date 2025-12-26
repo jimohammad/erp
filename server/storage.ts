@@ -5066,95 +5066,91 @@ export class DatabaseStorage implements IStorage {
       .where(whereClause)
       .orderBy(desc(landedCostVouchers.createdAt));
 
-    const result: LandedCostVoucherWithDetails[] = [];
-    for (const row of vouchersList) {
-      const lineItemsList = await db.select()
-        .from(landedCostLineItems)
-        .where(eq(landedCostLineItems.voucherId, row.landed_cost_vouchers.id))
-        .orderBy(landedCostLineItems.id);
+    if (vouchersList.length === 0) return [];
 
-      // Fetch partner party separately if exists
-      let partnerParty: Supplier | null = null;
-      if (row.landed_cost_vouchers.partnerPartyId) {
-        const [pp] = await db.select().from(suppliers).where(eq(suppliers.id, row.landed_cost_vouchers.partnerPartyId));
-        partnerParty = pp || null;
-      }
+    // Pre-fetch all related data in bulk to avoid N+1 queries
+    const voucherIds = vouchersList.map(v => v.landed_cost_vouchers.id);
+    
+    // Collect all unique party and payment IDs across all vouchers
+    const allPartyIds = new Set<number>();
+    const allPaymentIds = new Set<number>();
+    for (const v of vouchersList) {
+      if (v.landed_cost_vouchers.partnerPartyId) allPartyIds.add(v.landed_cost_vouchers.partnerPartyId);
+      if (v.landed_cost_vouchers.dxbKwiPartyId) allPartyIds.add(v.landed_cost_vouchers.dxbKwiPartyId);
+      if (v.landed_cost_vouchers.packingPartyId) allPartyIds.add(v.landed_cost_vouchers.packingPartyId);
+      if (v.landed_cost_vouchers.partnerPaymentId) allPaymentIds.add(v.landed_cost_vouchers.partnerPaymentId);
+      if (v.landed_cost_vouchers.packingPaymentId) allPaymentIds.add(v.landed_cost_vouchers.packingPaymentId);
+      if (v.landed_cost_vouchers.dxbKwiPaymentId) allPaymentIds.add(v.landed_cost_vouchers.dxbKwiPaymentId);
+    }
 
-      // Fetch DXB→KWI logistics party separately if exists
-      let dxbKwiParty: Supplier | null = null;
-      if (row.landed_cost_vouchers.dxbKwiPartyId) {
-        const [dkp] = await db.select().from(suppliers).where(eq(suppliers.id, row.landed_cost_vouchers.dxbKwiPartyId));
-        dxbKwiParty = dkp || null;
-      }
+    // Fetch all data in parallel
+    const [allLineItems, allLinkedPOs, allSuppliers, allPayments] = await Promise.all([
+      db.select().from(landedCostLineItems).where(inArray(landedCostLineItems.voucherId, voucherIds)).orderBy(landedCostLineItems.id),
+      db.select().from(landedCostVoucherPurchaseOrders).leftJoin(purchaseOrders, eq(landedCostVoucherPurchaseOrders.purchaseOrderId, purchaseOrders.id)).where(inArray(landedCostVoucherPurchaseOrders.voucherId, voucherIds)).orderBy(landedCostVoucherPurchaseOrders.sortOrder),
+      allPartyIds.size > 0 ? db.select().from(suppliers).where(inArray(suppliers.id, Array.from(allPartyIds))) : Promise.resolve([]),
+      allPaymentIds.size > 0 ? db.select().from(payments).where(inArray(payments.id, Array.from(allPaymentIds))) : Promise.resolve([]),
+    ]);
 
-      // Fetch packing party separately if exists
-      let packingParty: Supplier | null = null;
-      if (row.landed_cost_vouchers.packingPartyId) {
-        const [pkp] = await db.select().from(suppliers).where(eq(suppliers.id, row.landed_cost_vouchers.packingPartyId));
-        packingParty = pkp || null;
-      }
+    // Get all PO IDs to fetch their line items and suppliers
+    const allPOIds = allLinkedPOs.filter(lp => lp.purchase_orders).map(lp => lp.purchase_orders!.id);
+    const allPOSupplierIds = new Set(allLinkedPOs.filter(lp => lp.purchase_orders?.supplierId).map(lp => lp.purchase_orders!.supplierId!));
+    
+    const [allPOLineItems, allPOSuppliers] = await Promise.all([
+      allPOIds.length > 0 ? db.select().from(purchaseOrderLineItems).where(inArray(purchaseOrderLineItems.purchaseOrderId, allPOIds)) : Promise.resolve([]),
+      allPOSupplierIds.size > 0 ? db.select().from(suppliers).where(inArray(suppliers.id, Array.from(allPOSupplierIds))) : Promise.resolve([]),
+    ]);
 
-      // Fetch partner payment separately if exists
-      let partnerPayment: Payment | null = null;
-      if (row.landed_cost_vouchers.partnerPaymentId) {
-        const [pPmt] = await db.select().from(payments).where(eq(payments.id, row.landed_cost_vouchers.partnerPaymentId));
-        partnerPayment = pPmt || null;
-      }
+    // Create Maps for O(1) lookups
+    const lineItemsByVoucher = new Map<number, typeof allLineItems>();
+    for (const li of allLineItems) {
+      if (!lineItemsByVoucher.has(li.voucherId)) lineItemsByVoucher.set(li.voucherId, []);
+      lineItemsByVoucher.get(li.voucherId)!.push(li);
+    }
 
-      // Fetch packing payment separately if exists
-      let packingPayment: Payment | null = null;
-      if (row.landed_cost_vouchers.packingPaymentId) {
-        const [pkPmt] = await db.select().from(payments).where(eq(payments.id, row.landed_cost_vouchers.packingPaymentId));
-        packingPayment = pkPmt || null;
-      }
+    const linkedPOsByVoucher = new Map<number, typeof allLinkedPOs>();
+    for (const lp of allLinkedPOs) {
+      if (!linkedPOsByVoucher.has(lp.landed_cost_voucher_purchase_orders.voucherId)) linkedPOsByVoucher.set(lp.landed_cost_voucher_purchase_orders.voucherId, []);
+      linkedPOsByVoucher.get(lp.landed_cost_voucher_purchase_orders.voucherId)!.push(lp);
+    }
 
-      // Fetch DXB→KWI freight payment separately if exists
-      let dxbKwiPayment: Payment | null = null;
-      if (row.landed_cost_vouchers.dxbKwiPaymentId) {
-        const [dkPmt] = await db.select().from(payments).where(eq(payments.id, row.landed_cost_vouchers.dxbKwiPaymentId));
-        dxbKwiPayment = dkPmt || null;
-      }
+    const supplierMap = new Map(allSuppliers.map(s => [s.id, s]));
+    const paymentMap = new Map(allPayments.map(p => [p.id, p]));
+    const poSupplierMap = new Map(allPOSuppliers.map(s => [s.id, s]));
+    
+    const poLineItemsByPO = new Map<number, typeof allPOLineItems>();
+    for (const pli of allPOLineItems) {
+      if (!poLineItemsByPO.has(pli.purchaseOrderId)) poLineItemsByPO.set(pli.purchaseOrderId, []);
+      poLineItemsByPO.get(pli.purchaseOrderId)!.push(pli);
+    }
 
-      // Fetch all linked purchase orders from junction table
-      const linkedPOs = await db.select()
-        .from(landedCostVoucherPurchaseOrders)
-        .leftJoin(purchaseOrders, eq(landedCostVoucherPurchaseOrders.purchaseOrderId, purchaseOrders.id))
-        .where(eq(landedCostVoucherPurchaseOrders.voucherId, row.landed_cost_vouchers.id))
-        .orderBy(landedCostVoucherPurchaseOrders.sortOrder);
+    // Build result using Maps for O(1) lookups
+    const result: LandedCostVoucherWithDetails[] = vouchersList.map(row => {
+      const v = row.landed_cost_vouchers;
+      const linkedPOs = linkedPOsByVoucher.get(v.id) || [];
+      
+      const purchaseOrdersWithDetails: PurchaseOrderWithDetails[] = linkedPOs
+        .filter(lp => lp.purchase_orders)
+        .map(lp => ({
+          ...lp.purchase_orders!,
+          supplier: lp.purchase_orders!.supplierId ? poSupplierMap.get(lp.purchase_orders!.supplierId) || null : null,
+          lineItems: poLineItemsByPO.get(lp.purchase_orders!.id) || [],
+        }));
 
-      // Build full PO details with line items
-      const purchaseOrdersWithDetails: PurchaseOrderWithDetails[] = [];
-      for (const linkedPO of linkedPOs) {
-        if (linkedPO.purchase_orders) {
-          const poLineItems = await db.select()
-            .from(purchaseOrderLineItems)
-            .where(eq(purchaseOrderLineItems.purchaseOrderId, linkedPO.purchase_orders.id));
-          const [supplierRow] = linkedPO.purchase_orders.supplierId 
-            ? await db.select().from(suppliers).where(eq(suppliers.id, linkedPO.purchase_orders.supplierId))
-            : [null];
-          purchaseOrdersWithDetails.push({
-            ...linkedPO.purchase_orders,
-            supplier: supplierRow || null,
-            lineItems: poLineItems,
-          });
-        }
-      }
-
-      result.push({
-        ...row.landed_cost_vouchers,
+      return {
+        ...v,
         purchaseOrder: row.purchase_orders || null,
         purchaseOrders: purchaseOrdersWithDetails,
         party: row.suppliers || null,
-        dxbKwiParty,
-        partnerParty,
-        packingParty,
+        dxbKwiParty: v.dxbKwiPartyId ? supplierMap.get(v.dxbKwiPartyId) || null : null,
+        partnerParty: v.partnerPartyId ? supplierMap.get(v.partnerPartyId) || null : null,
+        packingParty: v.packingPartyId ? supplierMap.get(v.packingPartyId) || null : null,
         payment: row.payments || null,
-        dxbKwiPayment,
-        partnerPayment,
-        packingPayment,
-        lineItems: lineItemsList,
-      });
-    }
+        dxbKwiPayment: v.dxbKwiPaymentId ? paymentMap.get(v.dxbKwiPaymentId) || null : null,
+        partnerPayment: v.partnerPaymentId ? paymentMap.get(v.partnerPaymentId) || null : null,
+        packingPayment: v.packingPaymentId ? paymentMap.get(v.packingPaymentId) || null : null,
+        lineItems: lineItemsByVoucher.get(v.id) || [],
+      };
+    });
 
     return result;
   }
