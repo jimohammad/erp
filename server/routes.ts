@@ -853,53 +853,50 @@ export async function registerRoutes(
         }
       }
       
-      // Send WhatsApp notification to customer
-      if (customerId) {
-        try {
-          // Get customer details including phone
-          const customer = await storage.getCustomer(customerId);
-          
-          // Also check Party Master if customer was synced from there
-          let customerPhone = customer?.phone;
-          let customerName = customer?.name || "Valued Customer";
-          
-          // If no phone in customers table, try Party Master
-          if (!customerPhone && orderData.customerId >= 100000) {
-            const partyId = orderData.customerId - 100000;
-            const party = await storage.getSupplier(partyId);
-            if (party) {
-              customerPhone = party.phone;
-              customerName = party.name;
-            }
-          }
-          
-          if (customerPhone) {
-            const saleDetails = {
-              invoiceNumber: orderData.invoiceNumber,
-              saleDate: orderData.saleDate,
-              totalKwd: orderData.totalKwd,
-              customerName: customerName,
-              items: (lineItems || []).map((item: any) => ({
-                itemName: item.itemName,
-                quantity: item.quantity || 1,
-                priceKwd: item.priceKwd,
-                imeiNumbers: item.imeiNumbers,
-              })),
-            };
+      // Send WhatsApp notification to customer (fire-and-forget for performance)
+      // Disable with ENABLE_WHATSAPP=false for VPS performance
+      if (customerId && process.env.ENABLE_WHATSAPP !== 'false') {
+        // Fire-and-forget: don't await to avoid blocking the response
+        (async () => {
+          try {
+            const customer = await storage.getCustomer(customerId);
+            let customerPhone = customer?.phone;
+            let customerName = customer?.name || "Valued Customer";
             
-            const whatsappResult = await sendSaleNotification(customerPhone, saleDetails);
-            if (whatsappResult.success) {
-              console.log(`[WhatsApp] SUCCESS: Notification sent for sale order #${order.id} to ${customerPhone} (messageId: ${whatsappResult.messageId})`);
-            } else {
-              console.warn(`[WhatsApp] FAILED: Sale order #${order.id}, customer: ${customerName}, phone: ${customerPhone}, error: ${whatsappResult.error}`);
+            if (!customerPhone && orderData.customerId >= 100000) {
+              const partyId = orderData.customerId - 100000;
+              const party = await storage.getSupplier(partyId);
+              if (party) {
+                customerPhone = party.phone;
+                customerName = party.name;
+              }
             }
-          } else {
-            console.log(`[WhatsApp] SKIPPED: No phone number for customer ${customerId} (${customerName})`);
+            
+            if (customerPhone) {
+              const saleDetails = {
+                invoiceNumber: orderData.invoiceNumber,
+                saleDate: orderData.saleDate,
+                totalKwd: orderData.totalKwd,
+                customerName: customerName,
+                items: (lineItems || []).map((item: any) => ({
+                  itemName: item.itemName,
+                  quantity: item.quantity || 1,
+                  priceKwd: item.priceKwd,
+                  imeiNumbers: item.imeiNumbers,
+                })),
+              };
+              
+              const whatsappResult = await sendSaleNotification(customerPhone, saleDetails);
+              if (whatsappResult.success) {
+                console.log(`[WhatsApp] SUCCESS: Sale #${order.id} to ${customerPhone}`);
+              } else {
+                console.warn(`[WhatsApp] FAILED: Sale #${order.id}, error: ${whatsappResult.error}`);
+              }
+            }
+          } catch (whatsappError) {
+            console.error(`[WhatsApp] ERROR: Sale #${order.id}:`, whatsappError);
           }
-        } catch (whatsappError) {
-          // Don't fail the sale if WhatsApp fails - just log the error
-          console.error(`[WhatsApp] ERROR: Sale order #${order.id}, exception:`, whatsappError);
-        }
+        })();
       }
       
       // Audit log for sales order creation

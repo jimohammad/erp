@@ -118,16 +118,19 @@ app.use((req, res, next) => {
     () => {
       log(`serving on port ${port}`);
       
-      // Start backup scheduler AFTER server is accepting requests (non-blocking)
-      setImmediate(async () => {
-        try {
-          const { startBackupScheduler } = await import("./backupScheduler");
-          startBackupScheduler();
-        } catch (error) {
-          console.error("[WARN] Failed to start backup scheduler:", error);
-          // Don't crash the server - backup is optional functionality
-        }
-      });
+      // Start backup scheduler only if explicitly enabled (disabled by default for VPS performance)
+      if (process.env.ENABLE_BACKUPS === 'true') {
+        setImmediate(async () => {
+          try {
+            const { startBackupScheduler } = await import("./backupScheduler");
+            startBackupScheduler();
+          } catch (error) {
+            console.error("[WARN] Failed to start backup scheduler:", error);
+          }
+        });
+      } else {
+        log("Backup scheduler disabled (set ENABLE_BACKUPS=true to enable)", "startup");
+      }
     },
   );
 })();
