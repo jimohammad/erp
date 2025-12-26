@@ -17,6 +17,18 @@ function csrfProtection(req: Request, res: Response, next: NextFunction) {
     return next();
   }
   
+  // Exempt public API endpoints from CSRF (they don't require authentication)
+  // These are intentionally public-facing and accessed from external domains
+  // Use req.originalUrl to handle mounted routes correctly
+  const publicPaths = [
+    '/api/public/',           // All public endpoints (price list, etc.)
+    '/api/auth/login',        // Login endpoint
+    '/api/auth/logout',       // Logout endpoint
+  ];
+  if (publicPaths.some(path => req.originalUrl.startsWith(path))) {
+    return next();
+  }
+  
   // Allow requests without authentication (login/logout endpoints)
   if (!req.isAuthenticated || !req.isAuthenticated()) {
     return next();
