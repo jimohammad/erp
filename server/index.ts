@@ -36,15 +36,39 @@ declare module "http" {
   }
 }
 
+// Security headers middleware - bank-grade hardening
+app.use((req, res, next) => {
+  // Prevent clickjacking attacks
+  res.setHeader('X-Frame-Options', 'DENY');
+  // Prevent MIME type sniffing
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  // Enable XSS filter in browsers
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  // Referrer policy for privacy
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  // Content Security Policy - restrict resource loading
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' wss: ws:;");
+  // Permissions Policy - disable unnecessary browser features
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  // HSTS - enforce HTTPS in production
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  // Remove Express fingerprint
+  res.removeHeader('X-Powered-By');
+  next();
+});
+
 app.use(
   express.json({
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
+    limit: '10mb', // Limit request body size
   }),
 );
 
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -87,11 +111,27 @@ app.use((req, res, next) => {
     process.exit(1);
   }
 
+  // Secure error handler - sanitizes responses in production
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-    console.error(`[ERROR] ${err.message}`, err.stack);
-    res.status(status).json({ message });
+    
+    // Log full error details for debugging (server-side only)
+    console.error(`[ERROR] ${err.message}`);
+    if (process.env.NODE_ENV !== 'production') {
+      console.error(err.stack);
+    }
+    
+    // In production, never expose internal error details
+    const isProduction = process.env.NODE_ENV === 'production';
+    const safeMessage = isProduction && status >= 500 
+      ? "An internal error occurred. Please try again later."
+      : (err.message || "Internal Server Error");
+    
+    res.status(status).json({ 
+      message: safeMessage,
+      // Only include error code in production for debugging reference
+      ...(isProduction && status >= 500 ? { errorCode: `ERR-${Date.now().toString(36)}` } : {})
+    });
   });
 
   // importantly only setup vite in development and after

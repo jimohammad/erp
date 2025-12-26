@@ -4726,20 +4726,12 @@ export class DatabaseStorage implements IStorage {
   }> {
     const today = new Date();
     
-    // Build filter conditions
-    let itemFilter = '';
-    let supplierFilter = '';
-    
-    if (filters?.itemName) {
-      itemFilter = `AND poli.item_name ILIKE '%${filters.itemName}%'`;
-    }
-    if (filters?.supplierId) {
-      supplierFilter = `AND po.supplier_id = ${filters.supplierId}`;
-    }
+    // Sanitize filter inputs to prevent SQL injection
+    const sanitizedItemName = filters?.itemName ? filters.itemName.replace(/[%_\\]/g, '\\$&') : null;
+    const sanitizedSupplierId = filters?.supplierId ? Number(filters.supplierId) : null;
 
-    // Calculate stock aging using FIFO approach
-    // Get all purchase lots with their dates and remaining quantities
-    const result = await db.execute(sql.raw(`
+    // Calculate stock aging using FIFO approach with parameterized queries
+    const result = await db.execute(sql`
       WITH purchase_lots AS (
         SELECT 
           poli.item_name,
@@ -4753,7 +4745,9 @@ export class DatabaseStorage implements IStorage {
         FROM purchase_order_line_items poli
         JOIN purchase_orders po ON poli.purchase_order_id = po.id
         LEFT JOIN suppliers s ON po.supplier_id = s.id
-        WHERE 1=1 ${itemFilter} ${supplierFilter}
+        WHERE 1=1 
+          ${sanitizedItemName ? sql`AND poli.item_name ILIKE ${'%' + sanitizedItemName + '%'}` : sql``}
+          ${sanitizedSupplierId ? sql`AND po.supplier_id = ${sanitizedSupplierId}` : sql``}
       ),
       sold_qty AS (
         SELECT item_name, COALESCE(SUM(quantity), 0) as qty
@@ -4841,7 +4835,7 @@ export class DatabaseStorage implements IStorage {
       FROM aged_stock
       GROUP BY item_name, supplier_name
       ORDER BY item_name
-    `));
+    `);
 
     const details = result.rows as Array<{
       itemName: string;
