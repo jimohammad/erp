@@ -37,16 +37,6 @@ The system is designed as an enterprise productivity tool with a focus on effici
 
 **Recommendation**: Evaluate 3-6 months after launch once baseline performance is established.
 
-### WhatsApp Business Integration (Implemented)
-**Status**: Active - Sends automatic sale notifications to customers
-**Account Details**: Facebook Business Manager Account ID: 816615727952157, Phone Number ID: 931389683383196
-**Implementation**: 
-- Located in `server/whatsapp.ts`
-- Automatically sends sale transaction details when a sale is saved
-- Requires customer to have a valid phone number in Party Master
-- Supports Kuwait mobile (5/6/9 prefix) and landline (2 prefix) numbers
-- Logs all WhatsApp activity with `[WhatsApp]` prefix for monitoring
-
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.

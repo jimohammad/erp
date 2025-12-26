@@ -6,7 +6,6 @@ import { insertSupplierSchema, insertItemSchema, insertPurchaseOrderSchema, inse
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupAuth, isAuthenticated, isAdmin } from "./localAuth";
 import { listBackups, getBackupDownloadUrl, createBackup } from "./backupScheduler";
-import { sendSaleNotification } from "./whatsapp";
 
 // CSRF Protection Middleware - validates Origin/Referer against configured allowed origins
 // Uses environment-driven allowlist, not request Host header (prevents spoofing)
@@ -853,51 +852,6 @@ export async function registerRoutes(
         }
       }
       
-      // Send WhatsApp notification to customer (fire-and-forget for performance)
-      // Disable with ENABLE_WHATSAPP=false for VPS performance
-      if (customerId && process.env.ENABLE_WHATSAPP !== 'false') {
-        // Fire-and-forget: don't await to avoid blocking the response
-        (async () => {
-          try {
-            const customer = await storage.getCustomer(customerId);
-            let customerPhone = customer?.phone;
-            let customerName = customer?.name || "Valued Customer";
-            
-            if (!customerPhone && orderData.customerId >= 100000) {
-              const partyId = orderData.customerId - 100000;
-              const party = await storage.getSupplier(partyId);
-              if (party) {
-                customerPhone = party.phone;
-                customerName = party.name;
-              }
-            }
-            
-            if (customerPhone) {
-              const saleDetails = {
-                invoiceNumber: orderData.invoiceNumber,
-                saleDate: orderData.saleDate,
-                totalKwd: orderData.totalKwd,
-                customerName: customerName,
-                items: (lineItems || []).map((item: any) => ({
-                  itemName: item.itemName,
-                  quantity: item.quantity || 1,
-                  priceKwd: item.priceKwd,
-                  imeiNumbers: item.imeiNumbers,
-                })),
-              };
-              
-              const whatsappResult = await sendSaleNotification(customerPhone, saleDetails);
-              if (whatsappResult.success) {
-                console.log(`[WhatsApp] SUCCESS: Sale #${order.id} to ${customerPhone}`);
-              } else {
-                console.warn(`[WhatsApp] FAILED: Sale #${order.id}, error: ${whatsappResult.error}`);
-              }
-            }
-          } catch (whatsappError) {
-            console.error(`[WhatsApp] ERROR: Sale #${order.id}:`, whatsappError);
-          }
-        })();
-      }
       
       // Audit log for sales order creation
       await createAuditLog(
@@ -4051,44 +4005,6 @@ export async function registerRoutes(
     }
   });
 
-  // WhatsApp Business API Integration
-  const { 
-    sendWhatsAppMessage: sendWhatsAppMsg,
-    buildSalesInvoiceMessage, 
-    buildPaymentReceiptMessage,
-    isWhatsAppConfigured 
-  } = await import("./whatsapp");
-
-  app.get("/api/whatsapp/status", isAuthenticated, (req, res) => {
-    res.json({ configured: isWhatsAppConfigured() });
-  });
-
-  app.post("/api/whatsapp/send-invoice", isAuthenticated, async (req: any, res) => {
-    try {
-      const { salesOrderId, phoneNumber } = req.body;
-      
-      if (!salesOrderId || !phoneNumber) {
-        return res.status(400).json({ error: "Sales order ID and phone number are required" });
-      }
-
-      const order = await storage.getSalesOrder(salesOrderId);
-      if (!order) {
-        return res.status(404).json({ error: "Sales order not found" });
-      }
-
-      const message = buildSalesInvoiceMessage(order);
-      const result = await sendWhatsAppMsg(phoneNumber, message);
-
-      if (result.success) {
-        res.json({ success: true, messageId: result.messageId });
-      } else {
-        res.status(400).json({ error: result.error });
-      }
-    } catch (error) {
-      console.error("WhatsApp invoice send error:", error);
-      res.status(500).json({ error: "Failed to send invoice via WhatsApp" });
-    }
-  });
 
   // ==================== ALL TRANSACTIONS ====================
   app.get("/api/transactions", isAuthenticated, async (req: any, res) => {
@@ -4123,99 +4039,6 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/whatsapp/send-payment-receipt", isAuthenticated, async (req: any, res) => {
-    try {
-      const { paymentId, phoneNumber } = req.body;
-      
-      if (!paymentId || !phoneNumber) {
-        return res.status(400).json({ error: "Payment ID and phone number are required" });
-      }
-
-      const payment = await storage.getPayment(paymentId);
-      if (!payment) {
-        return res.status(404).json({ error: "Payment not found" });
-      }
-
-      const message = buildPaymentReceiptMessage(payment);
-      const result = await sendWhatsAppMsg(phoneNumber, message);
-
-      if (result.success) {
-        res.json({ success: true, messageId: result.messageId });
-      } else {
-        res.status(400).json({ error: result.error });
-      }
-    } catch (error) {
-      console.error("WhatsApp payment receipt send error:", error);
-      res.status(500).json({ error: "Failed to send payment receipt via WhatsApp" });
-    }
-  });
-
-  app.post("/api/whatsapp/send-price-list", isAuthenticated, async (req: any, res) => {
-    try {
-      const { customerId, itemIds } = req.body;
-      
-      if (!customerId || !itemIds || !Array.isArray(itemIds) || itemIds.length === 0) {
-        return res.status(400).json({ error: "Customer ID and item IDs are required" });
-      }
-
-      const customer = await storage.getSupplier(customerId);
-      if (!customer) {
-        return res.status(404).json({ error: "Customer not found" });
-      }
-
-      if (!customer.phone) {
-        return res.status(400).json({ error: "Customer does not have a phone number" });
-      }
-
-      const items = await storage.getItems();
-      const selectedItems = items.filter(item => itemIds.includes(item.id));
-
-      if (selectedItems.length === 0) {
-        return res.status(400).json({ error: "No valid items found" });
-      }
-
-      const stockBalance = await storage.getStockBalance();
-      const stockMap = new Map<string, number>();
-      stockBalance.forEach((item: any) => {
-        stockMap.set(item.itemName, item.balance);
-      });
-
-      const lines: string[] = [];
-      lines.push(`*Iqbal Electronics Co. WLL*`);
-      lines.push(`━━━━━━━━━━━━━━━━━━━━`);
-      lines.push(``);
-      lines.push(`Dear ${customer.name},`);
-      lines.push(`Here is our latest price list:`);
-      lines.push(``);
-      
-      for (const item of selectedItems) {
-        const price = item.sellingPriceKwd ? parseFloat(item.sellingPriceKwd).toFixed(3) : "N/A";
-        const stock = stockMap.get(item.name) ?? 0;
-        const availability = stock > 0 ? `Available (${stock})` : "Out of Stock";
-        lines.push(`*${item.name}*`);
-        lines.push(`  Price: ${price} KWD`);
-        lines.push(`  ${availability}`);
-        lines.push(``);
-      }
-      
-      lines.push(`━━━━━━━━━━━━━━━━━━━━`);
-      lines.push(`For orders, please contact us.`);
-      lines.push(`Thank you!`);
-
-      const message = lines.join('\n');
-      const result = await sendWhatsAppMsg(customer.phone, message);
-
-      if (result.success) {
-        console.log(`[WhatsApp] Price list sent to ${customer.name} (${customer.phone})`);
-        res.json({ success: true, messageId: result.messageId });
-      } else {
-        res.status(400).json({ error: result.error });
-      }
-    } catch (error) {
-      console.error("WhatsApp price list send error:", error);
-      res.status(500).json({ error: "Failed to send price list via WhatsApp" });
-    }
-  });
 
   // ========== Admin User Management ==========
   

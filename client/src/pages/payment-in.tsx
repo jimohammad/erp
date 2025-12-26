@@ -52,7 +52,6 @@ import {
   ChevronDown,
   FileText,
 } from "lucide-react";
-import { SiWhatsapp } from "react-icons/si";
 import type { PaymentWithDetails, Customer, PaymentType, User } from "@shared/schema";
 import { PAYMENT_TYPES } from "@shared/schema";
 
@@ -83,9 +82,6 @@ export default function PaymentInPage() {
   const [selectedPayment, setSelectedPayment] = useState<PaymentWithDetails | null>(null);
   const [paymentToDelete, setPaymentToDelete] = useState<PaymentWithDetails | null>(null);
   const [page, setPage] = useState(1);
-  const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
-  const [whatsAppPhone, setWhatsAppPhone] = useState("");
-  const [whatsAppPayment, setWhatsAppPayment] = useState<PaymentWithDetails | null>(null);
   
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
@@ -246,50 +242,6 @@ export default function PaymentInPage() {
       toast({ title: "Failed to delete payment", description: error.message, variant: "destructive" });
     },
   });
-
-  const sendWhatsAppMutation = useMutation({
-    mutationFn: async (data: { paymentId: number; phoneNumber: string }) => {
-      const res = await apiRequest("POST", "/api/whatsapp/send-payment-receipt", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Receipt Sent",
-        description: "Payment receipt has been sent via WhatsApp",
-      });
-      setShowWhatsAppDialog(false);
-      setWhatsAppPhone("");
-      setWhatsAppPayment(null);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to Send",
-        description: error.message || "Could not send receipt via WhatsApp",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleWhatsAppSend = (payment: PaymentWithDetails) => {
-    setWhatsAppPhone(payment.customer?.phone || "");
-    setWhatsAppPayment(payment);
-    setShowWhatsAppDialog(true);
-  };
-
-  const handleSendWhatsApp = () => {
-    if (!whatsAppPhone.trim() || !whatsAppPayment) {
-      toast({
-        title: "Phone Required",
-        description: "Please enter a phone number",
-        variant: "destructive",
-      });
-      return;
-    }
-    sendWhatsAppMutation.mutate({
-      paymentId: whatsAppPayment.id,
-      phoneNumber: whatsAppPhone.trim(),
-    });
-  };
 
   const resetForm = () => {
     setPaymentDate(new Date().toISOString().split("T")[0]);
@@ -1213,14 +1165,6 @@ export default function PaymentInPage() {
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleWhatsAppSend(payment)}
-                              data-testid={`button-whatsapp-payment-${payment.id}`}
-                            >
-                              <SiWhatsapp className="h-4 w-4" />
-                            </Button>
                             {isAdmin && (
                               <Button
                                 size="icon"
@@ -1341,37 +1285,6 @@ export default function PaymentInPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Dialog open={showWhatsAppDialog} onOpenChange={setShowWhatsAppDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Send Receipt via WhatsApp</DialogTitle>
-            <DialogDescription>
-              Enter the customer's phone number to send the payment receipt
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Phone Number</Label>
-              <Input
-                value={whatsAppPhone}
-                onChange={(e) => setWhatsAppPhone(e.target.value)}
-                placeholder="e.g., 96550001234"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowWhatsAppDialog(false)}>Cancel</Button>
-            <Button onClick={handleSendWhatsApp} disabled={sendWhatsAppMutation.isPending}>
-              {sendWhatsAppMutation.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4 mr-2" />
-              )}
-              Send
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

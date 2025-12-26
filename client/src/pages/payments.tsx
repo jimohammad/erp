@@ -58,7 +58,6 @@ import {
   Send,
   RotateCcw,
 } from "lucide-react";
-import { SiWhatsapp } from "react-icons/si";
 import type { PaymentWithDetails, Customer, Supplier, PaymentType, PaymentDirection, PurchaseOrderWithDetails } from "@shared/schema";
 import { PAYMENT_TYPES, PAYMENT_DIRECTIONS } from "@shared/schema";
 
@@ -92,12 +91,9 @@ export default function PaymentsPage() {
   const [selectedPayment, setSelectedPayment] = useState<PaymentWithDetails | null>(null);
   const [paymentToDelete, setPaymentToDelete] = useState<PaymentWithDetails | null>(null);
   const [page, setPage] = useState(1);
-  const [showWhatsAppDialog, setShowWhatsAppDialog] = useState(false);
   const [, navigate] = useLocation();
   const searchParams = useSearch();
   const viewId = new URLSearchParams(searchParams).get("viewId");
-  const [whatsAppPhone, setWhatsAppPhone] = useState("");
-  const [whatsAppPayment, setWhatsAppPayment] = useState<PaymentWithDetails | null>(null);
   
   const handleSearchChange = (value: string) => {
     setSearchTerm(value);
@@ -288,29 +284,6 @@ export default function PaymentsPage() {
     },
   });
 
-  const sendWhatsAppMutation = useMutation({
-    mutationFn: async (data: { paymentId: number; phoneNumber: string }) => {
-      const res = await apiRequest("POST", "/api/whatsapp/send-payment-receipt", data);
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Receipt Sent",
-        description: "Payment receipt has been sent via WhatsApp",
-      });
-      setShowWhatsAppDialog(false);
-      setWhatsAppPhone("");
-      setWhatsAppPayment(null);
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Failed to Send",
-        description: error.message || "Could not send receipt via WhatsApp",
-        variant: "destructive",
-      });
-    },
-  });
-
   const { data: userData } = useQuery<{ printerType?: string }>({
     queryKey: ["/api/auth/user"],
   });
@@ -321,29 +294,6 @@ export default function PaymentsPage() {
       return apiRequest("PUT", "/api/auth/user/printer-type", { printerType });
     },
   });
-
-  const handleWhatsAppSend = (payment: PaymentWithDetails) => {
-    // Only allow WhatsApp for incoming payments (from customers)
-    if (payment.direction !== "IN") return;
-    setWhatsAppPhone(payment.customer?.phone || "");
-    setWhatsAppPayment(payment);
-    setShowWhatsAppDialog(true);
-  };
-
-  const handleSendWhatsApp = () => {
-    if (!whatsAppPhone.trim() || !whatsAppPayment) {
-      toast({
-        title: "Phone Required",
-        description: "Please enter a phone number",
-        variant: "destructive",
-      });
-      return;
-    }
-    sendWhatsAppMutation.mutate({
-      paymentId: whatsAppPayment.id,
-      phoneNumber: whatsAppPhone.trim(),
-    });
-  };
 
   const resetForm = () => {
     setPaymentDate(new Date().toISOString().split("T")[0]);
@@ -1794,93 +1744,7 @@ export default function PaymentsPage() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            {selectedPayment?.direction === "IN" && (
-              <Button 
-                variant="outline" 
-                onClick={() => selectedPayment && handleWhatsAppSend(selectedPayment)}
-                className="text-green-600"
-                data-testid="button-whatsapp-payment"
-              >
-                <SiWhatsapp className="h-4 w-4 mr-2" />
-                Send Receipt
-              </Button>
-            )}
             <Button onClick={() => setSelectedPayment(null)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog 
-        open={showWhatsAppDialog} 
-        onOpenChange={(open) => {
-          setShowWhatsAppDialog(open);
-          if (!open) {
-            setWhatsAppPhone("");
-            setWhatsAppPayment(null);
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <SiWhatsapp className="h-5 w-5 text-green-600" />
-              Send Receipt via WhatsApp
-            </DialogTitle>
-            <DialogDescription>
-              Send this payment receipt directly to the customer's WhatsApp
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="whatsapp-phone-payment">Phone Number</Label>
-              <Input
-                id="whatsapp-phone-payment"
-                placeholder="e.g., 96599123456"
-                value={whatsAppPhone}
-                onChange={(e) => setWhatsAppPhone(e.target.value)}
-                data-testid="input-whatsapp-phone-payment"
-              />
-              <p className="text-xs text-muted-foreground">
-                Enter the full phone number with country code (e.g., 965 for Kuwait)
-              </p>
-            </div>
-            {whatsAppPayment && (
-              <div className="p-3 rounded-md bg-muted/50 text-sm">
-                <p className="font-medium mb-1">
-                  Payment from {whatsAppPayment.customer?.name || "Customer"}
-                </p>
-                <p className="text-muted-foreground">
-                  Amount: {parseFloat(whatsAppPayment.amount).toFixed(3)} KWD
-                </p>
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowWhatsAppDialog(false)}
-              data-testid="button-cancel-whatsapp-payment"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSendWhatsApp}
-              disabled={sendWhatsAppMutation.isPending}
-              className="bg-green-600 hover:bg-green-700"
-              data-testid="button-confirm-whatsapp-payment"
-            >
-              {sendWhatsAppMutation.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Sending...
-                </>
-              ) : (
-                <>
-                  <Send className="h-4 w-4 mr-2" />
-                  Send Receipt
-                </>
-              )}
-            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
