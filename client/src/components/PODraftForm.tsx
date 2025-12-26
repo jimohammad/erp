@@ -4,6 +4,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { todayLocalISO } from "@/lib/dateUtils";
 import { useBranch } from "@/contexts/BranchContext";
+import { toDecimal, multiplyDecimals, divideDecimals } from "@/lib/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -156,36 +157,40 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
 
   // Auto-calculate FX rate when both fxTransferred and kwdTransferred are entered
   useEffect(() => {
-    const fxAmount = parseFloat(fxTransferred) || 0;
-    const kwdAmount = parseFloat(kwdTransferred) || 0;
+    const fxAmountDec = toDecimal(fxTransferred);
+    const kwdAmountDec = toDecimal(kwdTransferred);
     
-    if (fxAmount > 0 && kwdAmount > 0) {
-      const calculatedRate = kwdAmount / fxAmount;
-      setFxRate(calculatedRate.toFixed(4));
+    if (fxAmountDec.greaterThan(0) && kwdAmountDec.greaterThan(0)) {
+      const calculatedRateDec = divideDecimals(kwdAmountDec, fxAmountDec);
+      setFxRate(calculatedRateDec.toFixed(4));
     }
   }, [fxTransferred, kwdTransferred]);
 
   useEffect(() => {
-    let totalFxFromItems = 0;
-    let totalKwdFromItems = 0;
-    const rate = parseFloat(fxRate) || 0;
-    const fxTrans = parseFloat(fxTransferred) || 0;
-    const kwdTrans = parseFloat(kwdTransferred) || 0;
+    let totalFxFromItemsDec = toDecimal(0);
+    let totalKwdFromItemsDec = toDecimal(0);
+    const rateDec = toDecimal(fxRate);
+    const fxTransDec = toDecimal(fxTransferred);
+    const kwdTransDec = toDecimal(kwdTransferred);
 
     lineItems.forEach((item) => {
       const qty = item.quantity || 0;
-      const fxPrice = parseFloat(item.fxPrice) || 0;
-      const kwdPrice = parseFloat(item.priceKwd) || 0;
-      totalFxFromItems += qty * fxPrice;
-      totalKwdFromItems += qty * kwdPrice;
+      const fxPriceDec = toDecimal(item.fxPrice);
+      const kwdPriceDec = toDecimal(item.priceKwd);
+      totalFxFromItemsDec = totalFxFromItemsDec.plus(multiplyDecimals(fxPriceDec, qty));
+      totalKwdFromItemsDec = totalKwdFromItemsDec.plus(multiplyDecimals(kwdPriceDec, qty));
     });
 
     // Use kwdTransferred if available, then try fxTransferred * rate, otherwise sum from items
-    const calculatedKwd = kwdTrans || (fxTrans && rate ? (fxTrans * rate) : totalKwdFromItems);
+    const calculatedKwdDec = kwdTransDec.greaterThan(0) 
+      ? kwdTransDec 
+      : (fxTransDec.greaterThan(0) && rateDec.greaterThan(0) 
+          ? multiplyDecimals(fxTransDec, rateDec) 
+          : totalKwdFromItemsDec);
 
     setTotals({
-      totalKwd: calculatedKwd.toFixed(3),
-      totalFx: totalFxFromItems ? totalFxFromItems.toFixed(2) : "",
+      totalKwd: calculatedKwdDec.toFixed(3),
+      totalFx: totalFxFromItemsDec.greaterThan(0) ? totalFxFromItemsDec.toFixed(2) : "",
     });
   }, [lineItems, fxRate, fxTransferred, kwdTransferred]);
 
@@ -224,24 +229,24 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
         if (item.id !== id) return item;
 
         const updated = { ...item, [field]: value };
-        const rate = parseFloat(fxRate) || 0;
+        const rateDec = toDecimal(fxRate);
 
         // When FX price changes, auto-calculate KWD price if rate is set
-        if (field === "fxPrice" && rate > 0) {
-          const fxPriceVal = parseFloat(value as string) || 0;
-          updated.priceKwd = (fxPriceVal / rate).toFixed(3);
+        if (field === "fxPrice" && rateDec.greaterThan(0)) {
+          const fxPriceValDec = toDecimal(value as string);
+          updated.priceKwd = divideDecimals(fxPriceValDec, rateDec).toFixed(3);
         }
 
         // Recalculate total KWD based on quantity and priceKwd
         if (field === "quantity" || field === "priceKwd" || field === "fxPrice") {
           const qtyVal = field === "quantity" ? value : item.quantity;
           const qty = typeof qtyVal === "number" ? qtyVal : (parseInt(qtyVal as string) || 0);
-          const price = field === "priceKwd" 
-            ? (parseFloat(value as string) || 0)
-            : (field === "fxPrice" && rate > 0)
-              ? (parseFloat(value as string) || 0) / rate
-              : parseFloat(item.priceKwd) || 0;
-          updated.totalKwd = (qty * price).toFixed(3);
+          const priceDec = field === "priceKwd" 
+            ? toDecimal(value as string)
+            : (field === "fxPrice" && rateDec.greaterThan(0))
+              ? divideDecimals(toDecimal(value as string), rateDec)
+              : toDecimal(item.priceKwd);
+          updated.totalKwd = multiplyDecimals(priceDec, qty).toFixed(3);
         }
 
         return updated;

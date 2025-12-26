@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { todayLocalISO } from "@/lib/dateUtils";
+import { toDecimal, formatKWD, multiplyDecimals } from "@/lib/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,13 +110,12 @@ export function SalesOrderForm({
   const [totalKwd, setTotalKwd] = useState("0.000");
 
   useEffect(() => {
-    let total = 0;
-    lineItems.forEach(item => {
+    const totalDec = lineItems.reduce((acc, item) => {
       const qty = item.quantity || 0;
-      const price = parseFloat(item.priceKwd) || 0;
-      total += qty * price;
-    });
-    setTotalKwd(total.toFixed(3));
+      const priceDec = toDecimal(item.priceKwd);
+      return acc.plus(multiplyDecimals(priceDec, qty));
+    }, toDecimal(0));
+    setTotalKwd(totalDec.toFixed(3));
   }, [lineItems]);
 
   const selectedCustomer = useMemo(() => {
@@ -130,23 +130,23 @@ export function SalesOrderForm({
   });
 
   const creditLimitInfo = useMemo(() => {
-    if (!selectedCustomer) return { hasLimit: false, limit: 0, exceeded: false, currentBalance: 0, newTotal: 0, available: 0 };
+    if (!selectedCustomer) return { hasLimit: false, limitDec: toDecimal(0), exceeded: false, currentBalanceDec: toDecimal(0), newTotalDec: toDecimal(0), availableDec: toDecimal(0) };
     
-    const limit = selectedCustomer.creditLimit ? parseFloat(selectedCustomer.creditLimit) : 0;
-    if (limit === 0) return { hasLimit: false, limit: 0, exceeded: false, currentBalance: 0, newTotal: 0, available: 0 };
+    const limitDec = toDecimal(selectedCustomer.creditLimit);
+    if (limitDec.isZero()) return { hasLimit: false, limitDec: toDecimal(0), exceeded: false, currentBalanceDec: toDecimal(0), newTotalDec: toDecimal(0), availableDec: toDecimal(0) };
     
-    const currentBalance = customerBalance?.balance || 0;
-    const saleAmount = parseFloat(totalKwd) || 0;
-    const newTotal = currentBalance + saleAmount;
-    const available = limit - currentBalance;
+    const currentBalanceDec = toDecimal(customerBalance?.balance);
+    const saleAmountDec = toDecimal(totalKwd);
+    const newTotalDec = currentBalanceDec.plus(saleAmountDec);
+    const availableDec = limitDec.minus(currentBalanceDec);
     
     return {
       hasLimit: true,
-      limit,
-      exceeded: newTotal > limit,
-      currentBalance,
-      newTotal,
-      available: available > 0 ? available : 0,
+      limitDec,
+      exceeded: newTotalDec.greaterThan(limitDec),
+      currentBalanceDec,
+      newTotalDec,
+      availableDec: availableDec.greaterThan(0) ? availableDec : toDecimal(0),
     };
   }, [selectedCustomer, totalKwd, customerBalance]);
 
@@ -168,9 +168,9 @@ export function SalesOrderForm({
     return lineItems.some((li) => {
       if (!li.itemName) return false;
       const itemData = items.find((itm) => itm.name === li.itemName);
-      const minPrice = itemData?.sellingPriceKwd ? parseFloat(itemData.sellingPriceKwd) : 0;
-      const currentPrice = parseFloat(li.priceKwd) || 0;
-      return minPrice > 0 && currentPrice < minPrice;
+      const minPriceDec = toDecimal(itemData?.sellingPriceKwd);
+      const currentPriceDec = toDecimal(li.priceKwd);
+      return minPriceDec.greaterThan(0) && currentPriceDec.lessThan(minPriceDec);
     });
   }, [lineItems, items]);
 
@@ -182,7 +182,7 @@ export function SalesOrderForm({
     return lineItems.some(li => 
       li.itemName && 
       li.quantity > 0 && 
-      parseFloat(li.priceKwd) > 0
+      toDecimal(li.priceKwd).greaterThan(0)
     );
   }, [lineItems]);
 
@@ -221,9 +221,9 @@ export function SalesOrderForm({
   // Thermal printer print function (80mm receipt)
   const printThermal = async () => {
     const customerName = selectedCustomer?.name || "Walk-in Customer";
-    const previousBalance = customerBalance?.balance || 0;
-    const invoiceAmount = parseFloat(totalKwd) || 0;
-    const currentBalance = previousBalance + invoiceAmount;
+    const previousBalanceDec = toDecimal(customerBalance?.balance);
+    const invoiceAmountDec = toDecimal(totalKwd);
+    const currentBalanceDec = previousBalanceDec.plus(invoiceAmountDec);
     
     const validItems = lineItems.filter(li => li.itemName && li.quantity > 0);
     
@@ -231,7 +231,7 @@ export function SalesOrderForm({
     const qrDataUrl = await generateQRCodeDataURL({
       type: 'SALE',
       number: invoiceNumber || 'N/A',
-      amount: invoiceAmount.toFixed(3),
+      amount: invoiceAmountDec.toFixed(3),
       date: saleDate,
       partyName: customerName,
       partyType: 'customer',
@@ -244,7 +244,7 @@ export function SalesOrderForm({
       <tr>
         <td style="text-align:left;padding:2px 0;">${li.itemName}</td>
         <td style="text-align:center;padding:2px 0;">${li.quantity}</td>
-        <td style="text-align:right;padding:2px 0;">${parseFloat(li.priceKwd || "0").toFixed(3)}</td>
+        <td style="text-align:right;padding:2px 0;">${formatKWD(li.priceKwd)}</td>
         <td style="text-align:right;padding:2px 0;">${li.totalKwd}</td>
       </tr>
     `).join("");
@@ -300,9 +300,9 @@ export function SalesOrderForm({
         </table>
         <div class="divider"></div>
         <div class="totals">
-          <div class="row"><span>Previous Balance:</span><span>${previousBalance.toFixed(3)} KWD</span></div>
-          <div class="row"><span>Invoice Amount:</span><span>${invoiceAmount.toFixed(3)} KWD</span></div>
-          <div class="row total-row"><span>Current Balance:</span><span>${currentBalance.toFixed(3)} KWD</span></div>
+          <div class="row"><span>Previous Balance:</span><span>${previousBalanceDec.toFixed(3)} KWD</span></div>
+          <div class="row"><span>Invoice Amount:</span><span>${invoiceAmountDec.toFixed(3)} KWD</span></div>
+          <div class="row total-row"><span>Current Balance:</span><span>${currentBalanceDec.toFixed(3)} KWD</span></div>
         </div>
         <div class="divider"></div>
         <div class="footer">Thank You!</div>
@@ -324,19 +324,19 @@ export function SalesOrderForm({
     const customerName = selectedCustomer?.name || "Walk-in Customer";
     const customerPhone = selectedCustomer?.phone || "";
     const customerAddress = "";
-    const previousBalance = customerBalance?.balance || 0;
-    const invoiceAmount = parseFloat(totalKwd) || 0;
+    const previousBalanceDec = toDecimal(customerBalance?.balance);
+    const invoiceAmountDec = toDecimal(totalKwd);
     
     // Generate QR code (no ID since this is before save)
     const qrDataUrl = await generateQRCodeDataURL({
       type: 'SALE',
       number: invoiceNumber || 'N/A',
-      amount: invoiceAmount.toFixed(3),
+      amount: invoiceAmountDec.toFixed(3),
       date: saleDate,
       partyName: customerName,
       partyType: 'customer',
     });
-    const currentBalance = previousBalance + invoiceAmount;
+    const currentBalanceDec = previousBalanceDec.plus(invoiceAmountDec);
     
     const validItems = lineItems.filter(li => li.itemName && li.quantity > 0);
     
@@ -348,7 +348,7 @@ export function SalesOrderForm({
         <td style="padding:4px 3px;border:1px solid #ddd;text-align:center;">${idx + 1}</td>
         <td style="padding:4px 3px;border:1px solid #ddd;">${li.itemName}</td>
         <td style="padding:4px 3px;border:1px solid #ddd;text-align:center;">${li.quantity}</td>
-        <td style="padding:4px 3px;border:1px solid #ddd;text-align:right;">${parseFloat(li.priceKwd || "0").toFixed(3)}</td>
+        <td style="padding:4px 3px;border:1px solid #ddd;text-align:right;">${formatKWD(li.priceKwd)}</td>
         <td style="padding:4px 3px;border:1px solid #ddd;text-align:right;">${li.totalKwd}</td>
       </tr>
     `).join("");
@@ -434,9 +434,9 @@ export function SalesOrderForm({
           </table>
           <div class="totals-section">
             <div class="totals-box">
-              <div class="totals-row"><span>Previous Balance:</span><span>${previousBalance.toFixed(3)} KWD</span></div>
-              <div class="totals-row"><span>Invoice Amount:</span><span>${invoiceAmount.toFixed(3)} KWD</span></div>
-              <div class="totals-row total"><span>Current Balance:</span><span>${currentBalance.toFixed(3)} KWD</span></div>
+              <div class="totals-row"><span>Previous Balance:</span><span>${previousBalanceDec.toFixed(3)} KWD</span></div>
+              <div class="totals-row"><span>Invoice Amount:</span><span>${invoiceAmountDec.toFixed(3)} KWD</span></div>
+              <div class="totals-row total"><span>Current Balance:</span><span>${currentBalanceDec.toFixed(3)} KWD</span></div>
             </div>
           </div>
           <div class="footer">
@@ -469,8 +469,8 @@ export function SalesOrderForm({
       
       if (field === "quantity" || field === "priceKwd") {
         const qty = field === "quantity" ? (value as number) : item.quantity;
-        const price = field === "priceKwd" ? parseFloat(value as string) || 0 : parseFloat(item.priceKwd) || 0;
-        updated.totalKwd = (qty * price).toFixed(3);
+        const priceDec = field === "priceKwd" ? toDecimal(value as string) : toDecimal(item.priceKwd);
+        updated.totalKwd = multiplyDecimals(priceDec, qty).toFixed(3);
       }
       
       return updated;
@@ -592,19 +592,19 @@ export function SalesOrderForm({
                 </SelectContent>
               </Select>
               {customerId && customerBalance !== undefined && (
-                <p className={`text-sm font-medium ${(customerBalance?.balance || 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`} data-testid="text-customer-balance">
-                  Current Balance: {(customerBalance?.balance || 0).toFixed(3)} KWD
-                  {(customerBalance?.balance || 0) > 0 && <span className="text-xs font-normal ml-1">(Amount Due)</span>}
+                <p className={`text-sm font-medium ${toDecimal(customerBalance?.balance).greaterThan(0) ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`} data-testid="text-customer-balance">
+                  Current Balance: {formatKWD(customerBalance?.balance)} KWD
+                  {toDecimal(customerBalance?.balance).greaterThan(0) && <span className="text-xs font-normal ml-1">(Amount Due)</span>}
                 </p>
               )}
               {creditLimitInfo.hasLimit && (
                 <div className="space-y-1">
                   <p className="text-xs text-muted-foreground" data-testid="text-credit-limit-info">
-                    Credit Limit: {creditLimitInfo.limit.toFixed(3)} KWD | Available: <span className={creditLimitInfo.available <= 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-green-600 dark:text-green-400 font-medium"}>{creditLimitInfo.available.toFixed(3)} KWD</span>
+                    Credit Limit: {creditLimitInfo.limitDec.toFixed(3)} KWD | Available: <span className={creditLimitInfo.availableDec.lessThanOrEqualTo(0) ? "text-red-600 dark:text-red-400 font-medium" : "text-green-600 dark:text-green-400 font-medium"}>{creditLimitInfo.availableDec.toFixed(3)} KWD</span>
                   </p>
                   {creditLimitInfo.exceeded && (
                     <p className="text-xs text-red-600 dark:text-red-400 font-medium" data-testid="text-credit-exceeded-warning">
-                      New balance ({creditLimitInfo.newTotal.toFixed(3)} KWD) will exceed credit limit!
+                      New balance ({creditLimitInfo.newTotalDec.toFixed(3)} KWD) will exceed credit limit!
                     </p>
                   )}
                 </div>
@@ -702,8 +702,8 @@ export function SalesOrderForm({
               <AlertDescription className="flex flex-col gap-1">
                 <span className="font-medium">Credit Limit Exceeded!</span>
                 <span>
-                  This sale of {totalKwd} KWD will bring the customer balance to {creditLimitInfo.newTotal.toFixed(3)} KWD, 
-                  which exceeds their credit limit of {creditLimitInfo.limit.toFixed(3)} KWD.
+                  This sale of {totalKwd} KWD will bring the customer balance to {creditLimitInfo.newTotalDec.toFixed(3)} KWD, 
+                  which exceeds their credit limit of {creditLimitInfo.limitDec.toFixed(3)} KWD.
                 </span>
                 {isAdmin ? (
                   <span className="text-xs mt-1">As an admin, you can still proceed with this sale.</span>

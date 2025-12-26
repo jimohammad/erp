@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { todayLocalISO } from "@/lib/dateUtils";
+import { toDecimal, multiplyDecimals } from "@/lib/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,18 +65,18 @@ export function PurchaseOrderForm({
   const [totals, setTotals] = useState({ totalKwd: "0.000", totalFx: "" });
 
   useEffect(() => {
-    let totalKwd = 0;
-    const rate = parseFloat(fxRate) || 0;
+    const rateDec = toDecimal(fxRate);
+    let totalKwdDec = toDecimal(0);
 
     lineItems.forEach(item => {
       const qty = typeof item.quantity === "number" ? item.quantity : (parseInt(item.quantity) || 0);
-      const price = parseFloat(item.priceKwd) || 0;
-      totalKwd += qty * price;
+      const priceDec = toDecimal(item.priceKwd);
+      totalKwdDec = totalKwdDec.plus(multiplyDecimals(priceDec, qty));
     });
 
     setTotals({
-      totalKwd: totalKwd.toFixed(3),
-      totalFx: rate ? (totalKwd * rate).toFixed(2) : "",
+      totalKwd: totalKwdDec.toFixed(3),
+      totalFx: rateDec.greaterThan(0) ? multiplyDecimals(totalKwdDec, rateDec).toFixed(2) : "",
     });
   }, [lineItems, fxRate]);
 
@@ -88,8 +89,8 @@ export function PurchaseOrderForm({
       if (field === "quantity" || field === "priceKwd") {
         const qtyVal = field === "quantity" ? value : item.quantity;
         const qty = typeof qtyVal === "number" ? qtyVal : (parseInt(qtyVal as string) || 0);
-        const price = field === "priceKwd" ? parseFloat(value as string) || 0 : parseFloat(item.priceKwd) || 0;
-        updated.totalKwd = (qty * price).toFixed(3);
+        const priceDec = field === "priceKwd" ? toDecimal(value as string) : toDecimal(item.priceKwd);
+        updated.totalKwd = multiplyDecimals(priceDec, qty).toFixed(3);
       }
       
       return updated;

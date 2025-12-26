@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Trash2, Smartphone, Plus, X } from "lucide-react";
+import { toDecimal, formatKWD } from "@/lib/currency";
 import type { Item } from "@shared/schema";
 
 export interface SalesLineItemData {
@@ -44,13 +45,13 @@ export function SalesLineItemRow({
 
   // Get the minimum selling price for the selected item
   const selectedItemData = items.find((itm) => itm.name === item.itemName);
-  const minPrice = selectedItemData?.sellingPriceKwd ? parseFloat(selectedItemData.sellingPriceKwd) : 0;
+  const minPriceDec = toDecimal(selectedItemData?.sellingPriceKwd);
 
   const handlePriceChange = (value: string) => {
-    const price = parseFloat(value) || 0;
+    const priceDec = toDecimal(value);
     
-    if (item.itemName && minPrice > 0 && price < minPrice) {
-      setPriceError(`Min price: ${minPrice.toFixed(3)} KWD`);
+    if (item.itemName && minPriceDec.greaterThan(0) && priceDec.lessThan(minPriceDec)) {
+      setPriceError(`Min price: ${formatKWD(minPriceDec)} KWD`);
     } else {
       setPriceError("");
     }
