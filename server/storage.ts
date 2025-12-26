@@ -3492,203 +3492,228 @@ export class DatabaseStorage implements IStorage {
     const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
     const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
 
-    // Helper function to get metrics for a specific period
+    // Helper function to get metrics for a specific period - ALL queries run in parallel
     const getMetricsForPeriod = async (month: number, year: number, isCurrentMonth: boolean) => {
-      // 1. Total Receivables - Sum of all outstanding customer balances
-      const receivablesResult = await db.execute(sql`
-        WITH customer_sales AS (
-          SELECT customer_id, COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as total
+      const [
+        receivablesResult,
+        payablesResult,
+        poInTransitResult,
+        stockValueResult,
+        accountsResult,
+        salesResult,
+        cogsResult
+      ] = await Promise.all([
+        // 1. Total Receivables
+        db.execute(sql`
+          WITH customer_sales AS (
+            SELECT customer_id, COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as total
+            FROM sales_orders
+            GROUP BY customer_id
+          ),
+          customer_payments AS (
+            SELECT customer_id, COALESCE(SUM(CAST(amount AS DECIMAL)), 0) as total
+            FROM payments
+            WHERE customer_id IS NOT NULL AND direction = 'IN'
+            GROUP BY customer_id
+          ),
+          customer_returns AS (
+            SELECT customer_id, COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as total
+            FROM returns
+            WHERE customer_id IS NOT NULL AND return_type = 'sale_return'
+            GROUP BY customer_id
+          ),
+          customer_discounts AS (
+            SELECT customer_id, COALESCE(SUM(CAST(discount_amount AS DECIMAL)), 0) as total
+            FROM discounts
+            WHERE customer_id IS NOT NULL
+            GROUP BY customer_id
+          ),
+          customer_opening AS (
+            SELECT party_id, COALESCE(SUM(CAST(balance_amount AS DECIMAL)), 0) as total
+            FROM opening_balances
+            WHERE party_type = 'customer'
+            GROUP BY party_id
+          )
+          SELECT COALESCE(SUM(
+            COALESCE(co.total, 0) + COALESCE(cs.total, 0) - COALESCE(cp.total, 0) - COALESCE(cr.total, 0) - COALESCE(cd.total, 0)
+          ), 0)::float as total
+          FROM customers c
+          LEFT JOIN customer_opening co ON c.id = co.party_id
+          LEFT JOIN customer_sales cs ON c.id = cs.customer_id
+          LEFT JOIN customer_payments cp ON c.id = cp.customer_id
+          LEFT JOIN customer_returns cr ON c.id = cr.customer_id
+          LEFT JOIN customer_discounts cd ON c.id = cd.customer_id
+          WHERE (COALESCE(co.total, 0) + COALESCE(cs.total, 0) - COALESCE(cp.total, 0) - COALESCE(cr.total, 0) - COALESCE(cd.total, 0)) > 0
+        `),
+        // 2. Total Payables
+        db.execute(sql`
+          WITH supplier_purchases AS (
+            SELECT supplier_id, COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as total
+            FROM purchase_orders
+            WHERE supplier_id IS NOT NULL
+            GROUP BY supplier_id
+          ),
+          supplier_payments AS (
+            SELECT s.id as supplier_id, COALESCE(SUM(CAST(p.amount AS DECIMAL)), 0) as total
+            FROM payments p
+            JOIN suppliers s ON p.party_id = s.id
+            WHERE p.direction = 'OUT'
+            GROUP BY s.id
+          ),
+          supplier_returns AS (
+            SELECT supplier_id, COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as total
+            FROM returns
+            WHERE supplier_id IS NOT NULL AND return_type = 'purchase_return'
+            GROUP BY supplier_id
+          ),
+          supplier_opening AS (
+            SELECT party_id, COALESCE(SUM(CAST(balance_amount AS DECIMAL)), 0) as total
+            FROM opening_balances
+            WHERE party_type = 'supplier'
+            GROUP BY party_id
+          )
+          SELECT COALESCE(SUM(
+            COALESCE(so.total, 0) + COALESCE(sp.total, 0) - COALESCE(spm.total, 0) - COALESCE(sr.total, 0)
+          ), 0)::float as total
+          FROM suppliers s
+          LEFT JOIN supplier_opening so ON s.id = so.party_id
+          LEFT JOIN supplier_purchases sp ON s.id = sp.supplier_id
+          LEFT JOIN supplier_payments spm ON s.id = spm.supplier_id
+          LEFT JOIN supplier_returns sr ON s.id = sr.supplier_id
+          WHERE s.party_type = 'supplier'
+          AND (COALESCE(so.total, 0) + COALESCE(sp.total, 0) - COALESCE(spm.total, 0) - COALESCE(sr.total, 0)) > 0
+        `),
+        // 3. PO In Transit
+        db.execute(sql`
+          SELECT COALESCE(SUM(CAST(po.total_kwd AS DECIMAL)), 0)::float as total
+          FROM purchase_orders po
+          WHERE po.grn_date IS NULL
+          AND EXISTS (
+            SELECT 1 FROM payments p 
+            WHERE p.purchase_order_id = po.id AND p.direction = 'OUT'
+          )
+        `),
+        // 4. Stock Value
+        db.execute(sql`
+          WITH purchased AS (
+            SELECT pli.item_name, COALESCE(SUM(pli.quantity), 0) as qty
+            FROM purchase_order_line_items pli
+            GROUP BY pli.item_name
+          ),
+          sold AS (
+            SELECT item_name, COALESCE(SUM(quantity), 0) as qty
+            FROM sales_order_line_items
+            GROUP BY item_name
+          ),
+          sale_returns AS (
+            SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
+            FROM return_line_items rl
+            JOIN returns r ON rl.return_id = r.id
+            WHERE r.return_type = 'sale_return'
+            GROUP BY rl.item_name
+          ),
+          purchase_returns AS (
+            SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
+            FROM return_line_items rl
+            JOIN returns r ON rl.return_id = r.id
+            WHERE r.return_type = 'purchase_return'
+            GROUP BY rl.item_name
+          ),
+          opening_stock AS (
+            SELECT i.name as item_name, COALESCE(SUM(ia.quantity), 0) as qty
+            FROM inventory_adjustments ia
+            JOIN items i ON ia.item_id = i.id
+            GROUP BY i.name
+          ),
+          all_items AS (
+            SELECT item_name FROM purchased
+            UNION SELECT item_name FROM sold
+            UNION SELECT item_name FROM sale_returns
+            UNION SELECT item_name FROM purchase_returns
+            UNION SELECT item_name FROM opening_stock
+          ),
+          item_stock AS (
+            SELECT 
+              ai.item_name,
+              (COALESCE(os.qty, 0) + COALESCE(p.qty, 0) - COALESCE(s.qty, 0) + COALESCE(sr.qty, 0) - COALESCE(pr.qty, 0)) as net_qty
+            FROM all_items ai
+            LEFT JOIN purchased p ON ai.item_name = p.item_name
+            LEFT JOIN sold s ON ai.item_name = s.item_name
+            LEFT JOIN sale_returns sr ON ai.item_name = sr.item_name
+            LEFT JOIN purchase_returns pr ON ai.item_name = pr.item_name
+            LEFT JOIN opening_stock os ON ai.item_name = os.item_name
+          )
+          SELECT COALESCE(SUM(
+            GREATEST(ist.net_qty, 0) * COALESCE(CAST(i.landed_cost_kwd AS DECIMAL), CAST(i.purchase_price_kwd AS DECIMAL), 0)
+          ), 0)::float as total
+          FROM item_stock ist
+          LEFT JOIN items i ON ist.item_name = i.name
+        `),
+        // 5. Account Balances
+        db.execute(sql`
+          WITH payment_totals AS (
+            SELECT 
+              payment_type,
+              SUM(CASE WHEN direction = 'IN' THEN CAST(amount AS DECIMAL) ELSE -CAST(amount AS DECIMAL) END) as net
+            FROM payments
+            GROUP BY payment_type
+          ),
+          expense_totals AS (
+            SELECT 
+              a.name as account_name,
+              -SUM(CAST(e.amount AS DECIMAL)) as net
+            FROM expenses e
+            JOIN accounts a ON e.account_id = a.id
+            GROUP BY a.name
+          ),
+          transfer_in AS (
+            SELECT to_account_id as account_id, SUM(CAST(amount AS DECIMAL)) as amount
+            FROM account_transfers
+            GROUP BY to_account_id
+          ),
+          transfer_out AS (
+            SELECT from_account_id as account_id, SUM(CAST(amount AS DECIMAL)) as amount
+            FROM account_transfers
+            GROUP BY from_account_id
+          )
+          SELECT 
+            a.name,
+            (COALESCE(p.net, 0) + COALESCE(e.net, 0) + COALESCE(ti.amount, 0) - COALESCE(tout.amount, 0))::float as balance
+          FROM accounts a
+          LEFT JOIN payment_totals p ON a.name = p.payment_type
+          LEFT JOIN expense_totals e ON a.name = e.account_name
+          LEFT JOIN transfer_in ti ON a.id = ti.account_id
+          LEFT JOIN transfer_out tout ON a.id = tout.account_id
+          ORDER BY a.id
+        `),
+        // 6. Monthly sales
+        db.execute(sql`
+          SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
           FROM sales_orders
-          GROUP BY customer_id
-        ),
-        customer_payments AS (
-          SELECT customer_id, COALESCE(SUM(CAST(amount AS DECIMAL)), 0) as total
-          FROM payments
-          WHERE customer_id IS NOT NULL AND direction = 'IN'
-          GROUP BY customer_id
-        ),
-        customer_returns AS (
-          SELECT customer_id, COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as total
-          FROM returns
-          WHERE customer_id IS NOT NULL AND return_type = 'sale_return'
-          GROUP BY customer_id
-        ),
-        customer_discounts AS (
-          SELECT customer_id, COALESCE(SUM(CAST(discount_amount AS DECIMAL)), 0) as total
-          FROM discounts
-          WHERE customer_id IS NOT NULL
-          GROUP BY customer_id
-        ),
-        customer_opening AS (
-          SELECT party_id, COALESCE(SUM(CAST(balance_amount AS DECIMAL)), 0) as total
-          FROM opening_balances
-          WHERE party_type = 'customer'
-          GROUP BY party_id
-        )
-        SELECT COALESCE(SUM(
-          COALESCE(co.total, 0) + COALESCE(cs.total, 0) - COALESCE(cp.total, 0) - COALESCE(cr.total, 0) - COALESCE(cd.total, 0)
-        ), 0)::float as total
-        FROM customers c
-        LEFT JOIN customer_opening co ON c.id = co.party_id
-        LEFT JOIN customer_sales cs ON c.id = cs.customer_id
-        LEFT JOIN customer_payments cp ON c.id = cp.customer_id
-        LEFT JOIN customer_returns cr ON c.id = cr.customer_id
-        LEFT JOIN customer_discounts cd ON c.id = cd.customer_id
-        WHERE (COALESCE(co.total, 0) + COALESCE(cs.total, 0) - COALESCE(cp.total, 0) - COALESCE(cr.total, 0) - COALESCE(cd.total, 0)) > 0
-      `);
+          WHERE EXTRACT(MONTH FROM sale_date) = ${month}
+          AND EXTRACT(YEAR FROM sale_date) = ${year}
+        `),
+        // 7. COGS
+        db.execute(sql`
+          SELECT COALESCE(SUM(
+            sli.quantity * COALESCE(CAST(i.landed_cost_kwd AS DECIMAL), CAST(i.purchase_price_kwd AS DECIMAL), 0)
+          ), 0)::float as total
+          FROM sales_order_line_items sli
+          JOIN sales_orders so ON sli.sales_order_id = so.id
+          LEFT JOIN items i ON sli.item_name = i.name
+          WHERE EXTRACT(MONTH FROM so.sale_date) = ${month}
+          AND EXTRACT(YEAR FROM so.sale_date) = ${year}
+        `)
+      ]);
+
+      // Process results
       const totalReceivables = (receivablesResult.rows[0] as { total: number })?.total || 0;
-
-      // 2. Total Payables - Sum of all outstanding supplier balances
-      const payablesResult = await db.execute(sql`
-        WITH supplier_purchases AS (
-          SELECT supplier_id, COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as total
-          FROM purchase_orders
-          WHERE supplier_id IS NOT NULL
-          GROUP BY supplier_id
-        ),
-        supplier_payments AS (
-          SELECT s.id as supplier_id, COALESCE(SUM(CAST(p.amount AS DECIMAL)), 0) as total
-          FROM payments p
-          JOIN suppliers s ON p.party_id = s.id
-          WHERE p.direction = 'OUT'
-          GROUP BY s.id
-        ),
-        supplier_returns AS (
-          SELECT supplier_id, COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as total
-          FROM returns
-          WHERE supplier_id IS NOT NULL AND return_type = 'purchase_return'
-          GROUP BY supplier_id
-        ),
-        supplier_opening AS (
-          SELECT party_id, COALESCE(SUM(CAST(balance_amount AS DECIMAL)), 0) as total
-          FROM opening_balances
-          WHERE party_type = 'supplier'
-          GROUP BY party_id
-        )
-        SELECT COALESCE(SUM(
-          COALESCE(so.total, 0) + COALESCE(sp.total, 0) - COALESCE(spm.total, 0) - COALESCE(sr.total, 0)
-        ), 0)::float as total
-        FROM suppliers s
-        LEFT JOIN supplier_opening so ON s.id = so.party_id
-        LEFT JOIN supplier_purchases sp ON s.id = sp.supplier_id
-        LEFT JOIN supplier_payments spm ON s.id = spm.supplier_id
-        LEFT JOIN supplier_returns sr ON s.id = sr.supplier_id
-        WHERE s.party_type = 'supplier'
-        AND (COALESCE(so.total, 0) + COALESCE(sp.total, 0) - COALESCE(spm.total, 0) - COALESCE(sr.total, 0)) > 0
-      `);
       const totalPayables = (payablesResult.rows[0] as { total: number })?.total || 0;
-
-      // 3. PO Paid but Goods Not Received - Purchase orders with payments but no GRN date
-      const poInTransitResult = await db.execute(sql`
-        SELECT COALESCE(SUM(CAST(po.total_kwd AS DECIMAL)), 0)::float as total
-        FROM purchase_orders po
-        WHERE po.grn_date IS NULL
-        AND EXISTS (
-          SELECT 1 FROM payments p 
-          WHERE p.purchase_order_id = po.id AND p.direction = 'OUT'
-        )
-      `);
       const poInTransit = (poInTransitResult.rows[0] as { total: number })?.total || 0;
-
-      // 4. Stock Value using landed cost
-      const stockValueResult = await db.execute(sql`
-        WITH purchased AS (
-          SELECT pli.item_name, COALESCE(SUM(pli.quantity), 0) as qty
-          FROM purchase_order_line_items pli
-          GROUP BY pli.item_name
-        ),
-        sold AS (
-          SELECT item_name, COALESCE(SUM(quantity), 0) as qty
-          FROM sales_order_line_items
-          GROUP BY item_name
-        ),
-        sale_returns AS (
-          SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
-          FROM return_line_items rl
-          JOIN returns r ON rl.return_id = r.id
-          WHERE r.return_type = 'sale_return'
-          GROUP BY rl.item_name
-        ),
-        purchase_returns AS (
-          SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
-          FROM return_line_items rl
-          JOIN returns r ON rl.return_id = r.id
-          WHERE r.return_type = 'purchase_return'
-          GROUP BY rl.item_name
-        ),
-        opening_stock AS (
-          SELECT i.name as item_name, COALESCE(SUM(ia.quantity), 0) as qty
-          FROM inventory_adjustments ia
-          JOIN items i ON ia.item_id = i.id
-          GROUP BY i.name
-        ),
-        all_items AS (
-          SELECT item_name FROM purchased
-          UNION SELECT item_name FROM sold
-          UNION SELECT item_name FROM sale_returns
-          UNION SELECT item_name FROM purchase_returns
-          UNION SELECT item_name FROM opening_stock
-        ),
-        item_stock AS (
-          SELECT 
-            ai.item_name,
-            (COALESCE(os.qty, 0) + COALESCE(p.qty, 0) - COALESCE(s.qty, 0) + COALESCE(sr.qty, 0) - COALESCE(pr.qty, 0)) as net_qty
-          FROM all_items ai
-          LEFT JOIN purchased p ON ai.item_name = p.item_name
-          LEFT JOIN sold s ON ai.item_name = s.item_name
-          LEFT JOIN sale_returns sr ON ai.item_name = sr.item_name
-          LEFT JOIN purchase_returns pr ON ai.item_name = pr.item_name
-          LEFT JOIN opening_stock os ON ai.item_name = os.item_name
-        )
-        SELECT COALESCE(SUM(
-          GREATEST(ist.net_qty, 0) * COALESCE(CAST(i.landed_cost_kwd AS DECIMAL), CAST(i.purchase_price_kwd AS DECIMAL), 0)
-        ), 0)::float as total
-        FROM item_stock ist
-        LEFT JOIN items i ON ist.item_name = i.name
-      `);
       const stockValue = (stockValueResult.rows[0] as { total: number })?.total || 0;
-
-      // 5 & 6. Cash in Hand and Bank Balances
-      const accountsResult = await db.execute(sql`
-        WITH payment_totals AS (
-          SELECT 
-            payment_type,
-            SUM(CASE WHEN direction = 'IN' THEN CAST(amount AS DECIMAL) ELSE -CAST(amount AS DECIMAL) END) as net
-          FROM payments
-          GROUP BY payment_type
-        ),
-        expense_totals AS (
-          SELECT 
-            a.name as account_name,
-            -SUM(CAST(e.amount AS DECIMAL)) as net
-          FROM expenses e
-          JOIN accounts a ON e.account_id = a.id
-          GROUP BY a.name
-        ),
-        transfer_in AS (
-          SELECT to_account_id as account_id, SUM(CAST(amount AS DECIMAL)) as amount
-          FROM account_transfers
-          GROUP BY to_account_id
-        ),
-        transfer_out AS (
-          SELECT from_account_id as account_id, SUM(CAST(amount AS DECIMAL)) as amount
-          FROM account_transfers
-          GROUP BY from_account_id
-        )
-        SELECT 
-          a.name,
-          (COALESCE(p.net, 0) + COALESCE(e.net, 0) + COALESCE(ti.amount, 0) - COALESCE(tout.amount, 0))::float as balance
-        FROM accounts a
-        LEFT JOIN payment_totals p ON a.name = p.payment_type
-        LEFT JOIN expense_totals e ON a.name = e.account_name
-        LEFT JOIN transfer_in ti ON a.id = ti.account_id
-        LEFT JOIN transfer_out tout ON a.id = tout.account_id
-        ORDER BY a.id
-      `);
       
       let cashInHand = 0;
       let bankBalances = 0;
-      
       for (const row of accountsResult.rows as { name: string; balance: number }[]) {
         if (row.name === 'Cash') {
           cashInHand = row.balance || 0;
@@ -3697,29 +3722,8 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      // 7. Monthly sales
-      const salesResult = await db.execute(sql`
-        SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
-        FROM sales_orders
-        WHERE EXTRACT(MONTH FROM sale_date) = ${month}
-        AND EXTRACT(YEAR FROM sale_date) = ${year}
-      `);
       const totalSales = (salesResult.rows[0] as { total: number })?.total || 0;
-
-      // 8. Cost of Goods Sold for the month (using landed cost)
-      const cogsResult = await db.execute(sql`
-        SELECT COALESCE(SUM(
-          sli.quantity * COALESCE(CAST(i.landed_cost_kwd AS DECIMAL), CAST(i.purchase_price_kwd AS DECIMAL), 0)
-        ), 0)::float as total
-        FROM sales_order_line_items sli
-        JOIN sales_orders so ON sli.sales_order_id = so.id
-        LEFT JOIN items i ON sli.item_name = i.name
-        WHERE EXTRACT(MONTH FROM so.sale_date) = ${month}
-        AND EXTRACT(YEAR FROM so.sale_date) = ${year}
-      `);
       const costOfGoodsSold = (cogsResult.rows[0] as { total: number })?.total || 0;
-
-      // 9. Net Profit = Sales - COGS
       const netProfit = totalSales - costOfGoodsSold;
 
       return {
