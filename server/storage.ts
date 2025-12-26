@@ -4055,20 +4055,31 @@ export class DatabaseStorage implements IStorage {
   async getStockTransfers(): Promise<StockTransferWithDetails[]> {
     const transfers = await db.select().from(stockTransfers).orderBy(desc(stockTransfers.transferDate));
     
-    const result: StockTransferWithDetails[] = [];
-    for (const transfer of transfers) {
-      const fromBranch = await this.getBranch(transfer.fromBranchId);
-      const toBranch = await this.getBranch(transfer.toBranchId);
-      const lineItems = await db.select().from(stockTransferLineItems).where(eq(stockTransferLineItems.stockTransferId, transfer.id));
-      
-      result.push({
-        ...transfer,
-        fromBranch: fromBranch!,
-        toBranch: toBranch!,
-        lineItems,
-      });
+    if (transfers.length === 0) return [];
+
+    // Pre-fetch all branches and line items in bulk to avoid N+1 queries
+    const transferIds = transfers.map(t => t.id);
+    const branchIds = [...new Set([...transfers.map(t => t.fromBranchId), ...transfers.map(t => t.toBranchId)])];
+    
+    const [allBranches, allLineItems] = await Promise.all([
+      db.select().from(branches).where(inArray(branches.id, branchIds)),
+      db.select().from(stockTransferLineItems).where(inArray(stockTransferLineItems.stockTransferId, transferIds)),
+    ]);
+
+    // Create Maps for O(1) lookups
+    const branchMap = new Map(allBranches.map(b => [b.id, b]));
+    const lineItemsByTransfer = new Map<number, typeof allLineItems>();
+    for (const li of allLineItems) {
+      if (!lineItemsByTransfer.has(li.stockTransferId)) lineItemsByTransfer.set(li.stockTransferId, []);
+      lineItemsByTransfer.get(li.stockTransferId)!.push(li);
     }
-    return result;
+
+    return transfers.map(transfer => ({
+      ...transfer,
+      fromBranch: branchMap.get(transfer.fromBranchId)!,
+      toBranch: branchMap.get(transfer.toBranchId)!,
+      lineItems: lineItemsByTransfer.get(transfer.id) || [],
+    }));
   }
 
   async getStockTransfer(id: number): Promise<StockTransferWithDetails | undefined> {
@@ -4113,17 +4124,26 @@ export class DatabaseStorage implements IStorage {
       ? await db.select().from(inventoryAdjustments).where(eq(inventoryAdjustments.branchId, branchId)).orderBy(desc(inventoryAdjustments.effectiveDate))
       : await db.select().from(inventoryAdjustments).orderBy(desc(inventoryAdjustments.effectiveDate));
     
-    const result: InventoryAdjustmentWithDetails[] = [];
-    for (const adjustment of adjustments) {
-      const item = await this.getItem(adjustment.itemId);
-      const branch = await this.getBranch(adjustment.branchId);
-      result.push({
-        ...adjustment,
-        item: item!,
-        branch: branch!,
-      });
-    }
-    return result;
+    if (adjustments.length === 0) return [];
+
+    // Pre-fetch all items and branches in bulk to avoid N+1 queries
+    const itemIds = [...new Set(adjustments.map(a => a.itemId))];
+    const branchIds = [...new Set(adjustments.map(a => a.branchId))];
+    
+    const [allItems, allBranches] = await Promise.all([
+      db.select().from(items).where(inArray(items.id, itemIds)),
+      db.select().from(branches).where(inArray(branches.id, branchIds)),
+    ]);
+
+    // Create Maps for O(1) lookups
+    const itemMap = new Map(allItems.map(i => [i.id, i]));
+    const branchMap = new Map(allBranches.map(b => [b.id, b]));
+
+    return adjustments.map(adjustment => ({
+      ...adjustment,
+      item: itemMap.get(adjustment.itemId)!,
+      branch: branchMap.get(adjustment.branchId)!,
+    }));
   }
 
   async getInventoryAdjustment(id: number): Promise<InventoryAdjustmentWithDetails | undefined> {
@@ -4160,24 +4180,37 @@ export class DatabaseStorage implements IStorage {
       ? await db.select().from(openingBalances).where(eq(openingBalances.branchId, branchId)).orderBy(desc(openingBalances.effectiveDate))
       : await db.select().from(openingBalances).orderBy(desc(openingBalances.effectiveDate));
     
-    const result: OpeningBalanceWithDetails[] = [];
-    for (const balance of balances) {
-      const branch = balance.branchId ? await this.getBranch(balance.branchId) : undefined;
+    if (balances.length === 0) return [];
+
+    // Pre-fetch all branches, customers, and suppliers in bulk to avoid N+1 queries
+    const branchIds = [...new Set(balances.filter(b => b.branchId).map(b => b.branchId!))];
+    const customerIds = [...new Set(balances.filter(b => b.partyType === "customer").map(b => b.partyId))];
+    const supplierIds = [...new Set(balances.filter(b => b.partyType === "supplier").map(b => b.partyId))];
+    
+    const [allBranches, allCustomers, allSuppliers] = await Promise.all([
+      branchIds.length > 0 ? db.select().from(branches).where(inArray(branches.id, branchIds)) : Promise.resolve([]),
+      customerIds.length > 0 ? db.select().from(customers).where(inArray(customers.id, customerIds)) : Promise.resolve([]),
+      supplierIds.length > 0 ? db.select().from(suppliers).where(inArray(suppliers.id, supplierIds)) : Promise.resolve([]),
+    ]);
+
+    // Create Maps for O(1) lookups
+    const branchMap = new Map(allBranches.map(b => [b.id, b]));
+    const customerMap = new Map(allCustomers.map(c => [c.id, c.name]));
+    const supplierMap = new Map(allSuppliers.map(s => [s.id, s.name]));
+
+    return balances.map(balance => {
       let partyName = "";
       if (balance.partyType === "customer") {
-        const customer = await this.getCustomer(balance.partyId);
-        partyName = customer?.name || "Unknown Customer";
+        partyName = customerMap.get(balance.partyId) || "Unknown Customer";
       } else if (balance.partyType === "supplier") {
-        const supplier = await this.getSupplier(balance.partyId);
-        partyName = supplier?.name || "Unknown Supplier";
+        partyName = supplierMap.get(balance.partyId) || "Unknown Supplier";
       }
-      result.push({
+      return {
         ...balance,
-        branch,
+        branch: balance.branchId ? branchMap.get(balance.branchId) : undefined,
         partyName,
-      });
-    }
-    return result;
+      };
+    });
   }
 
   async getOpeningBalance(id: number): Promise<OpeningBalance | undefined> {
@@ -5519,31 +5552,34 @@ export class DatabaseStorage implements IStorage {
       .where(eq(landedCostVouchers.payableStatus, "pending"))
       .orderBy(desc(landedCostVouchers.voucherDate));
 
-    const result: LandedCostVoucherWithDetails[] = [];
-    for (const row of voucherRows) {
-      const lineItemsList = await db.select()
-        .from(landedCostLineItems)
-        .where(eq(landedCostLineItems.voucherId, row.landed_cost_vouchers.id))
-        .orderBy(landedCostLineItems.id);
+    if (voucherRows.length === 0) return [];
 
-      // Fetch partner party separately if exists
-      let partnerParty: Supplier | null = null;
-      if (row.landed_cost_vouchers.partnerPartyId) {
-        const [pp] = await db.select().from(suppliers).where(eq(suppliers.id, row.landed_cost_vouchers.partnerPartyId));
-        partnerParty = pp || null;
-      }
+    // Pre-fetch all data in bulk to avoid N+1 queries
+    const voucherIds = voucherRows.map(v => v.landed_cost_vouchers.id);
+    const partnerPartyIds = [...new Set(voucherRows.filter(v => v.landed_cost_vouchers.partnerPartyId).map(v => v.landed_cost_vouchers.partnerPartyId!))];
+    
+    const [allLineItems, allPartnerParties] = await Promise.all([
+      db.select().from(landedCostLineItems).where(inArray(landedCostLineItems.voucherId, voucherIds)).orderBy(landedCostLineItems.id),
+      partnerPartyIds.length > 0 ? db.select().from(suppliers).where(inArray(suppliers.id, partnerPartyIds)) : Promise.resolve([]),
+    ]);
 
-      result.push({
-        ...row.landed_cost_vouchers,
-        purchaseOrder: row.purchase_orders || null,
-        party: row.suppliers || null,
-        partnerParty,
-        payment: null,
-        partnerPayment: null,
-        lineItems: lineItemsList,
-      });
+    // Create Maps for O(1) lookups
+    const lineItemsByVoucher = new Map<number, typeof allLineItems>();
+    for (const li of allLineItems) {
+      if (!lineItemsByVoucher.has(li.voucherId)) lineItemsByVoucher.set(li.voucherId, []);
+      lineItemsByVoucher.get(li.voucherId)!.push(li);
     }
-    return result;
+    const partnerPartyMap = new Map(allPartnerParties.map(s => [s.id, s]));
+
+    return voucherRows.map(row => ({
+      ...row.landed_cost_vouchers,
+      purchaseOrder: row.purchase_orders || null,
+      party: row.suppliers || null,
+      partnerParty: row.landed_cost_vouchers.partnerPartyId ? partnerPartyMap.get(row.landed_cost_vouchers.partnerPartyId) || null : null,
+      payment: null,
+      partnerPayment: null,
+      lineItems: lineItemsByVoucher.get(row.landed_cost_vouchers.id) || [],
+    }));
   }
 
   async markLandedCostVoucherPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
@@ -5567,31 +5603,34 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(desc(landedCostVouchers.voucherDate));
 
-    const result: LandedCostVoucherWithDetails[] = [];
-    for (const row of voucherRows) {
-      const lineItemsList = await db.select()
-        .from(landedCostLineItems)
-        .where(eq(landedCostLineItems.voucherId, row.landed_cost_vouchers.id))
-        .orderBy(landedCostLineItems.id);
+    if (voucherRows.length === 0) return [];
 
-      // Fetch freight party separately if exists
-      let freightParty: Supplier | null = null;
-      if (row.landed_cost_vouchers.partyId) {
-        const [fp] = await db.select().from(suppliers).where(eq(suppliers.id, row.landed_cost_vouchers.partyId));
-        freightParty = fp || null;
-      }
+    // Pre-fetch all data in bulk to avoid N+1 queries
+    const voucherIds = voucherRows.map(v => v.landed_cost_vouchers.id);
+    const freightPartyIds = [...new Set(voucherRows.filter(v => v.landed_cost_vouchers.partyId).map(v => v.landed_cost_vouchers.partyId!))];
+    
+    const [allLineItems, allFreightParties] = await Promise.all([
+      db.select().from(landedCostLineItems).where(inArray(landedCostLineItems.voucherId, voucherIds)).orderBy(landedCostLineItems.id),
+      freightPartyIds.length > 0 ? db.select().from(suppliers).where(inArray(suppliers.id, freightPartyIds)) : Promise.resolve([]),
+    ]);
 
-      result.push({
-        ...row.landed_cost_vouchers,
-        purchaseOrder: row.purchase_orders || null,
-        party: freightParty,
-        partnerParty: row.suppliers || null,
-        payment: null,
-        partnerPayment: null,
-        lineItems: lineItemsList,
-      });
+    // Create Maps for O(1) lookups
+    const lineItemsByVoucher = new Map<number, typeof allLineItems>();
+    for (const li of allLineItems) {
+      if (!lineItemsByVoucher.has(li.voucherId)) lineItemsByVoucher.set(li.voucherId, []);
+      lineItemsByVoucher.get(li.voucherId)!.push(li);
     }
-    return result;
+    const freightPartyMap = new Map(allFreightParties.map(s => [s.id, s]));
+
+    return voucherRows.map(row => ({
+      ...row.landed_cost_vouchers,
+      purchaseOrder: row.purchase_orders || null,
+      party: row.landed_cost_vouchers.partyId ? freightPartyMap.get(row.landed_cost_vouchers.partyId) || null : null,
+      partnerParty: row.suppliers || null,
+      payment: null,
+      partnerPayment: null,
+      lineItems: lineItemsByVoucher.get(row.landed_cost_vouchers.id) || [],
+    }));
   }
 
   async markPartnerProfitPaid(voucherId: number, paymentId: number): Promise<LandedCostVoucherWithDetails | undefined> {
