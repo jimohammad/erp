@@ -832,7 +832,9 @@ function App() {
             <Route path="/s/:token" component={StockListPage} />
             <Route path="/p/:token" component={PriceListPage} />
             <Route path="/verify/:code" component={VerifyPage} />
-            <Route component={Router} />
+            <Route>
+              <Router />
+            </Route>
           </Switch>
         </Suspense>
       </TooltipProvider>

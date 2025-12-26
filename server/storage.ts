@@ -3236,127 +3236,187 @@ export class DatabaseStorage implements IStorage {
     const currentDate = new Date();
     const currentMonth = currentDate.getMonth() + 1;
     const currentYear = currentDate.getFullYear();
+    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
+    const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
 
-    // Get total stock amount (value in KWD based on purchase prices + opening stock)
-    const stockResult = await db.execute(sql`
-      WITH purchased AS (
-        SELECT item_name, 
-               COALESCE(SUM(quantity), 0) as qty,
-               COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as amount
-        FROM purchase_order_line_items
-        GROUP BY item_name
-      ),
-      sold AS (
-        SELECT item_name, COALESCE(SUM(quantity), 0) as qty
-        FROM sales_order_line_items
-        GROUP BY item_name
-      ),
-      sale_returns AS (
-        SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
-        FROM return_line_items rl
-        JOIN returns r ON rl.return_id = r.id
-        WHERE r.return_type = 'sale_return'
-        GROUP BY rl.item_name
-      ),
-      purchase_returns AS (
-        SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
-        FROM return_line_items rl
-        JOIN returns r ON rl.return_id = r.id
-        WHERE r.return_type = 'purchase_return'
-        GROUP BY rl.item_name
-      ),
-      opening_stock AS (
-        SELECT i.name as item_name, 
-               COALESCE(SUM(ia.quantity), 0) as qty,
-               COALESCE(SUM(ia.quantity * CAST(COALESCE(ia.unit_cost_kwd, '0') AS DECIMAL)), 0) as amount
-        FROM inventory_adjustments ia
-        JOIN items i ON ia.item_id = i.id
-        GROUP BY i.name
-      ),
-      all_items AS (
-        SELECT item_name FROM purchased
-        UNION SELECT item_name FROM sold
-        UNION SELECT item_name FROM sale_returns
-        UNION SELECT item_name FROM purchase_returns
-        UNION SELECT item_name FROM opening_stock
-      ),
-      stock_qty AS (
-        SELECT ai.item_name,
-               COALESCE(os.qty, 0) + COALESCE(p.qty, 0) - COALESCE(s.qty, 0) + COALESCE(sr.qty, 0) - COALESCE(pr.qty, 0) as net_qty,
-               CASE 
-                 WHEN COALESCE(os.qty, 0) + COALESCE(p.qty, 0) > 0 
-                 THEN (COALESCE(os.amount, 0) + COALESCE(p.amount, 0)) / (COALESCE(os.qty, 0) + COALESCE(p.qty, 0))
-                 ELSE 0 
-               END as avg_cost
-        FROM all_items ai
-        LEFT JOIN purchased p ON ai.item_name = p.item_name
-        LEFT JOIN sold s ON ai.item_name = s.item_name
-        LEFT JOIN sale_returns sr ON ai.item_name = sr.item_name
-        LEFT JOIN purchase_returns pr ON ai.item_name = pr.item_name
-        LEFT JOIN opening_stock os ON ai.item_name = os.item_name
-      )
-      SELECT COALESCE(SUM(GREATEST(net_qty, 0) * avg_cost), 0)::float as total
-      FROM stock_qty
-    `);
-    const stockAmount = (stockResult.rows[0] as { total: number })?.total || 0;
-
-    // Get total credit (all IN payments)
-    const creditResult = await db.execute(sql`
-      SELECT COALESCE(SUM(CAST(amount AS DECIMAL)), 0)::float as total
-      FROM payments
-      WHERE direction = 'IN'
-    `);
-    const totalCredit = (creditResult.rows[0] as { total: number })?.total || 0;
-
-    // Get total debit (all OUT payments + expenses)
-    const debitResult = await db.execute(sql`
-      SELECT 
-        COALESCE((SELECT SUM(CAST(amount AS DECIMAL)) FROM payments WHERE direction = 'OUT'), 0) +
-        COALESCE((SELECT SUM(CAST(amount AS DECIMAL)) FROM expenses), 0) as total
-    `);
-    const totalDebit = ((debitResult.rows[0] as { total: number })?.total || 0) as number;
-
-    // Get individual account balances
-    const accountsResult = await db.execute(sql`
-      WITH payment_totals AS (
-        SELECT 
-          payment_type,
-          SUM(CASE WHEN direction = 'IN' THEN CAST(amount AS DECIMAL) ELSE -CAST(amount AS DECIMAL) END) as net
+    // Run ALL queries in parallel for maximum performance
+    const [
+      stockResult,
+      creditResult,
+      debitResult,
+      accountsResult,
+      salesResult,
+      lastMonthSalesResult,
+      purchasesResult,
+      salesTrendResult,
+      purchasesTrendResult,
+      expensesResult
+    ] = await Promise.all([
+      // 1. Stock amount
+      db.execute(sql`
+        WITH purchased AS (
+          SELECT item_name, 
+                 COALESCE(SUM(quantity), 0) as qty,
+                 COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0) as amount
+          FROM purchase_order_line_items
+          GROUP BY item_name
+        ),
+        sold AS (
+          SELECT item_name, COALESCE(SUM(quantity), 0) as qty
+          FROM sales_order_line_items
+          GROUP BY item_name
+        ),
+        sale_returns AS (
+          SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
+          FROM return_line_items rl
+          JOIN returns r ON rl.return_id = r.id
+          WHERE r.return_type = 'sale_return'
+          GROUP BY rl.item_name
+        ),
+        purchase_returns AS (
+          SELECT rl.item_name, COALESCE(SUM(rl.quantity), 0) as qty
+          FROM return_line_items rl
+          JOIN returns r ON rl.return_id = r.id
+          WHERE r.return_type = 'purchase_return'
+          GROUP BY rl.item_name
+        ),
+        opening_stock AS (
+          SELECT i.name as item_name, 
+                 COALESCE(SUM(ia.quantity), 0) as qty,
+                 COALESCE(SUM(ia.quantity * CAST(COALESCE(ia.unit_cost_kwd, '0') AS DECIMAL)), 0) as amount
+          FROM inventory_adjustments ia
+          JOIN items i ON ia.item_id = i.id
+          GROUP BY i.name
+        ),
+        all_items AS (
+          SELECT item_name FROM purchased
+          UNION SELECT item_name FROM sold
+          UNION SELECT item_name FROM sale_returns
+          UNION SELECT item_name FROM purchase_returns
+          UNION SELECT item_name FROM opening_stock
+        ),
+        stock_qty AS (
+          SELECT ai.item_name,
+                 COALESCE(os.qty, 0) + COALESCE(p.qty, 0) - COALESCE(s.qty, 0) + COALESCE(sr.qty, 0) - COALESCE(pr.qty, 0) as net_qty,
+                 CASE 
+                   WHEN COALESCE(os.qty, 0) + COALESCE(p.qty, 0) > 0 
+                   THEN (COALESCE(os.amount, 0) + COALESCE(p.amount, 0)) / (COALESCE(os.qty, 0) + COALESCE(p.qty, 0))
+                   ELSE 0 
+                 END as avg_cost
+          FROM all_items ai
+          LEFT JOIN purchased p ON ai.item_name = p.item_name
+          LEFT JOIN sold s ON ai.item_name = s.item_name
+          LEFT JOIN sale_returns sr ON ai.item_name = sr.item_name
+          LEFT JOIN purchase_returns pr ON ai.item_name = pr.item_name
+          LEFT JOIN opening_stock os ON ai.item_name = os.item_name
+        )
+        SELECT COALESCE(SUM(GREATEST(net_qty, 0) * avg_cost), 0)::float as total
+        FROM stock_qty
+      `),
+      // 2. Total credit
+      db.execute(sql`
+        SELECT COALESCE(SUM(CAST(amount AS DECIMAL)), 0)::float as total
         FROM payments
-        GROUP BY payment_type
-      ),
-      expense_totals AS (
+        WHERE direction = 'IN'
+      `),
+      // 3. Total debit
+      db.execute(sql`
         SELECT 
-          a.name as account_name,
-          -SUM(CAST(e.amount AS DECIMAL)) as net
-        FROM expenses e
-        JOIN accounts a ON e.account_id = a.id
-        GROUP BY a.name
-      ),
-      transfer_in AS (
-        SELECT to_account_id as account_id, SUM(CAST(amount AS DECIMAL)) as amount
-        FROM account_transfers
-        GROUP BY to_account_id
-      ),
-      transfer_out AS (
-        SELECT from_account_id as account_id, SUM(CAST(amount AS DECIMAL)) as amount
-        FROM account_transfers
-        GROUP BY from_account_id
-      )
-      SELECT 
-        a.name,
-        (COALESCE(p.net, 0) + COALESCE(e.net, 0) + COALESCE(ti.amount, 0) - COALESCE(tout.amount, 0))::float as balance
-      FROM accounts a
-      LEFT JOIN payment_totals p ON a.name = p.payment_type
-      LEFT JOIN expense_totals e ON a.name = e.account_name
-      LEFT JOIN transfer_in ti ON a.id = ti.account_id
-      LEFT JOIN transfer_out tout ON a.id = tout.account_id
-      ORDER BY a.id
-    `);
+          COALESCE((SELECT SUM(CAST(amount AS DECIMAL)) FROM payments WHERE direction = 'OUT'), 0) +
+          COALESCE((SELECT SUM(CAST(amount AS DECIMAL)) FROM expenses), 0) as total
+      `),
+      // 4. Account balances
+      db.execute(sql`
+        WITH payment_totals AS (
+          SELECT 
+            payment_type,
+            SUM(CASE WHEN direction = 'IN' THEN CAST(amount AS DECIMAL) ELSE -CAST(amount AS DECIMAL) END) as net
+          FROM payments
+          GROUP BY payment_type
+        ),
+        expense_totals AS (
+          SELECT 
+            a.name as account_name,
+            -SUM(CAST(e.amount AS DECIMAL)) as net
+          FROM expenses e
+          JOIN accounts a ON e.account_id = a.id
+          GROUP BY a.name
+        ),
+        transfer_in AS (
+          SELECT to_account_id as account_id, SUM(CAST(amount AS DECIMAL)) as amount
+          FROM account_transfers
+          GROUP BY to_account_id
+        ),
+        transfer_out AS (
+          SELECT from_account_id as account_id, SUM(CAST(amount AS DECIMAL)) as amount
+          FROM account_transfers
+          GROUP BY from_account_id
+        )
+        SELECT 
+          a.name,
+          (COALESCE(p.net, 0) + COALESCE(e.net, 0) + COALESCE(ti.amount, 0) - COALESCE(tout.amount, 0))::float as balance
+        FROM accounts a
+        LEFT JOIN payment_totals p ON a.name = p.payment_type
+        LEFT JOIN expense_totals e ON a.name = e.account_name
+        LEFT JOIN transfer_in ti ON a.id = ti.account_id
+        LEFT JOIN transfer_out tout ON a.id = tout.account_id
+        ORDER BY a.id
+      `),
+      // 5. Current month sales
+      db.execute(sql`
+        SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
+        FROM sales_orders
+        WHERE EXTRACT(MONTH FROM sale_date) = ${currentMonth}
+        AND EXTRACT(YEAR FROM sale_date) = ${currentYear}
+      `),
+      // 6. Last month sales
+      db.execute(sql`
+        SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
+        FROM sales_orders
+        WHERE EXTRACT(MONTH FROM sale_date) = ${lastMonth}
+        AND EXTRACT(YEAR FROM sale_date) = ${lastMonthYear}
+      `),
+      // 7. Current month purchases
+      db.execute(sql`
+        SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
+        FROM purchase_orders
+        WHERE EXTRACT(MONTH FROM purchase_date) = ${currentMonth}
+        AND EXTRACT(YEAR FROM purchase_date) = ${currentYear}
+      `),
+      // 8. Sales trend
+      db.execute(sql`
+        SELECT 
+          date_trunc('day', sale_date)::date as day,
+          COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
+        FROM sales_orders
+        WHERE sale_date >= CURRENT_DATE - INTERVAL '6 days'
+        GROUP BY date_trunc('day', sale_date)
+        ORDER BY day
+      `),
+      // 9. Purchases trend
+      db.execute(sql`
+        SELECT 
+          date_trunc('day', purchase_date)::date as day,
+          COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
+        FROM purchase_orders
+        WHERE purchase_date >= CURRENT_DATE - INTERVAL '6 days'
+        GROUP BY date_trunc('day', purchase_date)
+        ORDER BY day
+      `),
+      // 10. Total expenses
+      db.execute(sql`
+        SELECT COALESCE(SUM(CAST(amount AS DECIMAL)), 0)::float as total
+        FROM expenses
+      `)
+    ]);
+
+    // Process results
+    const stockAmount = (stockResult.rows[0] as { total: number })?.total || 0;
+    const totalCredit = (creditResult.rows[0] as { total: number })?.total || 0;
+    const totalDebit = ((debitResult.rows[0] as { total: number })?.total || 0) as number;
     
     let cashBalance = 0;
     let bankAccountsBalance = 0;
-    
     for (const row of accountsResult.rows as { name: string; balance: number }[]) {
       if (row.name === 'Cash') {
         cashBalance = row.balance || 0;
@@ -3365,45 +3425,11 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    // Get current month sales
-    const salesResult = await db.execute(sql`
-      SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
-      FROM sales_orders
-      WHERE EXTRACT(MONTH FROM sale_date) = ${currentMonth}
-      AND EXTRACT(YEAR FROM sale_date) = ${currentYear}
-    `);
     const monthlySales = (salesResult.rows[0] as { total: number })?.total || 0;
-
-    // Get last month sales for comparison
-    const lastMonth = currentMonth === 1 ? 12 : currentMonth - 1;
-    const lastMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
-    const lastMonthSalesResult = await db.execute(sql`
-      SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
-      FROM sales_orders
-      WHERE EXTRACT(MONTH FROM sale_date) = ${lastMonth}
-      AND EXTRACT(YEAR FROM sale_date) = ${lastMonthYear}
-    `);
     const lastMonthSales = (lastMonthSalesResult.rows[0] as { total: number })?.total || 0;
-
-    // Get current month purchases
-    const purchasesResult = await db.execute(sql`
-      SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
-      FROM purchase_orders
-      WHERE EXTRACT(MONTH FROM purchase_date) = ${currentMonth}
-      AND EXTRACT(YEAR FROM purchase_date) = ${currentYear}
-    `);
     const monthlyPurchases = (purchasesResult.rows[0] as { total: number })?.total || 0;
 
-    // Get 7-day sales trend
-    const salesTrendResult = await db.execute(sql`
-      SELECT 
-        date_trunc('day', sale_date)::date as day,
-        COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
-      FROM sales_orders
-      WHERE sale_date >= CURRENT_DATE - INTERVAL '6 days'
-      GROUP BY date_trunc('day', sale_date)
-      ORDER BY day
-    `);
+    // Process sales trend
     const salesTrendMap = new Map<string, number>();
     for (const row of salesTrendResult.rows as { day: string; total: number }[]) {
       salesTrendMap.set(row.day, row.total);
@@ -3416,16 +3442,7 @@ export class DatabaseStorage implements IStorage {
       salesTrend.push(salesTrendMap.get(dateStr) || 0);
     }
 
-    // Get 7-day purchases trend
-    const purchasesTrendResult = await db.execute(sql`
-      SELECT 
-        date_trunc('day', purchase_date)::date as day,
-        COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
-      FROM purchase_orders
-      WHERE purchase_date >= CURRENT_DATE - INTERVAL '6 days'
-      GROUP BY date_trunc('day', purchase_date)
-      ORDER BY day
-    `);
+    // Process purchases trend
     const purchasesTrendMap = new Map<string, number>();
     for (const row of purchasesTrendResult.rows as { day: string; total: number }[]) {
       purchasesTrendMap.set(row.day, row.total);
@@ -3438,11 +3455,6 @@ export class DatabaseStorage implements IStorage {
       purchasesTrend.push(purchasesTrendMap.get(dateStr) || 0);
     }
 
-    // Get total expenses
-    const expensesResult = await db.execute(sql`
-      SELECT COALESCE(SUM(CAST(amount AS DECIMAL)), 0)::float as total
-      FROM expenses
-    `);
     const totalExpenses = (expensesResult.rows[0] as { total: number })?.total || 0;
 
     return { stockAmount, totalCredit, totalDebit, cashBalance, bankAccountsBalance, monthlySales, lastMonthSales, monthlyPurchases, salesTrend, purchasesTrend, totalExpenses };
