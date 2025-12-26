@@ -3755,132 +3755,150 @@ export class DatabaseStorage implements IStorage {
     const searchPattern = `%${query.trim()}%`;
     const results: { type: string; id: number; title: string; subtitle: string; url: string }[] = [];
 
-    // Search customers
-    const customerResults = await db.execute(sql`
-      SELECT id, name, phone FROM customers 
-      WHERE name ILIKE ${searchPattern} OR phone ILIKE ${searchPattern}
-      LIMIT 5
-    `);
+    // Run all searches in parallel for much better performance
+    const [
+      customerResults,
+      supplierResults,
+      itemResults,
+      salesResults,
+      purchaseResults,
+      paymentResults,
+      salesmenResults,
+      imeiResults,
+      purchaseImeiResults,
+      expenseResults,
+      returnsResults,
+      accountResults,
+    ] = await Promise.all([
+      // Search customers
+      db.execute(sql`
+        SELECT id, name, phone FROM customers 
+        WHERE name ILIKE ${searchPattern} OR phone ILIKE ${searchPattern}
+        LIMIT 5
+      `).catch(() => ({ rows: [] })),
+      
+      // Search suppliers (excluding salesmen which are searched separately)
+      db.execute(sql`
+        SELECT id, name, phone FROM suppliers 
+        WHERE type != 'salesman' AND (name ILIKE ${searchPattern} OR phone ILIKE ${searchPattern})
+        LIMIT 5
+      `).catch(() => ({ rows: [] })),
+      
+      // Search items
+      db.execute(sql`
+        SELECT id, name FROM items 
+        WHERE name ILIKE ${searchPattern}
+        LIMIT 5
+      `).catch(() => ({ rows: [] })),
+      
+      // Search sales orders by invoice number
+      db.execute(sql`
+        SELECT so.id, so.invoice_number, c.name as customer_name
+        FROM sales_orders so
+        LEFT JOIN customers c ON so.customer_id = c.id
+        WHERE so.invoice_number ILIKE ${searchPattern}
+        LIMIT 5
+      `).catch(() => ({ rows: [] })),
+      
+      // Search purchase orders by invoice number
+      db.execute(sql`
+        SELECT po.id, po.invoice_number, s.name as supplier_name
+        FROM purchase_orders po
+        LEFT JOIN suppliers s ON po.supplier_id = s.id
+        WHERE po.invoice_number ILIKE ${searchPattern}
+        LIMIT 5
+      `).catch(() => ({ rows: [] })),
+      
+      // Search payments by reference
+      db.execute(sql`
+        SELECT id, reference, payment_type FROM payments 
+        WHERE reference ILIKE ${searchPattern}
+        LIMIT 5
+      `).catch(() => ({ rows: [] })),
+      
+      // Search salesmen (stored in suppliers table with type = 'salesman')
+      db.execute(sql`
+        SELECT id, name, phone FROM suppliers 
+        WHERE type = 'salesman' AND (name ILIKE ${searchPattern} OR phone ILIKE ${searchPattern})
+        LIMIT 5
+      `).catch(() => ({ rows: [] })),
+      
+      // Search IMEI numbers in sales line items
+      db.execute(sql`
+        SELECT sli.id, sli.imei, sli.item_name, so.invoice_number
+        FROM sales_order_line_items sli
+        JOIN sales_orders so ON sli.sales_order_id = so.id
+        WHERE sli.imei ILIKE ${searchPattern}
+        LIMIT 5
+      `).catch(() => ({ rows: [] })),
+      
+      // Search IMEI in purchase line items
+      db.execute(sql`
+        SELECT pli.id, pli.imei, pli.item_name, po.invoice_number
+        FROM purchase_order_line_items pli
+        JOIN purchase_orders po ON pli.purchase_order_id = po.id
+        WHERE pli.imei ILIKE ${searchPattern}
+        LIMIT 5
+      `).catch(() => ({ rows: [] })),
+      
+      // Search expenses by description or category
+      db.execute(sql`
+        SELECT id, description, category FROM expenses 
+        WHERE description ILIKE ${searchPattern} OR category ILIKE ${searchPattern}
+        LIMIT 5
+      `).catch(() => ({ rows: [] })),
+      
+      // Search returns by invoice number
+      db.execute(sql`
+        SELECT r.id, r.invoice_number, r.return_type
+        FROM returns r
+        WHERE r.invoice_number ILIKE ${searchPattern}
+        LIMIT 5
+      `).catch(() => ({ rows: [] })),
+      
+      // Search accounts by name
+      db.execute(sql`
+        SELECT id, name, account_type FROM accounts 
+        WHERE name ILIKE ${searchPattern}
+        LIMIT 5
+      `).catch(() => ({ rows: [] })),
+    ]);
+
+    // Process results
     for (const row of customerResults.rows as { id: number; name: string; phone: string | null }[]) {
       results.push({ type: 'Customer', id: row.id, title: row.name, subtitle: row.phone || '', url: '/parties' });
     }
-
-    // Search suppliers
-    const supplierResults = await db.execute(sql`
-      SELECT id, name, phone FROM suppliers 
-      WHERE name ILIKE ${searchPattern} OR phone ILIKE ${searchPattern}
-      LIMIT 5
-    `);
     for (const row of supplierResults.rows as { id: number; name: string; phone: string | null }[]) {
       results.push({ type: 'Supplier', id: row.id, title: row.name, subtitle: row.phone || '', url: '/parties' });
     }
-
-    // Search items
-    const itemResults = await db.execute(sql`
-      SELECT id, name FROM items 
-      WHERE name ILIKE ${searchPattern}
-      LIMIT 5
-    `);
     for (const row of itemResults.rows as { id: number; name: string }[]) {
       results.push({ type: 'Item', id: row.id, title: row.name, subtitle: '', url: '/items' });
     }
-
-    // Search sales orders by invoice number
-    const salesResults = await db.execute(sql`
-      SELECT so.id, so.invoice_number, c.name as customer_name
-      FROM sales_orders so
-      LEFT JOIN customers c ON so.customer_id = c.id
-      WHERE so.invoice_number ILIKE ${searchPattern}
-      LIMIT 5
-    `);
     for (const row of salesResults.rows as { id: number; invoice_number: string; customer_name: string | null }[]) {
       results.push({ type: 'Sale', id: row.id, title: `Invoice: ${row.invoice_number}`, subtitle: row.customer_name || '', url: '/sales' });
     }
-
-    // Search purchase orders by invoice number
-    const purchaseResults = await db.execute(sql`
-      SELECT po.id, po.invoice_number, s.name as supplier_name
-      FROM purchase_orders po
-      LEFT JOIN suppliers s ON po.supplier_id = s.id
-      WHERE po.invoice_number ILIKE ${searchPattern}
-      LIMIT 5
-    `);
     for (const row of purchaseResults.rows as { id: number; invoice_number: string; supplier_name: string | null }[]) {
       results.push({ type: 'Purchase', id: row.id, title: `Invoice: ${row.invoice_number}`, subtitle: row.supplier_name || '', url: '/' });
     }
-
-    // Search payments by reference
-    const paymentResults = await db.execute(sql`
-      SELECT id, reference, payment_type FROM payments 
-      WHERE reference ILIKE ${searchPattern}
-      LIMIT 5
-    `);
     for (const row of paymentResults.rows as { id: number; reference: string | null; payment_type: string }[]) {
       results.push({ type: 'Payment', id: row.id, title: row.reference || 'Payment', subtitle: row.payment_type, url: '/payments' });
     }
-
-    // Search salesmen (stored in suppliers table with type = 'salesman')
-    const salesmenResults = await db.execute(sql`
-      SELECT id, name, phone FROM suppliers 
-      WHERE type = 'salesman' AND (name ILIKE ${searchPattern} OR phone ILIKE ${searchPattern})
-      LIMIT 5
-    `);
     for (const row of salesmenResults.rows as { id: number; name: string; phone: string | null }[]) {
       results.push({ type: 'Salesman', id: row.id, title: row.name, subtitle: row.phone || '', url: '/parties' });
     }
-
-    // Search IMEI numbers in sales line items
-    const imeiResults = await db.execute(sql`
-      SELECT sli.id, sli.imei, sli.item_name, so.invoice_number
-      FROM sales_order_line_items sli
-      JOIN sales_orders so ON sli.sales_order_id = so.id
-      WHERE sli.imei ILIKE ${searchPattern}
-      LIMIT 5
-    `);
     for (const row of imeiResults.rows as { id: number; imei: string; item_name: string; invoice_number: string }[]) {
       results.push({ type: 'IMEI', id: row.id, title: row.imei, subtitle: `${row.item_name} - ${row.invoice_number}`, url: '/imei-history' });
     }
-
-    // Search IMEI in purchase line items
-    const purchaseImeiResults = await db.execute(sql`
-      SELECT pli.id, pli.imei, pli.item_name, po.invoice_number
-      FROM purchase_order_line_items pli
-      JOIN purchase_orders po ON pli.purchase_order_id = po.id
-      WHERE pli.imei ILIKE ${searchPattern}
-      LIMIT 5
-    `);
     for (const row of purchaseImeiResults.rows as { id: number; imei: string; item_name: string; invoice_number: string }[]) {
       results.push({ type: 'IMEI (Purchase)', id: row.id, title: row.imei, subtitle: `${row.item_name} - ${row.invoice_number}`, url: '/imei-history' });
     }
-
-    // Search expenses by description or category
-    const expenseResults = await db.execute(sql`
-      SELECT id, description, category FROM expenses 
-      WHERE description ILIKE ${searchPattern} OR category ILIKE ${searchPattern}
-      LIMIT 5
-    `);
     for (const row of expenseResults.rows as { id: number; description: string; category: string }[]) {
       results.push({ type: 'Expense', id: row.id, title: row.description, subtitle: row.category, url: '/expenses' });
     }
-
-    // Search returns by invoice number
-    const returnsResults = await db.execute(sql`
-      SELECT r.id, r.invoice_number, r.return_type
-      FROM returns r
-      WHERE r.invoice_number ILIKE ${searchPattern}
-      LIMIT 5
-    `);
     for (const row of returnsResults.rows as { id: number; invoice_number: string; return_type: string }[]) {
       const typeLabel = row.return_type === 'sale_return' ? 'Sale Return' : 'Purchase Return';
       results.push({ type: typeLabel, id: row.id, title: `Return: ${row.invoice_number}`, subtitle: '', url: '/returns' });
     }
-
-    // Search accounts by name
-    const accountResults = await db.execute(sql`
-      SELECT id, name, account_type FROM accounts 
-      WHERE name ILIKE ${searchPattern}
-      LIMIT 5
-    `);
     for (const row of accountResults.rows as { id: number; name: string; account_type: string }[]) {
       results.push({ type: 'Account', id: row.id, title: row.name, subtitle: row.account_type, url: '/accounts' });
     }
