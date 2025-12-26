@@ -25,7 +25,7 @@ export default function SalesPage() {
     mutationFn: (data: { name: string; creditLimit?: string }) => 
       apiRequest("POST", "/api/customers", { 
         name: data.name, 
-        creditLimit: data.creditLimit || null 
+        creditLimit: data.creditLimit ?? null 
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
@@ -40,7 +40,7 @@ export default function SalesPage() {
     mutationFn: ({ id, data }: { id: number; data: { name: string; creditLimit?: string } }) =>
       apiRequest("PUT", `/api/customers/${id}`, { 
         name: data.name, 
-        creditLimit: data.creditLimit || null 
+        creditLimit: data.creditLimit ?? null 
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/customers"] });
@@ -82,7 +82,7 @@ export default function SalesPage() {
           .map(item => ({
             itemName: item.itemName,
             quantity: item.quantity,
-            priceKwd: item.priceKwd || null,
+            priceKwd: item.priceKwd ?? null,
             totalKwd: item.totalKwd,
             imeiNumbers: item.imeiNumbers,
           })),

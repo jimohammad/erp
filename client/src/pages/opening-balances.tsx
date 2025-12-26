@@ -221,7 +221,7 @@ export default function OpeningBalances() {
       itemId: parseInt(stockItemId),
       branchId: parseInt(stockBranchId),
       quantity: parseInt(stockQuantity),
-      unitCostKwd: stockUnitCost || null,
+      unitCostKwd: stockUnitCost ?? null,
       effectiveDate: stockEffectiveDate,
       adjustmentType: "opening",
       notes: stockNotes || null,

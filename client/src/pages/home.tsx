@@ -61,8 +61,8 @@ export default function Home() {
         supplierId: formData.supplierId,
         totalKwd: formData.totalKwd,
         fxCurrency: formData.fxCurrency,
-        fxRate: formData.fxRate || null,
-        totalFx: formData.totalFx || null,
+        fxRate: formData.fxRate ?? null,
+        totalFx: formData.totalFx ?? null,
         grnDate: formData.grnDate || null,
         invoiceFilePath,
         deliveryNoteFilePath,
@@ -72,8 +72,8 @@ export default function Home() {
           .map(item => ({
             itemName: item.itemName,
             quantity: item.quantity,
-            priceKwd: item.priceKwd || null,
-            fxPrice: item.fxPrice || null,
+            priceKwd: item.priceKwd ?? null,
+            fxPrice: item.fxPrice ?? null,
             totalKwd: item.totalKwd,
           })),
       };
