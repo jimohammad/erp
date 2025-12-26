@@ -414,8 +414,7 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
   const uploadFile = async (file: File): Promise<string | null> => {
     if (!file) return null;
     try {
-      const response = await apiRequest("POST", "/api/objects/upload");
-      const { uploadURL } = response as { uploadURL: string };
+      const { uploadURL } = await apiRequest<{ uploadURL: string }>("POST", "/api/objects/upload");
 
       await fetch(uploadURL, {
         method: "PUT",
@@ -423,8 +422,8 @@ export default function PODraftForm({ editingPO, onEditComplete }: PODraftFormPr
         headers: { "Content-Type": file.type },
       });
 
-      const updateResponse = await apiRequest("PUT", "/api/files/uploaded", { uploadURL });
-      return (updateResponse as { objectPath: string }).objectPath;
+      const { objectPath } = await apiRequest<{ objectPath: string }>("PUT", "/api/files/uploaded", { uploadURL });
+      return objectPath;
     } catch (error) {
       console.error("Upload failed:", error);
       return null;

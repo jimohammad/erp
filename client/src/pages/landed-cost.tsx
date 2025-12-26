@@ -1454,7 +1454,7 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
       if (!numberRes.ok) throw new Error("Failed to get settlement number");
       const { number: settlementNumber } = await numberRes.json();
       
-      const createRes = await apiRequest("POST", "/api/party-settlements", {
+      const settlement = await apiRequest<{ id: number }>("POST", "/api/party-settlements", {
         settlementNumber,
         partyType,
         partyId: data.partyId,
@@ -1466,14 +1466,10 @@ function MonthlySettlementsDialog({ onClose }: MonthlySettlementsDialogProps) {
         status: "pending",
       });
       
-      const settlement = await createRes.json();
-      
-      const finalizeRes = await apiRequest("POST", `/api/party-settlements/${settlement.id}/finalize`, {
+      return await apiRequest("POST", `/api/party-settlements/${settlement.id}/finalize`, {
         accountId,
         notes,
       });
-      
-      return finalizeRes.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/party-settlements"] });
