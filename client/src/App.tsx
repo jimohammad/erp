@@ -78,7 +78,6 @@ const VerifyPage = lazy(() => import("@/pages/verify"));
 const AllTransactionsPage = lazy(() => import("@/pages/all-transactions"));
 const CustomerAgingPage = lazy(() => import("@/pages/customer-aging"));
 const SendPriceListPage = lazy(() => import("@/pages/send-price-list"));
-const InvoicePrintingPage = lazy(() => import("@/pages/invoice-printing"));
 const SalesmanAnalysisPage = lazy(() => import("@/pages/salesman-analysis"));
 const ChequeRegisterPage = lazy(() => import("@/pages/cheque-register"));
 const FinancialStandingPage = lazy(() => import("@/pages/financial-standing"));
@@ -215,7 +214,6 @@ function AppSidebar() {
   const reportsSubItems = [
     { title: "Financial Standing", url: "/financial-standing" },
     { title: "General Reports", url: "/reports" },
-    { title: "Invoice Printing", url: "/reports/invoice-printing" },
     { title: "Salesman Analysis", url: "/reports/salesman-analysis" },
     { title: "Customer Aging", url: "/reports/customer-aging" },
     { title: "Party Statement", url: "/reports/party-statement" },
@@ -767,7 +765,6 @@ function AuthenticatedLayout() {
                 <Route path="/reports/customer-statement" component={CustomerStatementPage} />
                 <Route path="/all-transactions" component={AllTransactionsPage} />
                 <Route path="/reports/customer-aging" component={CustomerAgingPage} />
-                <Route path="/reports/invoice-printing" component={InvoicePrintingPage} />
                 <Route path="/reports/salesman-analysis" component={SalesmanAnalysisPage} />
                 <Route path="/send-price-list" component={SendPriceListPage} />
                 <Route path="/settings/users" component={UserManagementPage} />
