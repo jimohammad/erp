@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -167,15 +167,33 @@ export default function ChequeRegister() {
     return "-";
   };
 
-  const stats = {
-    total: cheques.length,
-    pending: cheques.filter(c => c.status === "pending").length,
-    cleared: cheques.filter(c => c.status === "cleared").length,
-    bounced: cheques.filter(c => c.status === "bounced").length,
-    pendingAmount: cheques.filter(c => c.status === "pending").reduce((sum, c) => sum + parseFloat(c.payment?.amount || "0"), 0),
-    clearedAmount: cheques.filter(c => c.status === "cleared").reduce((sum, c) => sum + parseFloat(c.payment?.amount || "0"), 0),
-    bouncedAmount: cheques.filter(c => c.status === "bounced").reduce((sum, c) => sum + parseFloat(c.payment?.amount || "0"), 0),
-  };
+  const stats = useMemo(() => {
+    return cheques.reduce(
+      (acc, c) => {
+        const amount = parseFloat(c.payment?.amount || "0");
+        if (c.status === "pending") {
+          acc.pending++;
+          acc.pendingAmount += amount;
+        } else if (c.status === "cleared") {
+          acc.cleared++;
+          acc.clearedAmount += amount;
+        } else if (c.status === "bounced") {
+          acc.bounced++;
+          acc.bouncedAmount += amount;
+        }
+        return acc;
+      },
+      {
+        total: cheques.length,
+        pending: 0,
+        cleared: 0,
+        bounced: 0,
+        pendingAmount: 0,
+        clearedAmount: 0,
+        bouncedAmount: 0,
+      }
+    );
+  }, [cheques]);
 
   return (
     <div className="flex-1 overflow-auto p-6 space-y-6">

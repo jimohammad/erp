@@ -1000,18 +1000,29 @@ export async function registerRoutes(
     try {
       const today = new Date().toISOString().split("T")[0];
       const allPayments = await storage.getPayments({ limit: 10000, offset: 0 });
-      const todayPaymentsIn = allPayments.data.filter(
-        (p: any) => p.direction === "IN" && p.paymentDate === today
-      );
       
-      const total = todayPaymentsIn.reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0);
-      const byType = {
-        Cash: todayPaymentsIn.filter((p: any) => p.paymentType === "Cash").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0),
-        "NBK Bank": todayPaymentsIn.filter((p: any) => p.paymentType === "NBK Bank").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0),
-        "CBK Bank": todayPaymentsIn.filter((p: any) => p.paymentType === "CBK Bank").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0),
-        Knet: todayPaymentsIn.filter((p: any) => p.paymentType === "Knet").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0),
-        Wamd: todayPaymentsIn.filter((p: any) => p.paymentType === "Wamd").reduce((sum: number, p: any) => sum + parseFloat(p.amount), 0),
-      };
+      const { total, byType } = allPayments.data.reduce(
+        (acc: { total: number; byType: Record<string, number> }, p: any) => {
+          if (p.direction === "IN" && p.paymentDate === today) {
+            const amount = parseFloat(p.amount);
+            acc.total += amount;
+            if (p.paymentType in acc.byType) {
+              acc.byType[p.paymentType] += amount;
+            }
+          }
+          return acc;
+        },
+        {
+          total: 0,
+          byType: {
+            Cash: 0,
+            "NBK Bank": 0,
+            "CBK Bank": 0,
+            Knet: 0,
+            Wamd: 0,
+          },
+        }
+      );
       
       res.json({ total, byType, date: today });
     } catch (error) {
