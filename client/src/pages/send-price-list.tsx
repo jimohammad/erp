@@ -89,8 +89,7 @@ export default function SendPriceList() {
   // Stock List mutations
   const generateStockListMutation = useMutation({
     mutationFn: async (pin: string) => {
-      const res = await apiRequest("POST", "/api/settings/stock-list/generate", { pin });
-      return await res.json();
+      return await apiRequest("POST", "/api/settings/stock-list/generate", { pin });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/stock-list"] });
@@ -111,8 +110,7 @@ export default function SendPriceList() {
 
   const revokeStockListMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("DELETE", "/api/settings/stock-list");
-      return await res.json();
+      return await apiRequest("DELETE", "/api/settings/stock-list");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/stock-list"] });
@@ -134,8 +132,7 @@ export default function SendPriceList() {
   // Price List mutations
   const generatePriceListMutation = useMutation({
     mutationFn: async (pin: string) => {
-      const res = await apiRequest("POST", "/api/settings/price-list/generate", { pin });
-      return await res.json();
+      return await apiRequest("POST", "/api/settings/price-list/generate", { pin });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/price-list"] });
@@ -156,8 +153,7 @@ export default function SendPriceList() {
 
   const revokePriceListMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("DELETE", "/api/settings/price-list");
-      return await res.json();
+      return await apiRequest("DELETE", "/api/settings/price-list");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/price-list"] });

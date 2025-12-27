@@ -38,8 +38,7 @@ export default function Landing() {
 
   const loginMutation = useMutation({
     mutationFn: async (data: LoginFormData & { totpCode?: string }) => {
-      const response = await apiRequest("POST", "/api/login", data);
-      return response.json();
+      return await apiRequest<{ requiresTOTP?: boolean }>("POST", "/api/login", data);
     },
     onSuccess: (response) => {
       // Check if TOTP is required

@@ -59,7 +59,7 @@ export async function createBackup(): Promise<{ success: boolean; filename?: str
       storage.getAllPayments(),
       storage.getExpenses(),
       storage.getExpenseCategories(),
-      storage.getReturns(),
+      storage.getReturns().then(r => r.data),
       storage.getAllReturnLineItems(),
       storage.getBranches(),
       storage.getAllUsers(),

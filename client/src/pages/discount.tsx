@@ -71,8 +71,7 @@ export default function DiscountPage() {
 
   const createDiscountMutation = useMutation({
     mutationFn: async (data: { customerId: number; salesOrderId: number; discountAmount: string; notes?: string }) => {
-      const response = await apiRequest("POST", "/api/discounts", data);
-      return response.json();
+      return await apiRequest<DiscountWithDetails>("POST", "/api/discounts", data);
     },
     onSuccess: (discount: DiscountWithDetails) => {
       // Invalidate all related queries for real-time updates

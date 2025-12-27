@@ -50,8 +50,7 @@ export default function SalesmanStatementPage() {
 
   const verifyMutation = useMutation({
     mutationFn: async (pinCode: string) => {
-      const response = await apiRequest("POST", `/api/public/salesman-statement/${token}/verify`, { pin: pinCode });
-      return response.json();
+      return await apiRequest<StatementData>("POST", `/api/public/salesman-statement/${token}/verify`, { pin: pinCode });
     },
     onSuccess: (data: StatementData) => {
       setStatementData(data);

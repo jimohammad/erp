@@ -89,8 +89,7 @@ export default function ChequeRegister() {
     mutationFn: async ({ id, status, bounceReason }: { id: number; status: string; bounceReason?: string }) => {
       const body: Record<string, unknown> = { status };
       if (bounceReason) body.bounceReason = bounceReason;
-      const res = await apiRequest("PUT", `/api/cheques/${id}/status`, body);
-      return res.json();
+      return await apiRequest("PUT", `/api/cheques/${id}/status`, body);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: (query) => String(query.queryKey[0]).startsWith("/api/cheques") });

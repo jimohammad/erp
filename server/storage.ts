@@ -173,7 +173,7 @@ export interface IStorage {
   getSuppliers(): Promise<Supplier[]>;
   getSupplier(id: number): Promise<Supplier | undefined>;
   createSupplier(supplier: InsertSupplier): Promise<Supplier>;
-  updateSupplier(id: number, supplier: InsertSupplier): Promise<Supplier | undefined>;
+  updateSupplier(id: number, supplier: Partial<InsertSupplier>): Promise<Supplier | undefined>;
   deleteSupplier(id: number): Promise<{ deleted: boolean; error?: string }>;
 
   getItems(): Promise<Item[]>;
@@ -256,7 +256,7 @@ export interface IStorage {
   deleteExpense(id: number): Promise<boolean>;
 
   // Returns Module
-  getReturns(): Promise<ReturnWithDetails[]>;
+  getReturns(options?: { limit?: number; offset?: number }): Promise<{ data: ReturnWithDetails[]; total: number }>;
   getReturn(id: number): Promise<ReturnWithDetails | undefined>;
   createReturn(returnData: InsertReturn, lineItems: Omit<InsertReturnLineItem, 'returnId'>[]): Promise<ReturnWithDetails>;
   deleteReturn(id: number): Promise<boolean>;
@@ -436,7 +436,7 @@ export class DatabaseStorage implements IStorage {
 
   async upsertUser(userData: UpsertUser): Promise<User> {
     // First check by ID
-    const existingUser = await this.getUser(userData.id);
+    const existingUser = userData.id ? await this.getUser(userData.id) : undefined;
     
     if (existingUser) {
       const [user] = await db
@@ -445,8 +445,8 @@ export class DatabaseStorage implements IStorage {
           ...userData,
           role: existingUser.role,
           updatedAt: new Date(),
-        })
-        .where(eq(users.id, userData.id))
+        } as any)
+        .where(eq(users.id, userData.id!))
         .returning();
       return user;
     }
@@ -639,7 +639,7 @@ export class DatabaseStorage implements IStorage {
     return newSupplier;
   }
 
-  async updateSupplier(id: number, supplier: InsertSupplier): Promise<Supplier | undefined> {
+  async updateSupplier(id: number, supplier: Partial<InsertSupplier>): Promise<Supplier | undefined> {
     const [updated] = await db.update(suppliers).set(supplier).where(eq(suppliers.id, id)).returning();
     return updated || undefined;
   }
@@ -1107,7 +1107,7 @@ export class DatabaseStorage implements IStorage {
       // Calculate outstanding credit using the pre-fetched balance map
       let outstandingCredit = 0;
       const customerIdSet = new Set(customerOrders.map(o => o.customerId).filter(Boolean));
-      for (const custId of customerIdSet) {
+      for (const custId of Array.from(customerIdSet)) {
         const balance = balanceMap.get(custId as number);
         if (balance && balance > 0) {
           outstandingCredit += balance;
@@ -1213,7 +1213,7 @@ export class DatabaseStorage implements IStorage {
       // Get outstanding credit using pre-fetched balance map
       const customerIdSet2 = new Set(allSalesData.map(o => o.customerId).filter(Boolean));
       let outstandingCredit = 0;
-      for (const custId of customerIdSet2) {
+      for (const custId of Array.from(customerIdSet2)) {
         const balance = balanceMap.get(custId as number);
         if (balance && balance > 0) {
           outstandingCredit += balance;
@@ -2603,7 +2603,7 @@ export class DatabaseStorage implements IStorage {
         ...item,
         returnId: newReturn.id,
       }));
-      await db.insert(returnLineItems).values(lineItemsWithReturnId);
+      await db.insert(returnLineItems).values(lineItemsWithReturnId as any);
     }
     
     return this.getReturn(newReturn.id) as Promise<ReturnWithDetails>;
@@ -3101,42 +3101,6 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async getCustomerCurrentBalance(customerId: number): Promise<number> {
-    const result = await db.execute(sql`
-      WITH opening_balance AS (
-        SELECT COALESCE(CAST(balance_amount AS DECIMAL), 0)::float as balance
-        FROM opening_balances
-        WHERE party_type = 'customer' AND party_id = ${customerId}
-        LIMIT 1
-      ),
-      all_sales AS (
-        SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
-        FROM sales_orders WHERE customer_id = ${customerId}
-      ),
-      all_payments AS (
-        SELECT COALESCE(SUM(CAST(amount AS DECIMAL)), 0)::float as total
-        FROM payments WHERE customer_id = ${customerId} AND direction = 'IN'
-      ),
-      all_returns AS (
-        SELECT COALESCE(SUM(CAST(total_kwd AS DECIMAL)), 0)::float as total
-        FROM returns WHERE customer_id = ${customerId} AND return_type = 'sale_return'
-      ),
-      all_discounts AS (
-        SELECT COALESCE(SUM(CAST(discount_amount AS DECIMAL)), 0)::float as total
-        FROM discounts WHERE customer_id = ${customerId}
-      )
-      SELECT (
-        COALESCE((SELECT balance FROM opening_balance), 0) +
-        COALESCE((SELECT total FROM all_sales), 0) -
-        COALESCE((SELECT total FROM all_payments), 0) -
-        COALESCE((SELECT total FROM all_returns), 0) -
-        COALESCE((SELECT total FROM all_discounts), 0)
-      )::float as balance
-    `);
-    const row = result.rows[0] as { balance: number } | undefined;
-    return row?.balance || 0;
-  }
-
   async getAllCustomerBalances(): Promise<{ customerId: number; balance: number }[]> {
     const result = await db.execute(sql`
       SELECT 
@@ -3169,10 +3133,10 @@ export class DatabaseStorage implements IStorage {
       conditions.push(sql`${salesOrders.invoiceNumber} ILIKE ${'%' + filters.invoiceNumber + '%'}`);
     }
     if (filters.dateFrom) {
-      conditions.push(gte(salesOrders.invoiceDate, filters.dateFrom));
+      conditions.push(gte(salesOrders.saleDate, filters.dateFrom));
     }
     if (filters.dateTo) {
-      conditions.push(lte(salesOrders.invoiceDate, filters.dateTo));
+      conditions.push(lte(salesOrders.saleDate, filters.dateTo));
     }
 
     const query = db.select({
@@ -3180,13 +3144,13 @@ export class DatabaseStorage implements IStorage {
       itemName: salesOrderLineItems.itemName,
       customerName: customers.name,
       invoiceNumber: salesOrders.invoiceNumber,
-      saleDate: salesOrders.invoiceDate,
+      saleDate: salesOrders.saleDate,
     })
     .from(salesOrderLineItems)
     .innerJoin(salesOrders, eq(salesOrderLineItems.salesOrderId, salesOrders.id))
     .innerJoin(customers, eq(salesOrders.customerId, customers.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(salesOrders.invoiceDate));
+    .orderBy(desc(salesOrders.saleDate));
 
     const results = await query;
 
@@ -4107,7 +4071,7 @@ export class DatabaseStorage implements IStorage {
     }));
 
     if (lineItemsWithId.length > 0) {
-      await db.insert(stockTransferLineItems).values(lineItemsWithId);
+      await db.insert(stockTransferLineItems).values(lineItemsWithId as any);
     }
 
     return (await this.getStockTransfer(newTransfer.id))!;
@@ -4264,7 +4228,7 @@ export class DatabaseStorage implements IStorage {
       const lineItems = await db.select().from(purchaseOrderDraftItems).where(eq(purchaseOrderDraftItems.purchaseOrderDraftId, pod.id));
       result.push({
         ...pod,
-        supplier,
+        supplier: supplier || null,
         lineItems,
       });
     }
@@ -4280,7 +4244,7 @@ export class DatabaseStorage implements IStorage {
 
     return {
       ...pod,
-      supplier,
+      supplier: supplier || null,
       lineItems,
     };
   }
@@ -4293,7 +4257,7 @@ export class DatabaseStorage implements IStorage {
       const [insertedItem] = await db.insert(purchaseOrderDraftItems).values({
         ...item,
         purchaseOrderDraftId: newPod.id,
-      }).returning();
+      } as any).returning();
       insertedLineItems.push(insertedItem);
     }
 
@@ -4301,7 +4265,7 @@ export class DatabaseStorage implements IStorage {
 
     return {
       ...newPod,
-      supplier,
+      supplier: supplier || null,
       lineItems: insertedLineItems,
     };
   }
@@ -4320,7 +4284,7 @@ export class DatabaseStorage implements IStorage {
         await db.insert(purchaseOrderDraftItems).values({
           ...item,
           purchaseOrderDraftId: id,
-        });
+        } as any);
       }
     }
 
@@ -4992,7 +4956,7 @@ export class DatabaseStorage implements IStorage {
 
   async createAuditLog(data: InsertAuditTrail): Promise<AuditTrail> {
     const [audit] = await db.insert(auditTrail)
-      .values(data)
+      .values(data as any)
       .returning();
     return audit;
   }
@@ -5065,7 +5029,7 @@ export class DatabaseStorage implements IStorage {
     const changedFields: string[] = [];
     const allKeys = new Set([...Object.keys(previousData), ...Object.keys(newData)]);
     
-    for (const key of allKeys) {
+    for (const key of Array.from(allKeys)) {
       if (JSON.stringify(previousData[key]) !== JSON.stringify(newData[key])) {
         changedFields.push(key);
       }
@@ -5144,7 +5108,7 @@ export class DatabaseStorage implements IStorage {
     const paymentMap = new Map(allPayments.map(p => [p.id, p]));
     const poSupplierMap = new Map(allPOSuppliers.map(s => [s.id, s]));
     
-    const poLineItemsByPO = new Map<number, typeof allPOLineItems>();
+    const poLineItemsByPO = new Map<number, (typeof allPOLineItems)[number][]>();
     for (const pli of allPOLineItems) {
       if (!poLineItemsByPO.has(pli.purchaseOrderId)) poLineItemsByPO.set(pli.purchaseOrderId, []);
       poLineItemsByPO.get(pli.purchaseOrderId)!.push(pli);
@@ -5568,10 +5532,15 @@ export class DatabaseStorage implements IStorage {
     return voucherRows.map(row => ({
       ...row.landed_cost_vouchers,
       purchaseOrder: row.purchase_orders || null,
+      purchaseOrders: [],
       party: row.suppliers || null,
+      dxbKwiParty: null,
       partnerParty: row.landed_cost_vouchers.partnerPartyId ? partnerPartyMap.get(row.landed_cost_vouchers.partnerPartyId) || null : null,
+      packingParty: null,
       payment: null,
+      dxbKwiPayment: null,
       partnerPayment: null,
+      packingPayment: null,
       lineItems: lineItemsByVoucher.get(row.landed_cost_vouchers.id) || [],
     }));
   }
@@ -5619,10 +5588,15 @@ export class DatabaseStorage implements IStorage {
     return voucherRows.map(row => ({
       ...row.landed_cost_vouchers,
       purchaseOrder: row.purchase_orders || null,
+      purchaseOrders: [],
       party: row.landed_cost_vouchers.partyId ? freightPartyMap.get(row.landed_cost_vouchers.partyId) || null : null,
+      dxbKwiParty: null,
       partnerParty: row.suppliers || null,
+      packingParty: null,
       payment: null,
+      dxbKwiPayment: null,
       partnerPayment: null,
+      packingPayment: null,
       lineItems: lineItemsByVoucher.get(row.landed_cost_vouchers.id) || [],
     }));
   }
@@ -5700,7 +5674,7 @@ export class DatabaseStorage implements IStorage {
       ...row.party_settlements,
       party: row.suppliers || null,
       payment: row.payments || null,
-      expense: row.expenses ? { ...row.expenses, category: null, account: null, branch: null, createdByUser: null } : null,
+      expense: row.expenses ? { ...row.expenses, category: null, account: null, branch: null, createdByUser: null } as ExpenseWithDetails : null,
       account: row.accounts || null,
     };
   }
@@ -5799,9 +5773,9 @@ export class DatabaseStorage implements IStorage {
       // Convert to result format
       const result: { partyId: number; partyName: string; voucherCount: number; totalAmountKwd: number; vouchers: LandedCostVoucherWithDetails[] }[] = [];
 
-      for (const [partyId, group] of groupedMap.entries()) {
+      for (const [partyId, group] of Array.from(groupedMap.entries())) {
         const vouchersWithDetails: LandedCostVoucherWithDetails[] = [];
-        for (const [voucherId, data] of group.voucherData.entries()) {
+        for (const [voucherId, data] of Array.from(group.voucherData.entries())) {
           const lineItemsList = await db.select()
             .from(landedCostLineItems)
             .where(eq(landedCostLineItems.voucherId, voucherId));
@@ -5880,7 +5854,7 @@ export class DatabaseStorage implements IStorage {
     // Convert to result format
     const result: { partyId: number; partyName: string; voucherCount: number; totalAmountKwd: number; vouchers: LandedCostVoucherWithDetails[] }[] = [];
     
-    for (const [partyId, group] of groupedMap.entries()) {
+    for (const [partyId, group] of Array.from(groupedMap.entries())) {
       const vouchersWithDetails: LandedCostVoucherWithDetails[] = [];
       for (const v of group.vouchers) {
         const lineItemsList = await db.select()
@@ -5892,9 +5866,11 @@ export class DatabaseStorage implements IStorage {
           purchaseOrder: null,
           purchaseOrders: [],
           party: null,
+          dxbKwiParty: null,
           partnerParty: partyType === "partner" ? v.suppliers || null : null,
           packingParty: partyType === "packing" ? v.suppliers || null : null,
           payment: null,
+          dxbKwiPayment: null,
           partnerPayment: null,
           packingPayment: null,
           lineItems: lineItemsList,
@@ -5937,10 +5913,10 @@ export class DatabaseStorage implements IStorage {
     const result = await db.transaction(async (tx) => {
       // Create outgoing payment
       const [payment] = await tx.insert(payments).values({
-        partyId: settlement.partyId,
+        supplierId: settlement.partyId,
         amount: settlement.totalAmountKwd,
         direction: "OUT",
-        accountId,
+        paymentType: "Cash",
         paymentDate: new Date().toISOString().split("T")[0],
         notes: notes || `Monthly settlement ${settlement.settlementNumber} for ${settlement.partyType} - ${settlement.settlementPeriod}`,
         branchId: 1,
@@ -5953,7 +5929,7 @@ export class DatabaseStorage implements IStorage {
           ? "Packing Charges" 
           : "Freight Charges";
       const [expense] = await tx.insert(expenses).values({
-        date: new Date().toISOString().split("T")[0],
+        expenseDate: new Date().toISOString().split("T")[0],
         categoryId: null,
         description: `${expenseDescription} Settlement - ${settlement.settlementPeriod}`,
         amount: settlement.totalAmountKwd,
