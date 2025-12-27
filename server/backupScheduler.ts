@@ -40,7 +40,7 @@ export async function createBackup(): Promise<{ success: boolean; filename?: str
       payments,
       expenses,
       expenseCategories,
-      returns,
+      returnsResult,
       returnLineItems,
       branches,
       users,
@@ -88,7 +88,7 @@ export async function createBackup(): Promise<{ success: boolean; filename?: str
     addSheet(payments, "Payments");
     addSheet(expenses, "Expenses");
     addSheet(expenseCategories, "ExpenseCategories");
-    addSheet(returns, "Returns");
+    addSheet(returnsResult.data, "Returns");
     addSheet(returnLineItems, "ReturnLineItems");
     addSheet(branches, "Branches");
     addSheet(users.map(u => ({ id: u.id, email: u.email, firstName: u.firstName, lastName: u.lastName, role: u.role })), "Users");
