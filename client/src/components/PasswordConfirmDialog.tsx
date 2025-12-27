@@ -39,8 +39,7 @@ export function PasswordConfirmDialog({
 
   const verifyMutation = useMutation({
     mutationFn: async (pwd: string) => {
-      const res = await apiRequest("POST", "/api/settings/verify-transaction-password", { password: pwd });
-      return await res.json();
+      return await apiRequest<{ valid: boolean }>("POST", "/api/settings/verify-transaction-password", { password: pwd });
     },
     onSuccess: (data) => {
       if (data.valid) {

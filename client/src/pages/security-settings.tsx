@@ -44,8 +44,7 @@ export default function SecuritySettingsPage() {
 
   const setPasswordMutation = useMutation({
     mutationFn: async (password: string) => {
-      const res = await apiRequest("POST", "/api/settings/transaction-password", { password });
-      return await res.json();
+      return await apiRequest("POST", "/api/settings/transaction-password", { password });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/transaction-password-status"] });
@@ -67,8 +66,7 @@ export default function SecuritySettingsPage() {
 
   const removePasswordMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("DELETE", "/api/settings/transaction-password");
-      return await res.json();
+      return await apiRequest("DELETE", "/api/settings/transaction-password");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings/transaction-password-status"] });
@@ -109,8 +107,7 @@ export default function SecuritySettingsPage() {
 
   const enableTotpMutation = useMutation({
     mutationFn: async (code: string) => {
-      const res = await apiRequest("POST", "/api/totp/enable", { code });
-      return await res.json();
+      return await apiRequest("POST", "/api/totp/enable", { code });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/totp/status"] });
@@ -132,8 +129,7 @@ export default function SecuritySettingsPage() {
 
   const disableTotpMutation = useMutation({
     mutationFn: async (code: string) => {
-      const res = await apiRequest("POST", "/api/totp/disable", { code });
-      return await res.json();
+      return await apiRequest("POST", "/api/totp/disable", { code });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/totp/status"] });

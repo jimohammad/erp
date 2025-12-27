@@ -60,6 +60,7 @@ interface PODraftLineItem {
   priceKwd: string | null;
   fxPrice: string | null;
   totalKwd: string | null;
+  imeiNumbers: string[] | null;
 }
 
 interface PurchaseOrderDraft {

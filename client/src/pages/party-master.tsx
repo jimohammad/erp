@@ -224,8 +224,7 @@ export default function PartyMaster() {
 
   const settlementMutation = useMutation({
     mutationFn: async (id: number) => {
-      const response = await apiRequest("POST", `/api/salesmen/${id}/settle`);
-      return response.json();
+      return await apiRequest("POST", `/api/salesmen/${id}/settle`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/suppliers"] });
@@ -239,8 +238,7 @@ export default function PartyMaster() {
 
   const statementAccessMutation = useMutation({
     mutationFn: async ({ id, pin }: { id: number; pin: string }) => {
-      const response = await apiRequest("POST", `/api/salesmen/${id}/generate-statement-access`, { pin });
-      return response.json();
+      return await apiRequest<{ success: boolean; token: string; statementUrl: string }>("POST", `/api/salesmen/${id}/generate-statement-access`, { pin });
     },
     onSuccess: (data: { success: boolean; token: string; statementUrl: string }) => {
       const fullUrl = `${window.location.origin}/salesman-statement/${data.token}`;

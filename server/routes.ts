@@ -132,7 +132,7 @@ async function createAuditLog(
     
     const changedFields = storage.getChangedFields(previousData, newData);
     
-    const auditData: InsertAuditTrail = {
+    const auditData = {
       module,
       action,
       recordId,
@@ -147,7 +147,7 @@ async function createAuditLog(
       ipAddress: req.ip || req.headers['x-forwarded-for'] || null,
       userAgent: req.headers['user-agent'] || null,
       notes,
-    };
+    } as InsertAuditTrail;
     
     await storage.createAuditLog(auditData);
   } catch (error) {
@@ -2106,16 +2106,16 @@ export async function registerRoutes(
       
       // Create audit log entry
       await storage.createAuditLog({
-        userId: userId || 0,
-        action: 'CREATE',
-        entityType: 'discount',
-        entityId: discount.id,
-        newValues: JSON.stringify({
+        userId: userId?.toString() || null,
+        action: 'create',
+        module: 'discount',
+        recordId: discount.id,
+        newData: {
           customerId: discount.customerId,
           salesOrderId: discount.salesOrderId,
           discountAmount: discount.discountAmount,
           notes: discount.notes,
-        }),
+        },
       });
       
       invalidateDashboardCache();
@@ -2162,16 +2162,16 @@ export async function registerRoutes(
       // Create audit log entry for deletion
       const userId = req.user?.id;
       await storage.createAuditLog({
-        userId: userId || 0,
-        action: 'DELETE',
-        entityType: 'discount',
-        entityId: id,
-        previousValues: JSON.stringify({
+        userId: userId?.toString() || null,
+        action: 'delete',
+        module: 'discount',
+        recordId: id,
+        previousData: {
           customerId: discount.customerId,
           salesOrderId: discount.salesOrderId,
           discountAmount: discount.discountAmount,
           notes: discount.notes,
-        }),
+        },
       });
       
       invalidateDashboardCache();
@@ -3427,10 +3427,9 @@ export async function registerRoutes(
         paymentDate: paymentDate || new Date().toISOString().split("T")[0],
         paymentType: paymentType || "cash",
         amount,
-        direction: "out",
-        partyId,
+        direction: "OUT",
+        supplierId: partyId,
         reference: paymentReference || null,
-        accountId: accountId || null,
         notes: description,
         createdBy: (req as any).user?.id || null,
       });

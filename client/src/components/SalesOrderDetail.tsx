@@ -69,8 +69,7 @@ export function SalesOrderDetail({
 
   const sendWhatsAppMutation = useMutation({
     mutationFn: async (data: { salesOrderId: number; phoneNumber: string }) => {
-      const res = await apiRequest("POST", "/api/whatsapp/send-invoice", data);
-      return res.json();
+      return await apiRequest("POST", "/api/whatsapp/send-invoice", data);
     },
     onSuccess: () => {
       toast({

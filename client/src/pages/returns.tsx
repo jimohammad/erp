@@ -224,8 +224,7 @@ export default function ReturnsPage() {
           imeiNumbers: item.imeiNumbers,
         })),
       };
-      const response = await apiRequest("POST", "/api/returns", payload);
-      return response.json();
+      return await apiRequest<ReturnWithDetails>("POST", "/api/returns", payload);
     },
     onSuccess: async (savedReturn: ReturnWithDetails) => {
       // Invalidate all related queries for real-time updates

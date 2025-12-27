@@ -26,7 +26,7 @@ export interface VerificationRecord {
 
 async function createVerificationRecord(data: QRCodeData): Promise<VerificationRecord | null> {
   try {
-    const response = await apiRequest('POST', '/api/verification/create', {
+    return await apiRequest<VerificationRecord>('POST', '/api/verification/create', {
       documentType: data.type,
       documentId: data.id,
       documentNumber: data.number,
@@ -35,7 +35,6 @@ async function createVerificationRecord(data: QRCodeData): Promise<VerificationR
       partyName: data.partyName || null,
       partyType: data.partyType || null,
     });
-    return response.json();
   } catch (error) {
     console.error('Failed to create verification record:', error);
     return null;

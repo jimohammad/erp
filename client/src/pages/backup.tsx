@@ -23,8 +23,7 @@ export default function BackupPage() {
 
   const createBackupMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/backup/create");
-      return res.json();
+      return await apiRequest<{ filename: string }>("POST", "/api/backup/create");
     },
     onSuccess: (data) => {
       toast({
